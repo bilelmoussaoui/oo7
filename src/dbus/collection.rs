@@ -35,7 +35,7 @@ impl<'a> Collection<'a> {
         P: TryInto<ObjectPath<'a>>,
         P::Error: Into<zbus::Error>,
     {
-        let mut collections = Vec::with_capacity(paths.len());
+        let mut collections = Vec::with_capacity(paths.capacity());
         for path in paths.into_iter() {
             collections.push(Self::new(connection, path).await?);
         }

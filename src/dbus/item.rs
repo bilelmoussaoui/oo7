@@ -30,7 +30,7 @@ impl<'a> Item<'a> {
         P: TryInto<ObjectPath<'a>>,
         P::Error: Into<zbus::Error>,
     {
-        let mut items = Vec::with_capacity(paths.len());
+        let mut items = Vec::with_capacity(paths.capacity());
         for path in paths.into_iter() {
             items.push(Self::new(connection, path).await?);
         }
