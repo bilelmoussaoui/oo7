@@ -2,16 +2,17 @@ use std::{collections::HashMap, time::Duration};
 
 use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 
-use crate::{Item, Result, DESTINATION};
+use crate::{Item, Result, DESTINATION, Prompt};
 
 #[derive(Debug)]
 pub struct Collection<'a>(zbus::Proxy<'a>);
 
 impl<'a> Collection<'a> {
-    pub async fn new(
-        connection: &zbus::Connection,
-        object_path: ObjectPath<'a>,
-    ) -> Result<Collection<'a>> {
+    pub async fn new<P>(connection: &zbus::Connection, object_path: P) -> Result<Collection<'a>>
+    where
+        P: TryInto<ObjectPath<'a>>,
+        P::Error: Into<zbus::Error>,
+    {
         let inner = zbus::ProxyBuilder::new_bare(connection)
             .interface("org.freedesktop.Secret.Collection")?
             .path(object_path)?
@@ -22,6 +23,20 @@ impl<'a> Collection<'a> {
     }
     pub fn inner(&self) -> &zbus::Proxy {
         &self.0
+    }
+
+    pub async fn items(&self) -> Result<Vec<Item<'_>>> {
+        let item_paths = self
+            .inner()
+            .get_property::<Vec<ObjectPath>>("Items")
+            .await?;
+        let mut items = Vec::with_capacity(item_paths.capacity());
+        let cnx = self.inner().connection();
+        for path in item_paths {
+            let item = Item::new(cnx, path).await?;
+            items.push(item);
+        }
+        Ok(items)
     }
 
     pub async fn label(&self) -> Result<String> {
@@ -46,6 +61,21 @@ impl<'a> Collection<'a> {
         Ok(Duration::from_secs(time))
     }
 
+    pub async fn delete(&self) -> Result<Option<Prompt<'_>>> {
+        let prompt_path = self
+            .inner()
+            .call_method("Delete", &())
+            .await?
+            .body::<zbus::zvariant::OwnedObjectPath>()?;
+
+        if prompt_path.as_str() != "/" {
+            let prompt = Prompt::new(self.inner().connection(), prompt_path).await?;
+            Ok(Some(prompt))
+        } else {
+            Ok(None)
+        }
+    }
+    
     pub async fn search_items(&self, attributes: HashMap<&str, &str>) -> Result<Vec<Item<'_>>> {
         let msg = self
             .inner()
@@ -54,9 +84,9 @@ impl<'a> Collection<'a> {
         let item_paths = msg.body::<Vec<OwnedObjectPath>>()?;
         let mut items = Vec::with_capacity(item_paths.capacity());
 
-        let connection = self.inner().connection();
+        let cnx = self.inner().connection();
         for path in item_paths {
-            items.push(Item::new(connection, path).await?);
+            items.push(Item::new(cnx, path).await?);
         }
 
         Ok(items)

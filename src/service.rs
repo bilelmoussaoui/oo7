@@ -26,8 +26,9 @@ impl<'a> Service<'a> {
             .get_property::<Vec<ObjectPath>>("Collections")
             .await?;
         let mut collections = Vec::with_capacity(collections_paths.capacity());
+        let cnx = self.inner().connection();
         for path in collections_paths {
-            let collection = Collection::new(self.inner().connection(), path).await?;
+            let collection = Collection::new(cnx, path).await?;
             collections.push(collection);
         }
         Ok(collections)

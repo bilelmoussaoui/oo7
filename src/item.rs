@@ -1,16 +1,17 @@
 use std::{collections::HashMap, time::Duration};
 
 use crate::{Prompt, Result, DESTINATION};
-use zbus::zvariant::OwnedObjectPath;
+use zbus::zvariant::ObjectPath;
 
 #[derive(Debug)]
 pub struct Item<'a>(zbus::Proxy<'a>);
 
 impl<'a> Item<'a> {
-    pub async fn new(
-        connection: &zbus::Connection,
-        object_path: OwnedObjectPath,
-    ) -> Result<Item<'a>> {
+    pub async fn new<P>(connection: &zbus::Connection, object_path: P) -> Result<Item<'a>>
+    where
+        P: TryInto<ObjectPath<'a>>,
+        P::Error: Into<zbus::Error>,
+    {
         let inner = zbus::ProxyBuilder::new_bare(connection)
             .interface("org.freedesktop.Secret.Item")?
             .path(object_path)?
