@@ -70,7 +70,7 @@ impl<'a> Service<'a> {
             // A prompt is needed
             Ok((
                 None,
-                Some(Prompt::new(self.inner().connection(), prompt_path).await?),
+                Prompt::new(self.inner().connection(), prompt_path).await?,
             ))
         }
     }
@@ -108,11 +108,7 @@ impl<'a> Service<'a> {
             .await?
             .body::<(Vec<OwnedObjectPath>, OwnedObjectPath)>()?;
         let cnx = self.inner().connection();
-        let prompt = if prompt_path.as_str() == "/" {
-            None
-        } else {
-            Some(Prompt::new(cnx, prompt_path).await?)
-        };
+        let prompt = Prompt::new(cnx, prompt_path).await?;
 
         let mut unlocked_items = Vec::with_capacity(unlocked_item_paths.capacity());
         for path in unlocked_item_paths {
@@ -128,11 +124,8 @@ impl<'a> Service<'a> {
             .await?
             .body::<(Vec<OwnedObjectPath>, OwnedObjectPath)>()?;
         let cnx = self.inner().connection();
-        let prompt = if prompt_path.as_str() == "/" {
-            None
-        } else {
-            Some(Prompt::new(cnx, prompt_path).await?)
-        };
+
+        let prompt = Prompt::new(cnx, prompt_path).await?;
 
         let mut locked_items = Vec::with_capacity(locked_item_paths.capacity());
         for path in locked_item_paths {

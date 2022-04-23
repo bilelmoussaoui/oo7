@@ -76,13 +76,7 @@ impl<'a> Collection<'a> {
             .call_method("Delete", &())
             .await?
             .body::<zbus::zvariant::OwnedObjectPath>()?;
-
-        if prompt_path.as_str() != "/" {
-            let prompt = Prompt::new(self.inner().connection(), prompt_path).await?;
-            Ok(Some(prompt))
-        } else {
-            Ok(None)
-        }
+        Prompt::new(self.inner().connection(), prompt_path).await
     }
 
     pub async fn search_items(&self, attributes: HashMap<&str, &str>) -> Result<Vec<Item<'_>>> {
@@ -124,7 +118,7 @@ impl<'a> Collection<'a> {
             // A prompt is needed
             Ok((
                 None,
-                Some(Prompt::new(self.inner().connection(), prompt_path).await?),
+                Prompt::new(self.inner().connection(), prompt_path).await?,
             ))
         }
     }

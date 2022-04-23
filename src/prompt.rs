@@ -6,18 +6,23 @@ use zbus::zvariant::ObjectPath;
 pub struct Prompt<'a>(zbus::Proxy<'a>);
 
 impl<'a> Prompt<'a> {
-    pub async fn new<P>(connection: &zbus::Connection, object_path: P) -> Result<Prompt<'a>>
+    pub async fn new<P>(connection: &zbus::Connection, object_path: P) -> Result<Option<Prompt<'a>>>
     where
         P: TryInto<ObjectPath<'a>>,
         P::Error: Into<zbus::Error>,
     {
-        let inner = zbus::ProxyBuilder::new_bare(connection)
-            .interface("org.freedesktop.Secret.Prompt")?
-            .path(object_path)?
-            .destination(DESTINATION)?
-            .build()
-            .await?;
-        Ok(Self(inner))
+        let path = object_path.try_into().map_err(Into::into)?;
+        if path.as_str() != "/" {
+            let inner = zbus::ProxyBuilder::new_bare(connection)
+                .interface("org.freedesktop.Secret.Prompt")?
+                .path(path)?
+                .destination(DESTINATION)?
+                .build()
+                .await?;
+            Ok(Some(Self(inner)))
+        } else {
+            Ok(None)
+        }
     }
 
     pub fn inner(&self) -> &zbus::Proxy {

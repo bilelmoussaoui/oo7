@@ -77,13 +77,7 @@ impl<'a> Item<'a> {
             .call_method("Delete", &())
             .await?
             .body::<zbus::zvariant::OwnedObjectPath>()?;
-
-        if prompt_path.as_str() != "/" {
-            let prompt = Prompt::new(self.inner().connection(), prompt_path).await?;
-            Ok(Some(prompt))
-        } else {
-            Ok(None)
-        }
+        Prompt::new(self.inner().connection(), prompt_path).await
     }
 
     #[doc(alias = "GetSecret")]
