@@ -22,6 +22,21 @@ impl<'a> Item<'a> {
         Ok(Self(inner))
     }
 
+    pub(crate) async fn from_paths<P>(
+        connection: &zbus::Connection,
+        paths: Vec<P>,
+    ) -> Result<Vec<Item<'a>>>
+    where
+        P: TryInto<ObjectPath<'a>>,
+        P::Error: Into<zbus::Error>,
+    {
+        let mut items = Vec::with_capacity(paths.len());
+        for path in paths.into_iter() {
+            items.push(Self::new(connection, path).await?);
+        }
+        Ok(items)
+    }
+
     pub fn inner(&self) -> &zbus::Proxy {
         &self.0
     }

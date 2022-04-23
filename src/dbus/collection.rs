@@ -22,8 +22,24 @@ impl<'a> Collection<'a> {
             .await?;
         Ok(Self(inner))
     }
+
     pub fn inner(&self) -> &zbus::Proxy {
         &self.0
+    }
+
+    pub(crate) async fn from_paths<P>(
+        connection: &zbus::Connection,
+        paths: Vec<P>,
+    ) -> Result<Vec<Collection<'a>>>
+    where
+        P: TryInto<ObjectPath<'a>>,
+        P::Error: Into<zbus::Error>,
+    {
+        let mut collections = Vec::with_capacity(paths.len());
+        for path in paths.into_iter() {
+            collections.push(Self::new(connection, path).await?);
+        }
+        Ok(collections)
     }
 
     pub async fn items(&self) -> Result<Vec<Item<'_>>> {
@@ -31,13 +47,7 @@ impl<'a> Collection<'a> {
             .inner()
             .get_property::<Vec<ObjectPath>>("Items")
             .await?;
-        let mut items = Vec::with_capacity(item_paths.capacity());
-        let cnx = self.inner().connection();
-        for path in item_paths {
-            let item = Item::new(cnx, path).await?;
-            items.push(item);
-        }
-        Ok(items)
+        Item::from_paths(self.inner().connection(), item_paths).await
     }
 
     pub async fn label(&self) -> Result<String> {
@@ -84,15 +94,9 @@ impl<'a> Collection<'a> {
             .inner()
             .call_method("SearchItems", &(attributes))
             .await?;
+
         let item_paths = msg.body::<Vec<OwnedObjectPath>>()?;
-        let mut items = Vec::with_capacity(item_paths.capacity());
-
-        let cnx = self.inner().connection();
-        for path in item_paths {
-            items.push(Item::new(cnx, path).await?);
-        }
-
-        Ok(items)
+        Item::from_paths(self.inner().connection(), item_paths).await
     }
 
     pub async fn create_item(

@@ -29,13 +29,7 @@ impl<'a> Service<'a> {
             .inner()
             .get_property::<Vec<ObjectPath>>("Collections")
             .await?;
-        let mut collections = Vec::with_capacity(collections_paths.capacity());
-        let cnx = self.inner().connection();
-        for path in collections_paths {
-            let collection = Collection::new(cnx, path).await?;
-            collections.push(collection);
-        }
-        Ok(collections)
+        Collection::from_paths(self.inner().connection(), collections_paths).await
     }
 
     #[doc(alias = "OpenSession")]
@@ -100,19 +94,10 @@ impl<'a> Service<'a> {
             .call_method("SearchItems", &(attributes))
             .await?
             .body::<(Vec<OwnedObjectPath>, Vec<OwnedObjectPath>)>()?;
-
-        let mut unlocked_items = Vec::with_capacity(unlocked_item_paths.capacity());
-        let mut locked_items = Vec::with_capacity(locked_item_paths.capacity());
-
         let cnx = self.inner().connection();
 
-        for path in unlocked_item_paths {
-            unlocked_items.push(Item::new(cnx, path).await?);
-        }
-
-        for path in locked_item_paths {
-            locked_items.push(Item::new(cnx, path).await?);
-        }
+        let unlocked_items = Item::from_paths(cnx, unlocked_item_paths).await?;
+        let locked_items = Item::from_paths(cnx, locked_item_paths).await?;
 
         Ok((unlocked_items, locked_items))
     }
@@ -124,12 +109,9 @@ impl<'a> Service<'a> {
             .await?
             .body::<(Vec<OwnedObjectPath>, OwnedObjectPath)>()?;
         let cnx = self.inner().connection();
-        let prompt = Prompt::new(cnx, prompt_path).await?;
 
-        let mut unlocked_items = Vec::with_capacity(unlocked_item_paths.capacity());
-        for path in unlocked_item_paths {
-            unlocked_items.push(Item::new(cnx, path).await?);
-        }
+        let prompt = Prompt::new(cnx, prompt_path).await?;
+        let unlocked_items = Item::from_paths(cnx, unlocked_item_paths).await?;
         Ok((unlocked_items, prompt))
     }
 
@@ -142,11 +124,7 @@ impl<'a> Service<'a> {
         let cnx = self.inner().connection();
 
         let prompt = Prompt::new(cnx, prompt_path).await?;
-
-        let mut locked_items = Vec::with_capacity(locked_item_paths.capacity());
-        for path in locked_item_paths {
-            locked_items.push(Item::new(cnx, path).await?);
-        }
+        let locked_items = Item::from_paths(cnx, locked_item_paths).await?;
         Ok((locked_items, prompt))
     }
 
