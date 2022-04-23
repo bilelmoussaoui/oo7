@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt;
 
 use zbus::zvariant::{Array, ObjectPath, OwnedObjectPath, OwnedValue, Value};
 
@@ -193,5 +194,13 @@ impl<'a> Service<'a> {
             .call_method("SetAlias", &(name, collection))
             .await?;
         Ok(())
+    }
+}
+
+impl<'a> fmt::Debug for Service<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Service")
+            .field(&self.inner().path().as_str())
+            .finish()
     }
 }

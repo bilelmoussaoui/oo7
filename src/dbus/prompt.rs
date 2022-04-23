@@ -1,9 +1,10 @@
+use std::fmt;
+
 use super::DESTINATION;
 use crate::Result;
 use serde::Serialize;
 use zbus::zvariant::ObjectPath;
 
-#[derive(Debug)]
 pub struct Prompt<'a>(zbus::Proxy<'a>);
 
 impl<'a> Prompt<'a> {
@@ -53,5 +54,13 @@ impl<'a> Serialize for Prompt<'a> {
 impl<'a> zbus::zvariant::Type for Prompt<'a> {
     fn signature() -> zbus::zvariant::Signature<'static> {
         ObjectPath::signature()
+    }
+}
+
+impl<'a> fmt::Debug for Prompt<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Prompt")
+            .field(&self.inner().path().as_str())
+            .finish()
     }
 }

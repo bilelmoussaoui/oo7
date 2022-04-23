@@ -1,9 +1,11 @@
+use std::fmt;
+
 use super::DESTINATION;
 use crate::Result;
 use serde::Serialize;
 use zbus::zvariant::ObjectPath;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Session<'a>(zbus::Proxy<'a>);
 
 impl<'a> Session<'a> {
@@ -43,5 +45,13 @@ impl<'a> Serialize for Session<'a> {
 impl<'a> zbus::zvariant::Type for Session<'a> {
     fn signature() -> zbus::zvariant::Signature<'static> {
         ObjectPath::signature()
+    }
+}
+
+impl<'a> fmt::Debug for Session<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Session")
+            .field(&self.inner().path().as_str())
+            .finish()
     }
 }

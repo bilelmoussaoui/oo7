@@ -1,11 +1,10 @@
-use std::{collections::HashMap, hash::Hash, time::Duration};
+use std::{collections::HashMap, fmt, hash::Hash, time::Duration};
 
 use super::{secret::SecretInner, Prompt, Secret, Session, DESTINATION};
 use crate::Result;
 use serde::Serialize;
 use zbus::zvariant::ObjectPath;
 
-#[derive(Debug)]
 pub struct Item<'a>(zbus::Proxy<'a>);
 
 impl<'a> Item<'a> {
@@ -123,5 +122,13 @@ impl<'a> Eq for Item<'a> {}
 impl<'a> Hash for Item<'a> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.inner().path().hash(state);
+    }
+}
+
+impl<'a> fmt::Debug for Item<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Item")
+            .field(&self.inner().path().as_str())
+            .finish()
     }
 }

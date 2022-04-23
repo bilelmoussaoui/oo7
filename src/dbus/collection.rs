@@ -1,4 +1,4 @@
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, fmt, time::Duration};
 
 use serde::Serialize;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath, Value};
@@ -6,7 +6,6 @@ use zbus::zvariant::{ObjectPath, OwnedObjectPath, Value};
 use super::{Item, Prompt, Secret, DESTINATION};
 use crate::Result;
 
-#[derive(Debug)]
 pub struct Collection<'a>(zbus::Proxy<'a>);
 
 impl<'a> Collection<'a> {
@@ -137,5 +136,13 @@ impl<'a> Serialize for Collection<'a> {
 impl<'a> zbus::zvariant::Type for Collection<'a> {
     fn signature() -> zbus::zvariant::Signature<'static> {
         ObjectPath::signature()
+    }
+}
+
+impl<'a> fmt::Debug for Collection<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Collection")
+            .field(&self.inner().path().as_str())
+            .finish()
     }
 }
