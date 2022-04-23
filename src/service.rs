@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
-use zbus::zvariant::{ObjectPath, OwnedObjectPath};
+use zbus::zvariant::{Array, ObjectPath, OwnedObjectPath, OwnedValue, Value};
 
 use crate::{
-    secret::SecretInner, Collection, Item, Prompt, Result, Secret, Session, DESTINATION, PATH,
+    secret::SecretInner, Algorithm, Collection, Item, Prompt, Result, Secret, Session, DESTINATION,
+    PATH,
 };
 
 #[doc(alias = "org.freedesktop.secrets")]
@@ -39,18 +40,34 @@ impl<'a> Service<'a> {
     }
 
     #[doc(alias = "OpenSession")]
-    pub async fn open_session(&self, algorithm: &str, variant: &str) -> Result<()> {
-        let output = self
+    pub async fn open_session(
+        &self,
+        algorithm: Algorithm,
+    ) -> Result<(Option<Vec<u8>>, Session<'_>)> {
+        let client_key = algorithm.session_input();
+        let (service_key, session_path) = self
             .inner()
-            .call_method("OpenSession", &(algorithm, variant))
-            .await?;
-        println!("{:#?}", output.body::<zbus::zvariant::Value>());
-        Ok(())
+            .call_method("OpenSession", &(&algorithm, client_key))
+            .await?
+            .body::<(OwnedValue, OwnedObjectPath)>()?;
+        let session = Session::new(self.inner().connection(), session_path).await?;
+
+        let key = if algorithm == Algorithm::Plain {
+            None
+        } else {
+            let mut res = vec![];
+            for value in service_key.downcast_ref::<Array>().unwrap().get() {
+                res.push(*value.downcast_ref::<u8>().unwrap());
+            }
+            Some(res)
+        };
+
+        Ok((key, session))
     }
 
     pub async fn create_collection(
         &self,
-        properties: HashMap<&str, zbus::zvariant::Value<'_>>,
+        properties: HashMap<&str, Value<'_>>,
         alias: &str,
     ) -> Result<(Option<Collection<'_>>, Option<Prompt<'_>>)> {
         let (collection_path, prompt_path) = self
