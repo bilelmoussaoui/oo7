@@ -1,9 +1,9 @@
 use std::{collections::HashMap, time::Duration};
 
 use serde::Serialize;
-use zbus::zvariant::{ObjectPath, OwnedObjectPath};
+use zbus::zvariant::{ObjectPath, OwnedObjectPath, Value};
 
-use crate::{Item, Prompt, Result, DESTINATION};
+use crate::{Item, Prompt, Result, DESTINATION, Secret};
 
 #[derive(Debug)]
 pub struct Collection<'a>(zbus::Proxy<'a>);
@@ -91,6 +91,29 @@ impl<'a> Collection<'a> {
         }
 
         Ok(items)
+    }
+
+    pub async fn create_item(&self, properties: HashMap<&str, Value<'_>>, secret: &Secret<'_>, replace: bool) -> Result<(Option<Item<'_>>, Option<Prompt<'_>>)> {
+        let (item_path, prompt_path) = self
+            .inner()
+            .call_method("CreateItem", &(properties, secret, replace))
+            .await?
+            .body::<(OwnedObjectPath, OwnedObjectPath)>()?;
+
+        // no prompt is needed in this case
+        // TODO: investigate if we can make the whole Prompt part an internal thing
+        if item_path.as_str() != "/" {
+            Ok((
+                Some(Item::new(self.inner().connection(), item_path).await?),
+                None,
+            ))
+        } else {
+            // A prompt is needed
+            Ok((
+                None,
+                Some(Prompt::new(self.inner().connection(), prompt_path).await?),
+            ))
+        }
     }
 }
 
