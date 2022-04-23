@@ -1,8 +1,9 @@
 use std::{collections::HashMap, time::Duration};
 
+use serde::Serialize;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 
-use crate::{Item, Result, DESTINATION, Prompt};
+use crate::{Item, Prompt, Result, DESTINATION};
 
 #[derive(Debug)]
 pub struct Collection<'a>(zbus::Proxy<'a>);
@@ -75,7 +76,7 @@ impl<'a> Collection<'a> {
             Ok(None)
         }
     }
-    
+
     pub async fn search_items(&self, attributes: HashMap<&str, &str>) -> Result<Vec<Item<'_>>> {
         let msg = self
             .inner()
@@ -90,5 +91,20 @@ impl<'a> Collection<'a> {
         }
 
         Ok(items)
+    }
+}
+
+impl<'a> Serialize for Collection<'a> {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        ObjectPath::serialize(self.inner().path(), serializer)
+    }
+}
+
+impl<'a> zbus::zvariant::Type for Collection<'a> {
+    fn signature() -> zbus::zvariant::Signature<'static> {
+        ObjectPath::signature()
     }
 }

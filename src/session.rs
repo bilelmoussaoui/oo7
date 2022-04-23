@@ -1,4 +1,5 @@
 use crate::{Result, DESTINATION};
+use serde::Serialize;
 use zbus::zvariant::ObjectPath;
 
 #[derive(Debug)]
@@ -26,5 +27,20 @@ impl<'a> Session<'a> {
     pub async fn close(&self) -> Result<()> {
         self.inner().call_method("Close", &()).await?;
         Ok(())
+    }
+}
+
+impl<'a> Serialize for Session<'a> {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        ObjectPath::serialize(self.inner().path(), serializer)
+    }
+}
+
+impl<'a> zbus::zvariant::Type for Session<'a> {
+    fn signature() -> zbus::zvariant::Signature<'static> {
+        ObjectPath::signature()
     }
 }

@@ -1,6 +1,7 @@
 use std::{collections::HashMap, time::Duration};
 
 use crate::{Prompt, Result, DESTINATION};
+use serde::Serialize;
 use zbus::zvariant::ObjectPath;
 
 #[derive(Debug)]
@@ -83,5 +84,20 @@ impl<'a> Item<'a> {
             .await
             .map_err::<zbus::fdo::Error, _>(From::from)?;
         Ok(())
+    }
+}
+
+impl<'a> Serialize for Item<'a> {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        ObjectPath::serialize(self.inner().path(), serializer)
+    }
+}
+
+impl<'a> zbus::zvariant::Type for Item<'a> {
+    fn signature() -> zbus::zvariant::Signature<'static> {
+        ObjectPath::signature()
     }
 }
