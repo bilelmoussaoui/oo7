@@ -12,6 +12,11 @@ impl From<zbus::Error> for Error {
         Self::Zbus(e)
     }
 }
+impl From<zbus::fdo::Error> for Error {
+    fn from(e: zbus::fdo::Error) -> Self {
+        Self::Zbus(zbus::Error::FDO(Box::new(e)))
+    }
+}
 
 impl std::error::Error for Error {}
 

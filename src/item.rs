@@ -1,6 +1,6 @@
 use std::{collections::HashMap, time::Duration};
 
-use crate::{Result, DESTINATION};
+use crate::{Prompt, Result, DESTINATION};
 use zbus::zvariant::OwnedObjectPath;
 
 #[derive(Debug)]
@@ -24,6 +24,21 @@ impl<'a> Item<'a> {
         &self.0
     }
 
+    pub async fn delete(&self) -> Result<Option<Prompt<'_>>> {
+        let prompt_path = self
+            .inner()
+            .call_method("Delete", &())
+            .await?
+            .body::<zbus::zvariant::OwnedObjectPath>()?;
+
+        if prompt_path.as_str() != "/" {
+            let prompt = Prompt::new(self.inner().connection(), prompt_path).await?;
+            Ok(Some(prompt))
+        } else {
+            Ok(None)
+        }
+    }
+
     #[doc(alias = "Locked")]
     pub async fn is_locked(&self) -> Result<bool> {
         self.inner()
@@ -34,6 +49,14 @@ impl<'a> Item<'a> {
 
     pub async fn label(&self) -> Result<String> {
         self.inner().get_property("Label").await.map_err(From::from)
+    }
+
+    pub async fn set_label(&self, label: &str) -> Result<()> {
+        self.inner()
+            .set_property("Label", label)
+            .await
+            .map_err::<zbus::fdo::Error, _>(From::from)?;
+        Ok(())
     }
 
     pub async fn created(&self) -> Result<Duration> {
@@ -51,5 +74,13 @@ impl<'a> Item<'a> {
             .get_property("Attributes")
             .await
             .map_err(From::from)
+    }
+
+    pub async fn set_attributes(&self, attributes: HashMap<&str, &str>) -> Result<()> {
+        self.inner()
+            .set_property("Atttributes", attributes)
+            .await
+            .map_err::<zbus::fdo::Error, _>(From::from)?;
+        Ok(())
     }
 }
