@@ -1,4 +1,5 @@
-use crate::{Result, DESTINATION};
+use super::DESTINATION;
+use crate::Result;
 use serde::Serialize;
 use zbus::zvariant::ObjectPath;
 

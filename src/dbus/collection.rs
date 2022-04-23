@@ -3,7 +3,8 @@ use std::{collections::HashMap, time::Duration};
 use serde::Serialize;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath, Value};
 
-use crate::{Item, Prompt, Result, Secret, DESTINATION};
+use super::{Item, Prompt, Secret, DESTINATION};
+use crate::Result;
 
 #[derive(Debug)]
 pub struct Collection<'a>(zbus::Proxy<'a>);

@@ -2,10 +2,8 @@ use std::collections::HashMap;
 
 use zbus::zvariant::{Array, ObjectPath, OwnedObjectPath, OwnedValue, Value};
 
-use crate::{
-    secret::SecretInner, Algorithm, Collection, Item, Prompt, Result, Secret, Session, DESTINATION,
-    PATH,
-};
+use super::{secret::SecretInner, Collection, Item, Prompt, Secret, Session, DESTINATION, PATH};
+use crate::{Algorithm, Result};
 
 #[doc(alias = "org.freedesktop.secrets")]
 pub struct Service<'a>(zbus::Proxy<'a>);

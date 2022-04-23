@@ -1,7 +1,8 @@
 use serde::{ser::SerializeTuple, Deserialize, Serialize};
 use zbus::zvariant::{OwnedObjectPath, Type};
 
-use crate::{Result, Session};
+use super::Session;
+use crate::Result;
 
 #[derive(Debug, Serialize, Deserialize, Type)]
 #[zvariant(signature = "(oayays)")]

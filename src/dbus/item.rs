@@ -1,6 +1,7 @@
 use std::{collections::HashMap, hash::Hash, time::Duration};
 
-use crate::{secret::SecretInner, Prompt, Result, Secret, Session, DESTINATION};
+use super::{secret::SecretInner, Prompt, Secret, Session, DESTINATION};
+use crate::Result;
 use serde::Serialize;
 use zbus::zvariant::ObjectPath;
 
