@@ -1,4 +1,4 @@
-use serde::{Deserialize, ser::SerializeTuple, Serialize};
+use serde::{ser::SerializeTuple, Deserialize, Serialize};
 use zbus::zvariant::{OwnedObjectPath, Type};
 
 use crate::Session;

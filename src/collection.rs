@@ -3,7 +3,7 @@ use std::{collections::HashMap, time::Duration};
 use serde::Serialize;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath, Value};
 
-use crate::{Item, Prompt, Result, DESTINATION, Secret};
+use crate::{Item, Prompt, Result, Secret, DESTINATION};
 
 #[derive(Debug)]
 pub struct Collection<'a>(zbus::Proxy<'a>);
@@ -42,6 +42,14 @@ impl<'a> Collection<'a> {
 
     pub async fn label(&self) -> Result<String> {
         self.inner().get_property("Label").await.map_err(From::from)
+    }
+
+    pub async fn set_label(&self, label: &str) -> Result<()> {
+        self.inner()
+            .set_property("Label", label)
+            .await
+            .map_err::<zbus::fdo::Error, _>(From::from)?;
+        Ok(())
     }
 
     #[doc(alias = "Locked")]
@@ -93,7 +101,12 @@ impl<'a> Collection<'a> {
         Ok(items)
     }
 
-    pub async fn create_item(&self, properties: HashMap<&str, Value<'_>>, secret: &Secret<'_>, replace: bool) -> Result<(Option<Item<'_>>, Option<Prompt<'_>>)> {
+    pub async fn create_item(
+        &self,
+        properties: HashMap<&str, Value<'_>>,
+        secret: &Secret<'_>,
+        replace: bool,
+    ) -> Result<(Option<Item<'_>>, Option<Prompt<'_>>)> {
         let (item_path, prompt_path) = self
             .inner()
             .call_method("CreateItem", &(properties, secret, replace))
