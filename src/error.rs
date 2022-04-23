@@ -2,6 +2,8 @@ use std::fmt;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+// TODO: support secret service errors
+// https://specifications.freedesktop.org/secret-service/latest/ch15.html
 #[derive(Debug)]
 pub enum Error {
     Zbus(zbus::Error),

@@ -2,7 +2,7 @@ use crate::{Result, DESTINATION};
 use serde::Serialize;
 use zbus::zvariant::ObjectPath;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Session<'a>(zbus::Proxy<'a>);
 
 impl<'a> Session<'a> {

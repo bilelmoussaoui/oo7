@@ -1,6 +1,6 @@
 use std::{collections::HashMap, time::Duration};
 
-use crate::{Prompt, Result, DESTINATION};
+use crate::{secret::SecretInner, Prompt, Result, Secret, Session, DESTINATION};
 use serde::Serialize;
 use zbus::zvariant::ObjectPath;
 
@@ -24,21 +24,6 @@ impl<'a> Item<'a> {
 
     pub fn inner(&self) -> &zbus::Proxy {
         &self.0
-    }
-
-    pub async fn delete(&self) -> Result<Option<Prompt<'_>>> {
-        let prompt_path = self
-            .inner()
-            .call_method("Delete", &())
-            .await?
-            .body::<zbus::zvariant::OwnedObjectPath>()?;
-
-        if prompt_path.as_str() != "/" {
-            let prompt = Prompt::new(self.inner().connection(), prompt_path).await?;
-            Ok(Some(prompt))
-        } else {
-            Ok(None)
-        }
     }
 
     #[doc(alias = "Locked")]
@@ -83,6 +68,44 @@ impl<'a> Item<'a> {
             .set_property("Atttributes", attributes)
             .await
             .map_err::<zbus::fdo::Error, _>(From::from)?;
+        Ok(())
+    }
+
+    pub async fn delete(&self) -> Result<Option<Prompt<'_>>> {
+        let prompt_path = self
+            .inner()
+            .call_method("Delete", &())
+            .await?
+            .body::<zbus::zvariant::OwnedObjectPath>()?;
+
+        if prompt_path.as_str() != "/" {
+            let prompt = Prompt::new(self.inner().connection(), prompt_path).await?;
+            Ok(Some(prompt))
+        } else {
+            Ok(None)
+        }
+    }
+
+    #[doc(alias = "GetSecret")]
+    pub async fn secret(&self, session: &Session<'_>) -> Result<Secret<'_>> {
+        let inner = self
+            .inner()
+            .call_method("GetSecret", &(session))
+            .await?
+            .body::<SecretInner>()?;
+        let session_path = inner.0.into_inner();
+        assert_eq!(&session_path, session.inner().path());
+
+        Ok(Secret {
+            session: Session::new(self.inner().connection(), &session_path).await?,
+            parameteres: inner.1,
+            value: inner.2,
+            content_type: inner.3,
+        })
+    }
+
+    pub async fn set_secret(&self, secret: &Secret<'_>) -> Result<()> {
+        self.inner().call_method("SetSecret", &(secret)).await?;
         Ok(())
     }
 }

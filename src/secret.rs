@@ -1,13 +1,22 @@
+use serde::{Deserialize, ser::SerializeTuple, Serialize};
+use zbus::zvariant::{OwnedObjectPath, Type};
+
 use crate::Session;
 
+#[derive(Debug, Serialize, Deserialize, Type)]
+#[zvariant(signature = "(oayays)")]
+pub(crate) struct SecretInner(pub OwnedObjectPath, pub Vec<u8>, pub Vec<u8>, pub String);
+
+#[derive(Debug, Type)]
+#[zvariant(signature = "(oayays)")]
 pub struct Secret<'a> {
-    session: Session<'a>,
-    parameteres: Vec<u8>,
-    value: Vec<u8>,
-    content_type: String,
+    pub(crate) session: Session<'a>,
+    pub(crate) parameteres: Vec<u8>,
+    pub(crate) value: Vec<u8>,
+    pub(crate) content_type: String,
 }
 
-impl <'a> Secret<'a> {
+impl<'a> Secret<'a> {
     /// Session used to encode the secret
     pub fn session(&self) -> &Session {
         &self.session
@@ -26,5 +35,19 @@ impl <'a> Secret<'a> {
     /// Content type of the secret
     pub fn content_type(&self) -> &str {
         &self.content_type
+    }
+}
+
+impl<'a> Serialize for Secret<'a> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut tuple_serializer = serializer.serialize_tuple(4)?;
+        tuple_serializer.serialize_element(self.session().inner().path())?;
+        tuple_serializer.serialize_element(self.parameters())?;
+        tuple_serializer.serialize_element(self.value())?;
+        tuple_serializer.serialize_element(self.content_type())?;
+        tuple_serializer.end()
     }
 }
