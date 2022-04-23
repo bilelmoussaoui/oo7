@@ -158,12 +158,7 @@ impl<'a> Service<'a> {
         for (path, secret_inner) in secrets {
             output.insert(
                 Item::new(cnx, path).await?,
-                Secret {
-                    session: Session::new(cnx, secret_inner.0).await?,
-                    parameteres: secret_inner.1,
-                    value: secret_inner.2,
-                    content_type: secret_inner.3,
-                },
+                Secret::from_inner(cnx, secret_inner).await?,
             );
         }
 

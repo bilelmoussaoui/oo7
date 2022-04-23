@@ -93,15 +93,7 @@ impl<'a> Item<'a> {
             .call_method("GetSecret", &(session))
             .await?
             .body::<SecretInner>()?;
-        let session_path = inner.0.into_inner();
-        assert_eq!(&session_path, session.inner().path());
-
-        Ok(Secret {
-            session: Session::new(self.inner().connection(), &session_path).await?,
-            parameteres: inner.1,
-            value: inner.2,
-            content_type: inner.3,
-        })
+        Secret::from_inner(self.inner().connection(), inner).await
     }
 
     pub async fn set_secret(&self, secret: &Secret<'_>) -> Result<()> {

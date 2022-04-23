@@ -1,7 +1,7 @@
 use serde::{ser::SerializeTuple, Deserialize, Serialize};
 use zbus::zvariant::{OwnedObjectPath, Type};
 
-use crate::Session;
+use crate::{Result, Session};
 
 #[derive(Debug, Serialize, Deserialize, Type)]
 #[zvariant(signature = "(oayays)")]
@@ -17,6 +17,19 @@ pub struct Secret<'a> {
 }
 
 impl<'a> Secret<'a> {
+    pub(crate) async fn from_inner(
+        cnx: &zbus::Connection,
+        inner: SecretInner,
+    ) -> Result<Secret<'_>> {
+        let secret = Secret {
+            session: Session::new(cnx, inner.0).await?,
+            parameteres: inner.1,
+            value: inner.2,
+            content_type: inner.3,
+        };
+        Ok(secret)
+    }
+
     /// Session used to encode the secret
     pub fn session(&self) -> &Session {
         &self.session
@@ -39,7 +52,7 @@ impl<'a> Secret<'a> {
 }
 
 impl<'a> Serialize for Secret<'a> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
