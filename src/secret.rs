@@ -22,12 +22,12 @@ impl<'a> Secret<'a> {
         &self.session
     }
 
-    /// Algorithm dependant parameters for secret value encoding
+    /// Algorithm dependent parameters for secret value encoding
     pub fn parameters(&self) -> &[u8] {
         &self.parameteres
     }
 
-    /// Possibily encoded secret value
+    /// Possibly encoded secret value
     pub fn value(&self) -> &[u8] {
         &self.value
     }

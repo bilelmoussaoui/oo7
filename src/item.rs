@@ -65,7 +65,7 @@ impl<'a> Item<'a> {
 
     pub async fn set_attributes(&self, attributes: HashMap<&str, &str>) -> Result<()> {
         self.inner()
-            .set_property("Atttributes", attributes)
+            .set_property("Attributes", attributes)
             .await
             .map_err::<zbus::fdo::Error, _>(From::from)?;
         Ok(())
