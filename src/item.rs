@@ -1,4 +1,4 @@
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, hash::Hash, time::Duration};
 
 use crate::{secret::SecretInner, Prompt, Result, Secret, Session, DESTINATION};
 use serde::Serialize;
@@ -122,5 +122,19 @@ impl<'a> Serialize for Item<'a> {
 impl<'a> zbus::zvariant::Type for Item<'a> {
     fn signature() -> zbus::zvariant::Signature<'static> {
         ObjectPath::signature()
+    }
+}
+
+impl<'a> PartialEq for Item<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner().path() == other.inner().path()
+    }
+}
+
+impl<'a> Eq for Item<'a> {}
+
+impl<'a> Hash for Item<'a> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.inner().path().hash(state);
     }
 }
