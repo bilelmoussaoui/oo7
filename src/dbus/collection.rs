@@ -125,7 +125,7 @@ impl<'a> Collection<'a> {
         } else {
             item_path
         };
-        Ok(Item::new(self.inner().connection(), item_path).await?)
+        Item::new(self.inner().connection(), item_path).await
     }
 }
 

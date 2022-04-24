@@ -78,7 +78,7 @@ impl<'a> Service<'a> {
         } else {
             collection_path
         };
-        Ok(Collection::new(self.inner().connection(), collection_path).await?)
+        Collection::new(self.inner().connection(), collection_path).await
     }
 
     #[doc(alias = "SearchItems")]
