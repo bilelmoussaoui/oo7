@@ -63,9 +63,9 @@ impl<'a> Service<'a> {
     #[doc(alias = "OpenSession")]
     pub async fn open_session(
         &self,
-        algorithm: Algorithm,
+        algorithm: &Algorithm,
     ) -> Result<(Option<Vec<u8>>, Session<'a>)> {
-        let client_key = algorithm.session_input();
+        let client_key = algorithm.client_key();
         let (service_key, session_path) = self
             .inner()
             .call_method("OpenSession", &(&algorithm, client_key))
@@ -73,7 +73,7 @@ impl<'a> Service<'a> {
             .body::<(OwnedValue, OwnedObjectPath)>()?;
         let session = Session::new(self.inner().connection(), session_path).await?;
 
-        let key = if algorithm == Algorithm::Plain {
+        let key = if algorithm == &Algorithm::Plain {
             None
         } else {
             let mut res = vec![];

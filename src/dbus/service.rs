@@ -8,18 +8,20 @@ pub struct Service<'a> {
     #[allow(unused)]
     service_key: Option<Vec<u8>>,
     session: Arc<api::Session<'a>>,
+    algorithm: Arc<Algorithm>,
 }
 
 impl<'a> Service<'a> {
     pub async fn new(algorithm: Algorithm) -> Result<Service<'a>> {
         let cnx = zbus::Connection::session().await?;
         let api_service = Arc::new(api::Service::new(&cnx).await?);
-        let (service_key, session) = api_service.open_session(algorithm).await?;
+        let (service_key, session) = api_service.open_session(&algorithm).await?;
 
         Ok(Self {
             service_key,
             service: api_service,
             session: Arc::new(session),
+            algorithm: Arc::new(algorithm),
         })
     }
 
@@ -28,6 +30,8 @@ impl<'a> Service<'a> {
             .service
             .read_alias(DEFAULT_COLLECTION)
             .await?
-            .map(|collection| Collection::new(self.session.clone(), collection)))
+            .map(|collection| {
+                Collection::new(self.session.clone(), self.algorithm.clone(), collection)
+            }))
     }
 }

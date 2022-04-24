@@ -9,7 +9,7 @@ pub enum Algorithm {
 }
 
 impl Algorithm {
-    pub(crate) fn session_input(&self) -> zvariant::OwnedValue {
+    pub(crate) fn client_key(&self) -> zvariant::OwnedValue {
         match self {
             Self::Plain => zvariant::Str::default().into(),
             Self::Dh(key) => {

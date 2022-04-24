@@ -1,5 +1,5 @@
 /// The default collection alias.
-/// 
+///
 /// In general, you are supposed to use [`Service::default_collection`]
 pub static DEFAULT_COLLECTION: &str = "default";
 

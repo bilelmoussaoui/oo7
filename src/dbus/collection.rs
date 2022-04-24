@@ -1,22 +1,25 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::Result;
+use crate::{Algorithm, Result};
 
 use super::{api, Item};
 
 pub struct Collection<'a> {
     collection: Arc<api::Collection<'a>>,
     session: Arc<api::Session<'a>>,
+    algorithm: Arc<Algorithm>,
 }
 
 impl<'a> Collection<'a> {
     pub(crate) fn new(
         session: Arc<api::Session<'a>>,
+        algorithm: Arc<Algorithm>,
         collection: api::Collection<'a>,
     ) -> Collection<'a> {
         Self {
             collection: Arc::new(collection),
             session,
+            algorithm,
         }
     }
 
@@ -24,7 +27,7 @@ impl<'a> Collection<'a> {
         let items = self.collection.search_items(attributes).await?;
         Ok(items
             .into_iter()
-            .map(|item| Item::new(self.session.clone(), item))
+            .map(|item| Item::new(self.session.clone(), self.algorithm.clone(), item))
             .collect::<Vec<_>>())
     }
 

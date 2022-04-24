@@ -1,19 +1,26 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use crate::Result;
+use crate::{Algorithm, Result};
 
 use super::api;
 
 pub struct Item<'a> {
     item: Arc<api::Item<'a>>,
     session: Arc<api::Session<'a>>,
+    #[allow(unused)]
+    algorithm: Arc<Algorithm>,
 }
 
 impl<'a> Item<'a> {
-    pub(crate) fn new(session: Arc<api::Session<'a>>, item: api::Item<'a>) -> Item<'a> {
+    pub(crate) fn new(
+        session: Arc<api::Session<'a>>,
+        algorithm: Arc<Algorithm>,
+        item: api::Item<'a>,
+    ) -> Item<'a> {
         Self {
             item: Arc::new(item),
             session,
+            algorithm,
         }
     }
 
