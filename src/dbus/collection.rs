@@ -1,9 +1,9 @@
 use std::{collections::HashMap, fmt, time::Duration};
 
 use serde::Serialize;
-use zbus::zvariant::{ObjectPath, OwnedObjectPath, Value};
+use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 
-use super::{Item, Prompt, Secret, Unlockable, DESTINATION};
+use super::{Item, Prompt, Properties, Secret, Unlockable, DESTINATION};
 use crate::Result;
 
 pub struct Collection<'a>(zbus::Proxy<'a>);
@@ -104,10 +104,12 @@ impl<'a> Collection<'a> {
 
     pub async fn create_item(
         &self,
-        properties: HashMap<&str, Value<'_>>,
+        label: &str,
+        attributes: HashMap<&str, &str>,
         secret: &Secret<'_>,
         replace: bool,
     ) -> Result<Item<'_>> {
+        let properties = Properties::new(label, attributes);
         let (item_path, prompt_path) = self
             .inner()
             .call_method("CreateItem", &(properties, secret, replace))

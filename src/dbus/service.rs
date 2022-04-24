@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 use std::fmt;
 
-use zbus::zvariant::{Array, ObjectPath, OwnedObjectPath, OwnedValue, Value};
+use zbus::zvariant::{Array, ObjectPath, OwnedObjectPath, OwnedValue};
 
 use super::{
-    secret::SecretInner, Collection, Item, Prompt, Secret, Session, Unlockable, DESTINATION, PATH,
+    secret::SecretInner, Collection, Item, Prompt, Properties, Secret, Session, Unlockable,
+    DESTINATION, PATH,
 };
 use crate::{Algorithm, Result};
 
@@ -60,11 +61,8 @@ impl<'a> Service<'a> {
         Ok((key, session))
     }
 
-    pub async fn create_collection(
-        &self,
-        properties: HashMap<&str, Value<'_>>,
-        alias: &str,
-    ) -> Result<Collection<'_>> {
+    pub async fn create_collection(&self, label: &str, alias: &str) -> Result<Collection<'_>> {
+        let properties = Properties::with_label(label);
         let (collection_path, prompt_path) = self
             .inner()
             .call_method("CreateCollection", &(properties, alias))

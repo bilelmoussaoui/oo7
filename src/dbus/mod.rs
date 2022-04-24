@@ -8,6 +8,7 @@ pub trait Unlockable: serde::Serialize + zbus::zvariant::Type {}
 mod collection;
 mod item;
 mod prompt;
+mod properties;
 mod secret;
 mod service;
 mod session;
@@ -15,6 +16,7 @@ mod session;
 pub use collection::Collection;
 pub use item::Item;
 pub(crate) use prompt::Prompt;
+pub(crate) use properties::Properties;
 pub use secret::Secret;
 pub use service::Service;
 pub use session::Session;
