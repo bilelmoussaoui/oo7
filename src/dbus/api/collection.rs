@@ -2,11 +2,13 @@ use std::{collections::HashMap, fmt, time::Duration};
 
 use futures::StreamExt;
 use serde::Serialize;
-use zbus::zvariant::{ObjectPath, OwnedObjectPath};
+use zbus::zvariant::{ObjectPath, OwnedObjectPath, Type};
 
 use super::{Item, Prompt, Properties, Secret, Unlockable, DESTINATION};
 use crate::Result;
 
+#[derive(Type)]
+#[zvariant(signature = "o")]
 #[doc(alias = "org.freedesktop.Secret.Collection")]
 pub struct Collection<'a>(zbus::Proxy<'a>);
 
@@ -160,12 +162,6 @@ impl<'a> Serialize for Collection<'a> {
         S: serde::Serializer,
     {
         ObjectPath::serialize(self.inner().path(), serializer)
-    }
-}
-
-impl<'a> zbus::zvariant::Type for Collection<'a> {
-    fn signature() -> zbus::zvariant::Signature<'static> {
-        ObjectPath::signature()
     }
 }
 

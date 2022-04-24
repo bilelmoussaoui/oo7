@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 
 use serde::ser::{Serialize, SerializeMap};
-use zbus::zvariant::{Signature, Type, Value};
+use zbus::zvariant::Type;
 
 static PROPERTY_LABEL: &str = "org.freedesktop.Secret.Item.Label";
 static PROPERTY_ATTRIBUTES: &str = "org.freedesktop.Secret.Item.Attributes";
 
-#[derive(Debug)]
+#[derive(Debug, Type)]
+#[zvariant(signature = "a{sv}")]
 pub struct Properties<'a> {
     label: &'a str,
     attributes: HashMap<&'a str, &'a str>,
@@ -43,18 +44,12 @@ impl<'a> Serialize for Properties<'a> {
     }
 }
 
-impl<'a> Type for Properties<'a> {
-    fn signature() -> Signature<'static> {
-        HashMap::<&str, Value<'_>>::signature()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_serialize_label() {
+    fn serialize_label() {
         let properties = Properties::with_label("some_label");
 
         let encoded = serde_json::to_string(&properties).unwrap();
@@ -64,7 +59,7 @@ mod tests {
     }
 
     #[test]
-    fn test_serialize_label_with_attributes() {
+    fn serialize_label_with_attributes() {
         let mut attributes = HashMap::new();
         attributes.insert("some", "attribute");
         let properties = Properties::new("some_label", attributes);
@@ -74,5 +69,10 @@ mod tests {
         assert_eq!(decoded[PROPERTY_LABEL], "some_label");
         assert!(decoded.contains_key(PROPERTY_ATTRIBUTES));
         assert_eq!(decoded[PROPERTY_ATTRIBUTES]["some"], "attribute");
+    }
+
+    #[test]
+    fn signature() {
+        assert_eq!(Properties::signature(), "a{sv}");
     }
 }

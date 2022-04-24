@@ -2,12 +2,12 @@ use std::fmt;
 
 use super::DESTINATION;
 use crate::{Error, Result};
+use futures::StreamExt;
 use serde::Serialize;
-use zbus::{
-    export::futures_util::StreamExt,
-    zvariant::{ObjectPath, OwnedValue, Type},
-};
+use zbus::zvariant::{ObjectPath, OwnedValue, Type};
 
+#[derive(Type)]
+#[zvariant(signature = "o")]
 #[doc(alias = "org.freedesktop.Secret.Prompt")]
 pub struct Prompt<'a>(zbus::Proxy<'a>);
 
@@ -71,12 +71,6 @@ impl<'a> Serialize for Prompt<'a> {
         S: serde::Serializer,
     {
         ObjectPath::serialize(self.inner().path(), serializer)
-    }
-}
-
-impl<'a> Type for Prompt<'a> {
-    fn signature() -> zbus::zvariant::Signature<'static> {
-        ObjectPath::signature()
     }
 }
 

@@ -88,3 +88,13 @@ impl<'a> Serialize for Secret<'a> {
         tuple_serializer.end()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn signature() {
+        assert_eq!(Secret::signature(), "(oayays)");
+    }
+}

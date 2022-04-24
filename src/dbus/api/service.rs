@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt;
 
 use futures::StreamExt;
-use zbus::zvariant::{Array, ObjectPath, OwnedObjectPath, OwnedValue};
+use zbus::zvariant::{Array, ObjectPath, OwnedObjectPath, OwnedValue, Type};
 
 use super::{
     secret::SecretInner, Collection, Item, Prompt, Properties, Secret, Session, Unlockable,
@@ -10,6 +10,8 @@ use super::{
 };
 use crate::{Algorithm, Result};
 
+#[derive(Type)]
+#[zvariant(signature = "o")]
 #[doc(alias = "org.freedesktop.secrets")]
 pub struct Service<'a>(zbus::Proxy<'a>);
 

@@ -3,8 +3,10 @@ use std::{collections::HashMap, fmt, hash::Hash, time::Duration};
 use super::{secret::SecretInner, Prompt, Secret, Session, Unlockable, DESTINATION};
 use crate::Result;
 use serde::Serialize;
-use zbus::zvariant::ObjectPath;
+use zbus::zvariant::{ObjectPath, Type};
 
+#[derive(Type)]
+#[zvariant(signature = "o")]
 #[doc(alias = "org.freedesktop.Secret.Item")]
 pub struct Item<'a>(zbus::Proxy<'a>);
 
@@ -122,12 +124,6 @@ impl<'a> Serialize for Item<'a> {
         S: serde::Serializer,
     {
         ObjectPath::serialize(self.inner().path(), serializer)
-    }
-}
-
-impl<'a> zbus::zvariant::Type for Item<'a> {
-    fn signature() -> zbus::zvariant::Signature<'static> {
-        ObjectPath::signature()
     }
 }
 
