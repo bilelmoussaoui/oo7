@@ -6,7 +6,7 @@ WIP!
 
 James Bond went on a new mission and this time as a [secret service provider](https://specifications.freedesktop.org/secret-service/latest/).
 
-The library consists of a Rust implementation of the Secret Sevice specifications using [zbus](https://lib.rs/zbus).
+The library consists of a Rust implementation of the Secret Service specifications using [zbus](https://lib.rs/zbus).
 
 
 ## Goals
