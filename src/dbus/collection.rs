@@ -7,7 +7,7 @@ use crate::{Algorithm, Error, Result};
 use super::{api, Item};
 
 pub struct Collection<'a> {
-    collection: Arc<api::Collection<'a>>,
+    inner: Arc<api::Collection<'a>>,
     session: Arc<api::Session<'a>>,
     algorithm: Arc<Algorithm>,
     /// Defines whether the Collection has been deleted or not
@@ -21,7 +21,7 @@ impl<'a> Collection<'a> {
         collection: api::Collection<'a>,
     ) -> Collection<'a> {
         Self {
-            collection: Arc::new(collection),
+            inner: Arc::new(collection),
             session,
             algorithm,
             available: Mutex::new(true),
@@ -37,7 +37,7 @@ impl<'a> Collection<'a> {
             Err(Error::Deleted)
         } else {
             Ok(self
-                .collection
+                .inner
                 .items()
                 .await?
                 .into_iter()
@@ -50,7 +50,7 @@ impl<'a> Collection<'a> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            self.collection.label().await
+            self.inner.label().await
         }
     }
 
@@ -58,7 +58,7 @@ impl<'a> Collection<'a> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            self.collection.set_label(label).await
+            self.inner.set_label(label).await
         }
     }
 
@@ -67,7 +67,7 @@ impl<'a> Collection<'a> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            self.collection.is_locked().await
+            self.inner.is_locked().await
         }
     }
 
@@ -75,7 +75,7 @@ impl<'a> Collection<'a> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            self.collection.created().await
+            self.inner.created().await
         }
     }
 
@@ -83,7 +83,7 @@ impl<'a> Collection<'a> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            self.collection.modified().await
+            self.inner.modified().await
         }
     }
 
@@ -91,7 +91,7 @@ impl<'a> Collection<'a> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            let items = self.collection.search_items(attributes).await?;
+            let items = self.inner.search_items(attributes).await?;
             Ok(items
                 .into_iter()
                 .map(|item| Item::new(Arc::clone(&self.session), Arc::clone(&self.algorithm), item))
@@ -118,7 +118,7 @@ impl<'a> Collection<'a> {
             );
 
             let item = self
-                .collection
+                .inner
                 .create_item(label, attributes, &secret, replace)
                 .await?;
 
@@ -134,7 +134,7 @@ impl<'a> Collection<'a> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            self.collection.delete().await?;
+            self.inner.delete().await?;
             *self.available.lock().await = false;
             Ok(())
         }

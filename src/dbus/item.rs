@@ -7,7 +7,7 @@ use crate::{Algorithm, Error, Result};
 use super::api;
 
 pub struct Item<'a> {
-    item: Arc<api::Item<'a>>,
+    inner: Arc<api::Item<'a>>,
     session: Arc<api::Session<'a>>,
     algorithm: Arc<Algorithm>,
     /// Defines whether the Item has been deleted or not
@@ -21,7 +21,7 @@ impl<'a> Item<'a> {
         item: api::Item<'a>,
     ) -> Item<'a> {
         Self {
-            item: Arc::new(item),
+            inner: Arc::new(item),
             session,
             algorithm,
             available: Mutex::new(true),
@@ -36,7 +36,7 @@ impl<'a> Item<'a> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            self.item.is_locked().await
+            self.inner.is_locked().await
         }
     }
 
@@ -44,7 +44,7 @@ impl<'a> Item<'a> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            self.item.label().await
+            self.inner.label().await
         }
     }
 
@@ -52,7 +52,7 @@ impl<'a> Item<'a> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            self.item.set_label(label).await
+            self.inner.set_label(label).await
         }
     }
 
@@ -60,7 +60,7 @@ impl<'a> Item<'a> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            self.item.created().await
+            self.inner.created().await
         }
     }
 
@@ -68,7 +68,7 @@ impl<'a> Item<'a> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            self.item.modified().await
+            self.inner.modified().await
         }
     }
 
@@ -76,7 +76,7 @@ impl<'a> Item<'a> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            self.item.attributes().await
+            self.inner.attributes().await
         }
     }
 
@@ -84,7 +84,7 @@ impl<'a> Item<'a> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            self.item.set_attributes(attributes).await
+            self.inner.set_attributes(attributes).await
         }
     }
 
@@ -92,7 +92,7 @@ impl<'a> Item<'a> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            self.item.delete().await?;
+            self.inner.delete().await?;
             *self.available.lock().await = false;
             Ok(())
         }
@@ -102,7 +102,7 @@ impl<'a> Item<'a> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            let secret = self.item.secret(&self.session).await?;
+            let secret = self.inner.secret(&self.session).await?;
             Ok(secret.value)
         }
     }
@@ -115,7 +115,7 @@ impl<'a> Item<'a> {
             secret,
             content_type,
         );
-        self.item.set_secret(&secret).await?;
+        self.inner.set_secret(&secret).await?;
         Ok(())
     }
 }
