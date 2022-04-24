@@ -26,10 +26,26 @@ impl<'a> Service<'a> {
     }
 
     pub async fn default_collection(&self) -> Result<Option<Collection<'a>>> {
+        self.with_alias(DEFAULT_COLLECTION).await
+    }
+
+    pub async fn with_alias(&self, alias: &str) -> Result<Option<Collection<'a>>> {
+        Ok(self.inner.read_alias(alias).await?.map(|collection| {
+            Collection::new(
+                Arc::clone(&self.inner),
+                Arc::clone(&self.session),
+                Arc::clone(&self.algorithm),
+                collection,
+            )
+        }))
+    }
+
+    pub async fn collections(&self) -> Result<Vec<Collection<'a>>> {
         Ok(self
             .inner
-            .read_alias(DEFAULT_COLLECTION)
+            .collections()
             .await?
+            .into_iter()
             .map(|collection| {
                 Collection::new(
                     Arc::clone(&self.inner),
@@ -37,6 +53,21 @@ impl<'a> Service<'a> {
                     Arc::clone(&self.algorithm),
                     collection,
                 )
-            }))
+            })
+            .collect::<Vec<_>>())
+    }
+
+    pub async fn create_collection(&self, label: &str, alias: &str) -> Result<Collection<'a>> {
+        self.inner
+            .create_collection(label, alias)
+            .await
+            .map(|collection| {
+                Collection::new(
+                    Arc::clone(&self.inner),
+                    Arc::clone(&self.session),
+                    Arc::clone(&self.algorithm),
+                    collection,
+                )
+            })
     }
 }

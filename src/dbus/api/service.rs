@@ -31,7 +31,7 @@ impl<'a> Service<'a> {
     }
 
     #[doc(alias = "CollectionCreated")]
-    pub async fn receive_collection_created(&self) -> Result<Collection<'_>> {
+    pub async fn receive_collection_created(&self) -> Result<Collection<'a>> {
         let mut stream = self.inner().receive_signal("CollectionCreated").await?;
         let message = stream.next().await.unwrap();
         let object_path = message.body::<OwnedObjectPath>()?;
@@ -39,7 +39,7 @@ impl<'a> Service<'a> {
     }
 
     #[doc(alias = "CollectionDeleted")]
-    pub async fn receive_collection_deleted(&self) -> Result<Collection<'_>> {
+    pub async fn receive_collection_deleted(&self) -> Result<Collection<'a>> {
         let mut stream = self.inner().receive_signal("CollectionDeleted").await?;
         let message = stream.next().await.unwrap();
         let object_path = message.body::<OwnedObjectPath>()?;
@@ -47,14 +47,14 @@ impl<'a> Service<'a> {
     }
 
     #[doc(alias = "CollectionChanged")]
-    pub async fn receive_collection_changed(&self) -> Result<Collection<'_>> {
+    pub async fn receive_collection_changed(&self) -> Result<Collection<'a>> {
         let mut stream = self.inner().receive_signal("CollectionChanged").await?;
         let message = stream.next().await.unwrap();
         let object_path = message.body::<OwnedObjectPath>()?;
         Collection::new(self.inner().connection(), object_path).await
     }
 
-    pub async fn collections(&self) -> Result<Vec<Collection<'_>>> {
+    pub async fn collections(&self) -> Result<Vec<Collection<'a>>> {
         let collections_paths = self
             .inner()
             .get_property::<Vec<ObjectPath>>("Collections")
@@ -89,7 +89,7 @@ impl<'a> Service<'a> {
     }
 
     #[doc(alias = "CreateCollection")]
-    pub async fn create_collection(&self, label: &str, alias: &str) -> Result<Collection<'_>> {
+    pub async fn create_collection(&self, label: &str, alias: &str) -> Result<Collection<'a>> {
         let properties = Properties::with_label(label);
         let (collection_path, prompt_path) = self
             .inner()
