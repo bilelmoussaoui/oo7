@@ -1,9 +1,12 @@
 use std::fmt;
 
 use super::DESTINATION;
-use crate::Result;
-use serde::Serialize;
-use zbus::zvariant::ObjectPath;
+use crate::{Error, Result};
+use serde::{de::DeserializeOwned, Serialize};
+use zbus::{
+    export::futures_util::StreamExt,
+    zvariant::{ObjectPath, OwnedValue, Type},
+};
 
 pub struct Prompt<'a>(zbus::Proxy<'a>);
 
@@ -40,6 +43,17 @@ impl<'a> Prompt<'a> {
         self.inner().call_method("Dismiss", &()).await?;
         Ok(())
     }
+
+    pub async fn receive_completed<'de, T>(&self) -> std::result::Result<(bool, T), Error>
+    where
+        T: TryFrom<OwnedValue> + DeserializeOwned + Type,
+        Error: From<<T as TryFrom<OwnedValue>>::Error>,
+    {
+        let mut stream = self.inner().receive_signal("Completed").await?;
+        let message = stream.next().await.unwrap();
+        let (dismissed, result) = message.body::<(bool, OwnedValue)>()?;
+        Ok((dismissed, T::try_from(result).map_err(From::from)?))
+    }
 }
 
 impl<'a> Serialize for Prompt<'a> {
@@ -51,7 +65,7 @@ impl<'a> Serialize for Prompt<'a> {
     }
 }
 
-impl<'a> zbus::zvariant::Type for Prompt<'a> {
+impl<'a> Type for Prompt<'a> {
     fn signature() -> zbus::zvariant::Signature<'static> {
         ObjectPath::signature()
     }
