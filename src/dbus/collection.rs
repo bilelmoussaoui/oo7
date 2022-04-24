@@ -152,7 +152,7 @@ impl<'a> Collection<'a> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            self.service.lock(&vec![self.inner.inner().path()]).await?;
+            self.service.lock(&[self.inner.inner().path()]).await?;
             Ok(())
         }
     }
@@ -161,7 +161,7 @@ impl<'a> Collection<'a> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            self.service.lock(&vec![self.inner.inner().path()]).await?;
+            self.service.lock(&[self.inner.inner().path()]).await?;
             Ok(())
         }
     }
