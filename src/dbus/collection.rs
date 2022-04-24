@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{borrow::Borrow, collections::HashMap, sync::Arc};
 
 use crate::{Algorithm, Result};
 
@@ -31,16 +31,39 @@ impl<'a> Collection<'a> {
             .collect::<Vec<_>>())
     }
 
-    /*
     pub async fn create_item(
         &self,
         label: &str,
         attributes: HashMap<&str, &str>,
         secret: &[u8],
         replace: bool,
+        content_type: &str,
     ) -> Result<Item<'_>> {
-        let item = self.collection.create_item(label, attributes, secret, replace).await?;
-        Ok(Item::new(item))
+        // TODO Can this clone be removed?
+        let s = (*self.session).clone();
+        let (parameteres, value) = match self.algorithm.borrow() {
+            Algorithm::Plain => (vec![], secret.to_vec()),
+            Algorithm::Dh(_blob) => {
+                // See https://github.com/hwchen/secret-service-rs/blob/d6aaa774f0ec504ff5f26662279e07175b8ef111/src/util.rs#L52
+                unimplemented!()
+            }
+        };
+        let secret = crate::dbus::api::Secret {
+            session: s,
+            parameteres,
+            value,
+            content_type: content_type.to_string(),
+        };
+
+        let item = self
+            .collection
+            .create_item(label, attributes, &secret, replace)
+            .await?;
+
+        Ok(Item::new(
+            Arc::clone(&self.session),
+            Arc::clone(&self.algorithm),
+            item,
+        ))
     }
-    */
 }

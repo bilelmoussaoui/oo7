@@ -1,7 +1,7 @@
 use serde::Serialize;
 use zbus::zvariant::{self, Type};
 
-#[derive(Debug, zvariant::Type, PartialEq, Eq)]
+#[derive(Debug, zvariant::Type, PartialEq, Eq, Clone)]
 #[zvariant(signature = "s")]
 pub enum Algorithm {
     Plain,
