@@ -37,7 +37,7 @@ impl<'a> Secret<'a> {
             session,
             parameteres,
             value,
-            content_type: content_type.to_string(),
+            content_type: content_type.to_owned(),
         }
     }
 
