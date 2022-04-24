@@ -6,6 +6,7 @@ use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 use super::{Item, Prompt, Properties, Secret, Unlockable, DESTINATION};
 use crate::Result;
 
+#[doc(alias = "org.freedesktop.Secret.Collection")]
 pub struct Collection<'a>(zbus::Proxy<'a>);
 
 impl<'a> Collection<'a> {
@@ -92,6 +93,7 @@ impl<'a> Collection<'a> {
         Ok(())
     }
 
+    #[doc(alias = "SearchItems")]
     pub async fn search_items(&self, attributes: HashMap<&str, &str>) -> Result<Vec<Item<'_>>> {
         let msg = self
             .inner()
@@ -102,6 +104,7 @@ impl<'a> Collection<'a> {
         Item::from_paths(self.inner().connection(), item_paths).await
     }
 
+    #[doc(alias = "CreateItem")]
     pub async fn create_item(
         &self,
         label: &str,

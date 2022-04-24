@@ -5,6 +5,7 @@ use crate::Result;
 use serde::Serialize;
 use zbus::zvariant::ObjectPath;
 
+#[doc(alias = "org.freedesktop.Secret.Item")]
 pub struct Item<'a>(zbus::Proxy<'a>);
 
 impl<'a> Item<'a> {
@@ -108,6 +109,7 @@ impl<'a> Item<'a> {
         Secret::from_inner(self.inner().connection(), inner).await
     }
 
+    #[doc(alias = "SetSecret")]
     pub async fn set_secret(&self, secret: &Secret<'_>) -> Result<()> {
         self.inner().call_method("SetSecret", &(secret)).await?;
         Ok(())

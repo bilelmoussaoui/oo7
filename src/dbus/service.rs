@@ -61,6 +61,7 @@ impl<'a> Service<'a> {
         Ok((key, session))
     }
 
+    #[doc(alias = "CreateCollection")]
     pub async fn create_collection(&self, label: &str, alias: &str) -> Result<Collection<'_>> {
         let properties = Properties::with_label(label);
         let (collection_path, prompt_path) = self
@@ -80,6 +81,7 @@ impl<'a> Service<'a> {
         Ok(Collection::new(self.inner().connection(), collection_path).await?)
     }
 
+    #[doc(alias = "SearchItems")]
     pub async fn search_items(
         &self,
         attributes: HashMap<&str, &str>,
@@ -159,6 +161,7 @@ impl<'a> Service<'a> {
         Ok(output)
     }
 
+    #[doc(alias = "ReadAlias")]
     pub async fn read_alias(&self, name: &str) -> Result<Option<Collection<'_>>> {
         let collection_path = self
             .inner()
@@ -174,6 +177,7 @@ impl<'a> Service<'a> {
         }
     }
 
+    #[doc(alias = "SetAlias")]
     pub async fn set_alias(&self, name: &str, collection: &Collection<'_>) -> Result<()> {
         self.inner()
             .call_method("SetAlias", &(name, collection))

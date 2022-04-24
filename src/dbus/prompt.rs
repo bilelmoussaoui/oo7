@@ -8,6 +8,7 @@ use zbus::{
     zvariant::{ObjectPath, OwnedValue, Type},
 };
 
+#[doc(alias = "org.freedesktop.Secret.Prompt")]
 pub struct Prompt<'a>(zbus::Proxy<'a>);
 
 impl<'a> Prompt<'a> {

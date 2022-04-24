@@ -5,7 +5,7 @@ use crate::Result;
 use serde::Serialize;
 use zbus::zvariant::ObjectPath;
 
-#[derive(Clone)]
+#[doc(alias = "org.freedesktop.Secret.Session")]
 pub struct Session<'a>(zbus::Proxy<'a>);
 
 impl<'a> Session<'a> {
