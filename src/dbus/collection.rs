@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use futures::lock::Mutex;
 
@@ -30,6 +30,61 @@ impl<'a> Collection<'a> {
 
     pub(crate) async fn is_available(&self) -> bool {
         *self.available.lock().await
+    }
+
+    pub async fn items(&self) -> Result<Vec<Item<'_>>> {
+        if !self.is_available().await {
+            Err(Error::Deleted)
+        } else {
+            Ok(self
+                .collection
+                .items()
+                .await?
+                .into_iter()
+                .map(|item| Item::new(Arc::clone(&self.session), Arc::clone(&self.algorithm), item))
+                .collect::<Vec<_>>())
+        }
+    }
+
+    pub async fn label(&self) -> Result<String> {
+        if !self.is_available().await {
+            Err(Error::Deleted)
+        } else {
+            self.collection.label().await
+        }
+    }
+
+    pub async fn set_label(&self, label: &str) -> Result<()> {
+        if !self.is_available().await {
+            Err(Error::Deleted)
+        } else {
+            self.collection.set_label(label).await
+        }
+    }
+
+    #[doc(alias = "Locked")]
+    pub async fn is_locked(&self) -> Result<bool> {
+        if !self.is_available().await {
+            Err(Error::Deleted)
+        } else {
+            self.collection.is_locked().await
+        }
+    }
+
+    pub async fn created(&self) -> Result<Duration> {
+        if !self.is_available().await {
+            Err(Error::Deleted)
+        } else {
+            self.collection.created().await
+        }
+    }
+
+    pub async fn modified(&self) -> Result<Duration> {
+        if !self.is_available().await {
+            Err(Error::Deleted)
+        } else {
+            self.collection.modified().await
+        }
     }
 
     pub async fn search_items(&self, attributes: HashMap<&str, &str>) -> Result<Vec<Item<'_>>> {
