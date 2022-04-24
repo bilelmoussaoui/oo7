@@ -1,22 +1,17 @@
-pub(crate) static DESTINATION: &str = "org.freedesktop.secrets";
-pub(crate) static PATH: &str = "/org/freedesktop/secrets";
+/// The default collection alias.
+/// 
+/// In general, you are supposed to use [`Service::default_collection`]
+pub static DEFAULT_COLLECTION: &str = "default";
 
-/// A common trait implemented by objects that can be
-/// locked or unlocked. Like [`Collection`] or [`Item`].
-pub trait Unlockable: serde::Serialize + zbus::zvariant::Type {}
+/// Barebone DBus API of the secret service specifications.
+///
+/// The API is not supposed to be used by the applications in general unless
+/// the wrapper API doesn't provide functionality you need.
+pub mod api;
 
-mod collection;
 mod item;
-mod prompt;
-mod properties;
-mod secret;
-mod service;
-mod session;
-
-pub use collection::Collection;
 pub use item::Item;
-pub(crate) use prompt::Prompt;
-pub(crate) use properties::Properties;
-pub use secret::Secret;
+mod service;
 pub use service::Service;
-pub use session::Session;
+mod collection;
+pub use collection::Collection;
