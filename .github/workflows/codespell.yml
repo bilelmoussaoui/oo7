@@ -15,4 +15,5 @@ jobs:
           check_filenames: true
           ignore_words_list: "crate,ser"
           check_hidden: false
-          skip: "*.svg"
+          skip: "./.git/**"
+          builtin: "clear,rare,informal,usage,code"
