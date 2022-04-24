@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt, hash::Hash, time::Duration};
 
-use super::{secret::SecretInner, Prompt, Secret, Session, DESTINATION};
+use super::{secret::SecretInner, Prompt, Secret, Session, Unlockable, DESTINATION};
 use crate::Result;
 use serde::Serialize;
 use zbus::zvariant::ObjectPath;
@@ -150,3 +150,5 @@ impl<'a> fmt::Debug for Item<'a> {
             .finish()
     }
 }
+
+impl<'a> Unlockable for Item<'a> {}

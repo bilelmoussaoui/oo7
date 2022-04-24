@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt, time::Duration};
 use serde::Serialize;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath, Value};
 
-use super::{Item, Prompt, Secret, DESTINATION};
+use super::{Item, Prompt, Secret, Unlockable, DESTINATION};
 use crate::Result;
 
 pub struct Collection<'a>(zbus::Proxy<'a>);
@@ -146,3 +146,5 @@ impl<'a> fmt::Debug for Collection<'a> {
             .finish()
     }
 }
+
+impl<'a> Unlockable for Collection<'a> {}

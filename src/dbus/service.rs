@@ -3,7 +3,9 @@ use std::fmt;
 
 use zbus::zvariant::{Array, ObjectPath, OwnedObjectPath, OwnedValue, Value};
 
-use super::{secret::SecretInner, Collection, Item, Prompt, Secret, Session, DESTINATION, PATH};
+use super::{
+    secret::SecretInner, Collection, Item, Prompt, Secret, Session, Unlockable, DESTINATION, PATH,
+};
 use crate::{Algorithm, Result};
 
 #[doc(alias = "org.freedesktop.secrets")]
@@ -97,7 +99,7 @@ impl<'a> Service<'a> {
         Ok((unlocked_items, locked_items))
     }
 
-    pub async fn unlock(&self, items: &[Item<'_>]) -> Result<Vec<Item<'_>>> {
+    pub async fn unlock(&self, items: &[impl Unlockable]) -> Result<Vec<Item<'_>>> {
         let (unlocked_item_paths, prompt_path) = self
             .inner()
             .call_method("Unlock", &(items))
@@ -115,7 +117,7 @@ impl<'a> Service<'a> {
         Ok(unlocked_items)
     }
 
-    pub async fn lock(&self, items: &[Item<'_>]) -> Result<Vec<Item<'_>>> {
+    pub async fn lock(&self, items: &[impl Unlockable]) -> Result<Vec<Item<'_>>> {
         let (locked_item_paths, prompt_path) = self
             .inner()
             .call_method("Lock", &(items))
