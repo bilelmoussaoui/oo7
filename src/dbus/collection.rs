@@ -1,5 +1,6 @@
 use std::{collections::HashMap, fmt, time::Duration};
 
+use futures::StreamExt;
 use serde::Serialize;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 
@@ -41,6 +42,30 @@ impl<'a> Collection<'a> {
             collections.push(Self::new(connection, path).await?);
         }
         Ok(collections)
+    }
+
+    #[doc(alias = "ItemCreated")]
+    pub async fn receive_item_created(&self) -> Result<Item<'_>> {
+        let mut stream = self.inner().receive_signal("ItemCreated").await?;
+        let message = stream.next().await.unwrap();
+        let object_path = message.body::<OwnedObjectPath>()?;
+        Item::new(self.inner().connection(), object_path).await
+    }
+
+    #[doc(alias = "ItemDeleted")]
+    pub async fn receive_item_deleted(&self) -> Result<Item<'_>> {
+        let mut stream = self.inner().receive_signal("ItemDeleted").await?;
+        let message = stream.next().await.unwrap();
+        let object_path = message.body::<OwnedObjectPath>()?;
+        Item::new(self.inner().connection(), object_path).await
+    }
+
+    #[doc(alias = "ItemChanged")]
+    pub async fn receive_item_changed(&self) -> Result<Item<'_>> {
+        let mut stream = self.inner().receive_signal("ItemChanged").await?;
+        let message = stream.next().await.unwrap();
+        let object_path = message.body::<OwnedObjectPath>()?;
+        Item::new(self.inner().connection(), object_path).await
     }
 
     pub async fn items(&self) -> Result<Vec<Item<'_>>> {

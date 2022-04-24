@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fmt;
 
+use futures::StreamExt;
 use zbus::zvariant::{Array, ObjectPath, OwnedObjectPath, OwnedValue};
 
 use super::{
@@ -25,6 +26,30 @@ impl<'a> Service<'a> {
 
     pub fn inner(&self) -> &zbus::Proxy {
         &self.0
+    }
+
+    #[doc(alias = "CollectionCreated")]
+    pub async fn receive_collection_created(&self) -> Result<Collection<'_>> {
+        let mut stream = self.inner().receive_signal("CollectionCreated").await?;
+        let message = stream.next().await.unwrap();
+        let object_path = message.body::<OwnedObjectPath>()?;
+        Collection::new(self.inner().connection(), object_path).await
+    }
+
+    #[doc(alias = "CollectionDeleted")]
+    pub async fn receive_collection_deleted(&self) -> Result<Collection<'_>> {
+        let mut stream = self.inner().receive_signal("CollectionDeleted").await?;
+        let message = stream.next().await.unwrap();
+        let object_path = message.body::<OwnedObjectPath>()?;
+        Collection::new(self.inner().connection(), object_path).await
+    }
+
+    #[doc(alias = "CollectionChanged")]
+    pub async fn receive_collection_changed(&self) -> Result<Collection<'_>> {
+        let mut stream = self.inner().receive_signal("CollectionChanged").await?;
+        let message = stream.next().await.unwrap();
+        let object_path = message.body::<OwnedObjectPath>()?;
+        Collection::new(self.inner().connection(), object_path).await
     }
 
     pub async fn collections(&self) -> Result<Vec<Collection<'_>>> {
