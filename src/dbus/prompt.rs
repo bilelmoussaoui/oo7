@@ -2,7 +2,7 @@ use std::fmt;
 
 use super::DESTINATION;
 use crate::{Error, Result};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::Serialize;
 use zbus::{
     export::futures_util::StreamExt,
     zvariant::{ObjectPath, OwnedValue, Type},
@@ -39,20 +39,28 @@ impl<'a> Prompt<'a> {
         Ok(())
     }
 
+    #[allow(unused)]
     pub async fn dismiss(&self) -> Result<()> {
         self.inner().call_method("Dismiss", &()).await?;
         Ok(())
     }
 
-    pub async fn receive_completed<'de, T>(&self) -> std::result::Result<(bool, T), Error>
-    where
-        T: TryFrom<OwnedValue> + DeserializeOwned + Type,
-        Error: From<<T as TryFrom<OwnedValue>>::Error>,
-    {
+    pub async fn receive_completed(&self) -> Result<OwnedValue> {
         let mut stream = self.inner().receive_signal("Completed").await?;
-        let message = stream.next().await.unwrap();
-        let (dismissed, result) = message.body::<(bool, OwnedValue)>()?;
-        Ok((dismissed, T::try_from(result).map_err(From::from)?))
+        // TODO: figure out how to come with a window-id without depending on ashpd for it WindowIdentifier thingy
+        let (value, _) = futures::try_join!(
+            async {
+                let message = stream.next().await.unwrap();
+                let (dismissed, result) = message.body::<(bool, OwnedValue)>()?;
+                if dismissed {
+                    Err(Error::Dismissed)
+                } else {
+                    Ok(result)
+                }
+            },
+            async { self.prompt("").await }
+        )?;
+        Ok(value)
     }
 }
 

@@ -80,13 +80,16 @@ impl<'a> Collection<'a> {
         Ok(Duration::from_secs(time))
     }
 
-    pub async fn delete(&self) -> Result<Option<Prompt<'_>>> {
+    pub async fn delete(&self) -> Result<()> {
         let prompt_path = self
             .inner()
             .call_method("Delete", &())
             .await?
             .body::<zbus::zvariant::OwnedObjectPath>()?;
-        Prompt::new(self.inner().connection(), prompt_path).await
+        if let Some(prompt) = Prompt::new(self.inner().connection(), prompt_path).await? {
+            let _ = prompt.receive_completed().await?;
+        }
+        Ok(())
     }
 
     pub async fn search_items(&self, attributes: HashMap<&str, &str>) -> Result<Vec<Item<'_>>> {
@@ -104,27 +107,20 @@ impl<'a> Collection<'a> {
         properties: HashMap<&str, Value<'_>>,
         secret: &Secret<'_>,
         replace: bool,
-    ) -> Result<(Option<Item<'_>>, Option<Prompt<'_>>)> {
+    ) -> Result<Item<'_>> {
         let (item_path, prompt_path) = self
             .inner()
             .call_method("CreateItem", &(properties, secret, replace))
             .await?
             .body::<(OwnedObjectPath, OwnedObjectPath)>()?;
-
-        // no prompt is needed in this case
-        // TODO: investigate if we can make the whole Prompt part an internal thing
-        if item_path.as_str() != "/" {
-            Ok((
-                Some(Item::new(self.inner().connection(), item_path).await?),
-                None,
-            ))
+        let cnx = self.inner().connection();
+        let item_path = if let Some(prompt) = Prompt::new(cnx, prompt_path).await? {
+            let response = prompt.receive_completed().await?;
+            OwnedObjectPath::try_from(response).map_err::<zbus::zvariant::Error, _>(From::from)?
         } else {
-            // A prompt is needed
-            Ok((
-                None,
-                Prompt::new(self.inner().connection(), prompt_path).await?,
-            ))
-        }
+            item_path
+        };
+        Ok(Item::new(self.inner().connection(), item_path).await?)
     }
 }
 

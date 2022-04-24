@@ -10,7 +10,7 @@ mod session;
 
 pub use collection::Collection;
 pub use item::Item;
-pub use prompt::Prompt;
+pub(crate) use prompt::Prompt;
 pub use secret::Secret;
 pub use service::Service;
 pub use session::Session;

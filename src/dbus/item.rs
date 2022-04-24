@@ -86,13 +86,16 @@ impl<'a> Item<'a> {
         Ok(())
     }
 
-    pub async fn delete(&self) -> Result<Option<Prompt<'_>>> {
+    pub async fn delete(&self) -> Result<()> {
         let prompt_path = self
             .inner()
             .call_method("Delete", &())
             .await?
             .body::<zbus::zvariant::OwnedObjectPath>()?;
-        Prompt::new(self.inner().connection(), prompt_path).await
+        if let Some(prompt) = Prompt::new(self.inner().connection(), prompt_path).await? {
+            let _ = prompt.receive_completed().await?;
+        }
+        Ok(())
     }
 
     #[doc(alias = "GetSecret")]

@@ -62,27 +62,22 @@ impl<'a> Service<'a> {
         &self,
         properties: HashMap<&str, Value<'_>>,
         alias: &str,
-    ) -> Result<(Option<Collection<'_>>, Option<Prompt<'_>>)> {
+    ) -> Result<Collection<'_>> {
         let (collection_path, prompt_path) = self
             .inner()
             .call_method("CreateCollection", &(properties, alias))
             .await?
             .body::<(OwnedObjectPath, OwnedObjectPath)>()?;
 
-        // no prompt is needed in this case
-        // TODO: investigate if we can make the whole Prompt part an internal thing
-        if collection_path.as_str() != "/" {
-            Ok((
-                Some(Collection::new(self.inner().connection(), collection_path).await?),
-                None,
-            ))
+        let collection_path = if let Some(prompt) =
+            Prompt::new(self.inner().connection(), prompt_path).await?
+        {
+            let response = prompt.receive_completed().await?;
+            OwnedObjectPath::try_from(response).map_err::<zbus::zvariant::Error, _>(From::from)?
         } else {
-            // A prompt is needed
-            Ok((
-                None,
-                Prompt::new(self.inner().connection(), prompt_path).await?,
-            ))
-        }
+            collection_path
+        };
+        Ok(Collection::new(self.inner().connection(), collection_path).await?)
     }
 
     pub async fn search_items(
@@ -102,20 +97,25 @@ impl<'a> Service<'a> {
         Ok((unlocked_items, locked_items))
     }
 
-    pub async fn unlock(&self, items: &[Item<'_>]) -> Result<(Vec<Item<'_>>, Option<Prompt<'_>>)> {
+    pub async fn unlock(&self, items: &[Item<'_>]) -> Result<Vec<Item<'_>>> {
         let (unlocked_item_paths, prompt_path) = self
             .inner()
             .call_method("Unlock", &(items))
             .await?
             .body::<(Vec<OwnedObjectPath>, OwnedObjectPath)>()?;
         let cnx = self.inner().connection();
+        let mut unlocked_items = Item::from_paths(cnx, unlocked_item_paths).await?;
 
-        let prompt = Prompt::new(cnx, prompt_path).await?;
-        let unlocked_items = Item::from_paths(cnx, unlocked_item_paths).await?;
-        Ok((unlocked_items, prompt))
+        if let Some(prompt) = Prompt::new(cnx, prompt_path).await? {
+            let response = prompt.receive_completed().await?;
+            let locked_paths = Vec::<OwnedObjectPath>::try_from(response)
+                .map_err::<zbus::zvariant::Error, _>(From::from)?;
+            unlocked_items.extend(Item::from_paths(cnx, locked_paths).await?);
+        };
+        Ok(unlocked_items)
     }
 
-    pub async fn lock(&self, items: &[Item<'_>]) -> Result<(Vec<Item<'_>>, Option<Prompt<'_>>)> {
+    pub async fn lock(&self, items: &[Item<'_>]) -> Result<Vec<Item<'_>>> {
         let (locked_item_paths, prompt_path) = self
             .inner()
             .call_method("Lock", &(items))
@@ -123,9 +123,16 @@ impl<'a> Service<'a> {
             .body::<(Vec<OwnedObjectPath>, OwnedObjectPath)>()?;
         let cnx = self.inner().connection();
 
-        let prompt = Prompt::new(cnx, prompt_path).await?;
-        let locked_items = Item::from_paths(cnx, locked_item_paths).await?;
-        Ok((locked_items, prompt))
+        let mut locked_items = Item::from_paths(cnx, locked_item_paths).await?;
+
+        if let Some(prompt) = Prompt::new(cnx, prompt_path).await? {
+            let response = prompt.receive_completed().await?;
+            let locked_paths = Vec::<OwnedObjectPath>::try_from(response)
+                .map_err::<zbus::zvariant::Error, _>(From::from)?;
+            locked_items.extend(Item::from_paths(cnx, locked_paths).await?);
+        };
+
+        Ok(locked_items)
     }
 
     #[doc(alias = "GetSecrets")]

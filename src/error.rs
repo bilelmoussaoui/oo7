@@ -7,6 +7,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug)]
 pub enum Error {
     Zbus(zbus::Error),
+    Dismissed,
 }
 
 impl From<zbus::Error> for Error {
@@ -20,12 +21,19 @@ impl From<zbus::fdo::Error> for Error {
     }
 }
 
+impl From<zbus::zvariant::Error> for Error {
+    fn from(e: zbus::zvariant::Error) -> Self {
+        Self::Zbus(zbus::Error::Variant(e))
+    }
+}
+
 impl std::error::Error for Error {}
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Zbus(err) => write!(f, "zbus error {err}"),
+            Self::Dismissed => write!(f, "Prompt was dismissed"),
         }
     }
 }
