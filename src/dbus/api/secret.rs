@@ -14,7 +14,7 @@ pub(crate) struct SecretInner(pub OwnedObjectPath, pub Vec<u8>, pub Vec<u8>, pub
 #[zvariant(signature = "(oayays)")]
 pub struct Secret<'a> {
     pub(crate) session: Arc<Session<'a>>,
-    pub(crate) parameteres: Vec<u8>,
+    pub(crate) parameters: Vec<u8>,
     pub(crate) value: Vec<u8>,
     pub(crate) content_type: String,
 }
@@ -26,7 +26,7 @@ impl<'a> Secret<'a> {
         secret: &[u8],
         content_type: &str,
     ) -> Self {
-        let (parameteres, value) = match algorithm.as_ref() {
+        let (parameters, value) = match algorithm.as_ref() {
             Algorithm::Plain => (vec![], secret.to_vec()),
             Algorithm::Dh(_blob) => {
                 // See https://github.com/hwchen/secret-service-rs/blob/d6aaa774f0ec504ff5f26662279e07175b8ef111/src/util.rs#L52
@@ -35,7 +35,7 @@ impl<'a> Secret<'a> {
         };
         Self {
             session,
-            parameteres,
+            parameters,
             value,
             content_type: content_type.to_owned(),
         }
@@ -47,7 +47,7 @@ impl<'a> Secret<'a> {
     ) -> Result<Secret<'_>> {
         let secret = Secret {
             session: Arc::new(Session::new(cnx, inner.0).await?),
-            parameteres: inner.1,
+            parameters: inner.1,
             value: inner.2,
             content_type: inner.3,
         };
@@ -61,7 +61,7 @@ impl<'a> Secret<'a> {
 
     /// Algorithm dependent parameters for secret value encoding
     pub fn parameters(&self) -> &[u8] {
-        &self.parameteres
+        &self.parameters
     }
 
     /// Possibly encoded secret value
