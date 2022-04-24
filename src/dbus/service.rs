@@ -32,6 +32,7 @@ impl<'a> Service<'a> {
             .await?
             .map(|collection| {
                 Collection::new(
+                    Arc::clone(&self.inner),
                     Arc::clone(&self.session),
                     Arc::clone(&self.algorithm),
                     collection,

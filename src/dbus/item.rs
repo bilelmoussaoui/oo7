@@ -9,6 +9,7 @@ use super::api;
 pub struct Item<'a> {
     inner: Arc<api::Item<'a>>,
     session: Arc<api::Session<'a>>,
+    service: Arc<api::Service<'a>>,
     algorithm: Arc<Algorithm>,
     /// Defines whether the Item has been deleted or not
     available: Mutex<bool>,
@@ -16,12 +17,14 @@ pub struct Item<'a> {
 
 impl<'a> Item<'a> {
     pub(crate) fn new(
+        service: Arc<api::Service<'a>>,
         session: Arc<api::Session<'a>>,
         algorithm: Arc<Algorithm>,
         item: api::Item<'a>,
     ) -> Item<'a> {
         Self {
             inner: Arc::new(item),
+            service,
             session,
             algorithm,
             available: Mutex::new(true),
@@ -117,5 +120,23 @@ impl<'a> Item<'a> {
         );
         self.inner.set_secret(&secret).await?;
         Ok(())
+    }
+
+    pub async fn unlock(&self) -> Result<()> {
+        if !self.is_available().await {
+            Err(Error::Deleted)
+        } else {
+            self.service.lock(&vec![self.inner.inner().path()]).await?;
+            Ok(())
+        }
+    }
+
+    pub async fn lock(&self) -> Result<()> {
+        if !self.is_available().await {
+            Err(Error::Deleted)
+        } else {
+            self.service.lock(&vec![self.inner.inner().path()]).await?;
+            Ok(())
+        }
     }
 }

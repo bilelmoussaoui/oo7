@@ -8,6 +8,7 @@ use super::{api, Item};
 
 pub struct Collection<'a> {
     inner: Arc<api::Collection<'a>>,
+    service: Arc<api::Service<'a>>,
     session: Arc<api::Session<'a>>,
     algorithm: Arc<Algorithm>,
     /// Defines whether the Collection has been deleted or not
@@ -16,6 +17,7 @@ pub struct Collection<'a> {
 
 impl<'a> Collection<'a> {
     pub(crate) fn new(
+        service: Arc<api::Service<'a>>,
         session: Arc<api::Session<'a>>,
         algorithm: Arc<Algorithm>,
         collection: api::Collection<'a>,
@@ -23,6 +25,7 @@ impl<'a> Collection<'a> {
         Self {
             inner: Arc::new(collection),
             session,
+            service,
             algorithm,
             available: Mutex::new(true),
         }
@@ -41,7 +44,14 @@ impl<'a> Collection<'a> {
                 .items()
                 .await?
                 .into_iter()
-                .map(|item| Item::new(Arc::clone(&self.session), Arc::clone(&self.algorithm), item))
+                .map(|item| {
+                    Item::new(
+                        Arc::clone(&self.service),
+                        Arc::clone(&self.session),
+                        Arc::clone(&self.algorithm),
+                        item,
+                    )
+                })
                 .collect::<Vec<_>>())
         }
     }
@@ -94,7 +104,14 @@ impl<'a> Collection<'a> {
             let items = self.inner.search_items(attributes).await?;
             Ok(items
                 .into_iter()
-                .map(|item| Item::new(Arc::clone(&self.session), Arc::clone(&self.algorithm), item))
+                .map(|item| {
+                    Item::new(
+                        Arc::clone(&self.service),
+                        Arc::clone(&self.session),
+                        Arc::clone(&self.algorithm),
+                        item,
+                    )
+                })
                 .collect::<Vec<_>>())
         }
     }
@@ -123,10 +140,29 @@ impl<'a> Collection<'a> {
                 .await?;
 
             Ok(Item::new(
+                Arc::clone(&self.service),
                 Arc::clone(&self.session),
                 Arc::clone(&self.algorithm),
                 item,
             ))
+        }
+    }
+
+    pub async fn unlock(&self) -> Result<()> {
+        if !self.is_available().await {
+            Err(Error::Deleted)
+        } else {
+            self.service.lock(&vec![self.inner.inner().path()]).await?;
+            Ok(())
+        }
+    }
+
+    pub async fn lock(&self) -> Result<()> {
+        if !self.is_available().await {
+            Err(Error::Deleted)
+        } else {
+            self.service.lock(&vec![self.inner.inner().path()]).await?;
+            Ok(())
         }
     }
 
