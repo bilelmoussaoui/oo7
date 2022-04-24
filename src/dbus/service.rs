@@ -31,7 +31,11 @@ impl<'a> Service<'a> {
             .read_alias(DEFAULT_COLLECTION)
             .await?
             .map(|collection| {
-                Collection::new(self.session.clone(), self.algorithm.clone(), collection)
+                Collection::new(
+                    Arc::clone(&self.session),
+                    Arc::clone(&self.algorithm),
+                    collection,
+                )
             }))
     }
 }

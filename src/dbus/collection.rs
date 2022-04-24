@@ -27,7 +27,7 @@ impl<'a> Collection<'a> {
         let items = self.collection.search_items(attributes).await?;
         Ok(items
             .into_iter()
-            .map(|item| Item::new(self.session.clone(), self.algorithm.clone(), item))
+            .map(|item| Item::new(Arc::clone(&self.session), Arc::clone(&self.algorithm), item))
             .collect::<Vec<_>>())
     }
 
