@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use futures::lock::Mutex;
 
-use crate::{Algorithm, Result, Error};
+use crate::{Algorithm, Error, Result};
 
 use super::{api, Item};
 

@@ -9,7 +9,6 @@ use super::api;
 pub struct Item<'a> {
     item: Arc<api::Item<'a>>,
     session: Arc<api::Session<'a>>,
-    #[allow(unused)]
     algorithm: Arc<Algorithm>,
     /// Defines whether the Item has been deleted or not
     available: Mutex<bool>,
@@ -106,5 +105,17 @@ impl<'a> Item<'a> {
             let secret = self.item.secret(&self.session).await?;
             Ok(secret.value)
         }
+    }
+
+    #[doc(alias = "SetSecret")]
+    pub async fn set_secret(&self, secret: &[u8], content_type: &str) -> Result<()> {
+        let secret = api::Secret::new(
+            Arc::clone(&self.algorithm),
+            Arc::clone(&self.session),
+            secret,
+            content_type,
+        );
+        self.item.set_secret(&secret).await?;
+        Ok(())
     }
 }
