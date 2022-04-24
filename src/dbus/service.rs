@@ -99,42 +99,39 @@ impl<'a> Service<'a> {
         Ok((unlocked_items, locked_items))
     }
 
-    pub async fn unlock(&self, items: &[impl Unlockable]) -> Result<Vec<Item<'_>>> {
-        let (unlocked_item_paths, prompt_path) = self
+    pub async fn unlock(&self, items: &[impl Unlockable]) -> Result<Vec<OwnedObjectPath>> {
+        let (mut unlocked_item_paths, prompt_path) = self
             .inner()
             .call_method("Unlock", &(items))
             .await?
             .body::<(Vec<OwnedObjectPath>, OwnedObjectPath)>()?;
         let cnx = self.inner().connection();
-        let mut unlocked_items = Item::from_paths(cnx, unlocked_item_paths).await?;
 
         if let Some(prompt) = Prompt::new(cnx, prompt_path).await? {
             let response = prompt.receive_completed().await?;
             let locked_paths = Vec::<OwnedObjectPath>::try_from(response)
                 .map_err::<zbus::zvariant::Error, _>(From::from)?;
-            unlocked_items.extend(Item::from_paths(cnx, locked_paths).await?);
+            unlocked_item_paths.extend(locked_paths);
         };
-        Ok(unlocked_items)
+        Ok(unlocked_item_paths)
     }
 
-    pub async fn lock(&self, items: &[impl Unlockable]) -> Result<Vec<Item<'_>>> {
-        let (locked_item_paths, prompt_path) = self
+    pub async fn lock(&self, items: &[impl Unlockable]) -> Result<Vec<OwnedObjectPath>> {
+        let (mut locked_item_paths, prompt_path) = self
             .inner()
             .call_method("Lock", &(items))
             .await?
             .body::<(Vec<OwnedObjectPath>, OwnedObjectPath)>()?;
         let cnx = self.inner().connection();
 
-        let mut locked_items = Item::from_paths(cnx, locked_item_paths).await?;
-
         if let Some(prompt) = Prompt::new(cnx, prompt_path).await? {
             let response = prompt.receive_completed().await?;
             let locked_paths = Vec::<OwnedObjectPath>::try_from(response)
                 .map_err::<zbus::zvariant::Error, _>(From::from)?;
-            locked_items.extend(Item::from_paths(cnx, locked_paths).await?);
+            locked_item_paths.extend(locked_paths);
         };
 
-        Ok(locked_items)
+        Ok(locked_item_paths)
     }
 
     #[doc(alias = "GetSecrets")]
