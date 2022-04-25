@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use serde::ser::{Serialize, SerializeMap};
-use zbus::zvariant::Type;
+use zbus::zvariant::{Type, Value};
 
 static PROPERTY_LABEL: &str = "org.freedesktop.Secret.Item.Label";
 static PROPERTY_ATTRIBUTES: &str = "org.freedesktop.Secret.Item.Attributes";
@@ -33,12 +33,17 @@ impl<'a> Serialize for Properties<'a> {
     {
         if self.attributes.is_empty() {
             let mut map = serializer.serialize_map(Some(1))?;
-            map.serialize_entry(PROPERTY_LABEL, self.label)?;
+            map.serialize_entry(PROPERTY_LABEL, &Value::from(self.label))?;
             map.end()
         } else {
             let mut map = serializer.serialize_map(Some(2))?;
-            map.serialize_entry(PROPERTY_LABEL, self.label)?;
-            map.serialize_entry(PROPERTY_ATTRIBUTES, &self.attributes)?;
+            map.serialize_entry(PROPERTY_LABEL, &Value::from(self.label))?;
+            let mut dict = zbus::zvariant::Dict::new(String::signature(), String::signature());
+            for (key, value) in &self.attributes {
+                dict.add(key, value).expect("Key/Value of correct types");
+            }
+
+            map.serialize_entry(PROPERTY_ATTRIBUTES, &Value::from(dict))?;
             map.end()
         }
     }
