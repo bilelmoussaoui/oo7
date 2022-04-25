@@ -90,7 +90,7 @@ impl<'a> Service<'a> {
 
     #[doc(alias = "CreateCollection")]
     pub async fn create_collection(&self, label: &str, alias: &str) -> Result<Collection<'a>> {
-        let properties = Properties::with_label(label);
+        let properties = Properties::for_collection(label);
         let (collection_path, prompt_path) = self
             .inner()
             .call_method("CreateCollection", &(properties, alias))

@@ -140,7 +140,7 @@ impl<'a> Collection<'a> {
         secret: &Secret<'_>,
         replace: bool,
     ) -> Result<Item<'_>> {
-        let properties = Properties::new(label, attributes);
+        let properties = Properties::for_item(label, attributes);
         let (item_path, prompt_path) = self
             .inner()
             .call_method("CreateItem", &(properties, secret, replace))
