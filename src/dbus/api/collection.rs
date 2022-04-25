@@ -21,6 +21,7 @@ impl<'a> Collection<'a> {
         let inner = zbus::ProxyBuilder::new_bare(connection)
             .interface("org.freedesktop.Secret.Collection")?
             .path(object_path)?
+            .cache_properties(zbus::CacheProperties::No)
             .destination(DESTINATION)?
             .build()
             .await?;

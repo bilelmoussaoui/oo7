@@ -176,3 +176,35 @@ impl<'a> Collection<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::dbus::Service;
+
+    #[tokio::test]
+    async fn create_plain_item() {
+        let service = Service::new(Algorithm::Plain).await.unwrap();
+
+        let mut attributes = HashMap::new();
+        attributes.insert("type", "token");
+        let secret = "a password".as_bytes();
+
+        let collection = service.default_collection().await.unwrap().unwrap();
+        let n_items = collection.items().await.unwrap().len();
+
+        let item = collection
+            .create_item("A secret", attributes, secret, true, "text/plain")
+            .await
+            .unwrap();
+
+        assert_eq!(item.secret().await.unwrap(), secret);
+        assert_eq!(item.attributes().await.unwrap()["type"], "token");
+        assert_eq!(collection.items().await.unwrap().len(), n_items + 1);
+
+        item.delete().await.unwrap();
+
+        assert_eq!(collection.items().await.unwrap().len(), n_items);
+    }
+}
