@@ -13,7 +13,6 @@ jobs:
       - uses: codespell-project/actions-codespell@master
         with:
           check_filenames: true
-          ignore_words_list: "crate,ser"
-          check_hidden: false
-          skip: "./.git/**"
+          ignore_words_list: "crate,ser,mut"
           builtin: "clear,rare,informal,usage,code"
+          skip: ".github/**/**.yml,.git/**,.git/**/**"
