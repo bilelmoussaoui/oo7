@@ -1,3 +1,32 @@
+//! The implementation in this module allows you to interact with a
+//! [`org.freedesktop.Secrets`](https://specifications.freedesktop.org/secret-service/latest/index.html) implementation.
+//!
+//! That is usually done with
+//! ```ignore
+//! let service = Service::new(Algorithm::Plain).await?;
+//!
+//! let mut attributes = std::collections::HashMap::new();
+//! attributes.insert("type", "password");
+//! attributes.insert("user_id", "some_other_identifier");
+//!
+//! if let Some(collection) = service.default_collection().await? {
+//!     // Store a secret
+//!     collection
+//!         .create_item(
+//!             "My App's secret",
+//!             attributes.clone(),
+//!             b"password",
+//!             true,
+//!             "text/plain",
+//!         )
+//!         .await?;
+//!
+//!     // Retrieve it later thanks to it attributes
+//!     let item = collection.search_items(attributes).await?.first().unwrap();
+//!     assert_eq!(item.secret().await?, b"password");
+//! }
+//! ```
+
 /// The default collection alias.
 ///
 /// In general, you are supposed to use [`Service::default_collection`]
