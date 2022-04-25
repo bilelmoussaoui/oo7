@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use futures::lock::Mutex;
 
-use crate::{Algorithm, Error, Result};
+use crate::{utils, Algorithm, Error, Result};
 
 use super::api;
 
@@ -106,7 +106,15 @@ impl<'a> Item<'a> {
             Err(Error::Deleted)
         } else {
             let secret = self.inner.secret(&self.session).await?;
-            Ok(secret.value)
+
+            let value = match self.algorithm.as_ref() {
+                Algorithm::Plain => secret.value,
+                Algorithm::Dh(aes_key) => {
+                    let iv = secret.parameters;
+                    utils::decrypt(&secret.value, aes_key, &iv).unwrap()
+                }
+            };
+            Ok(value)
         }
     }
 

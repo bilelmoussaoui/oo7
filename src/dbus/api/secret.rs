@@ -4,7 +4,7 @@ use serde::{ser::SerializeTuple, Deserialize, Serialize};
 use zbus::zvariant::{OwnedObjectPath, Type};
 
 use super::Session;
-use crate::{Algorithm, Result};
+use crate::{utils, Algorithm, Result};
 
 #[derive(Debug, Serialize, Deserialize, Type)]
 #[zvariant(signature = "(oayays)")]
@@ -26,12 +26,9 @@ impl<'a> Secret<'a> {
         secret: &[u8],
         content_type: &str,
     ) -> Self {
-        let (parameters, value) = match algorithm.as_ref() {
-            Algorithm::Plain => (vec![], secret.to_vec()),
-            Algorithm::Dh(_blob) => {
-                // See https://github.com/hwchen/secret-service-rs/blob/d6aaa774f0ec504ff5f26662279e07175b8ef111/src/util.rs#L52
-                unimplemented!()
-            }
+        let (value, parameters) = match algorithm.as_ref() {
+            Algorithm::Plain => (secret.to_vec(), vec![]),
+            Algorithm::Dh(aes_key) => utils::encrypt(secret, aes_key).unwrap(),
         };
         Self {
             session,
