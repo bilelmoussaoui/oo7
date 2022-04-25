@@ -5,6 +5,7 @@ use futures::lock::Mutex;
 use super::{api, Algorithm};
 use crate::{Error, Result};
 
+/// A secret with a label and attributes to identify it.
 pub struct Item<'a> {
     inner: Arc<api::Item<'a>>,
     session: Arc<api::Session<'a>>,
@@ -34,6 +35,7 @@ impl<'a> Item<'a> {
         *self.available.lock().await
     }
 
+    /// Get whether the item is locked.
     pub async fn is_locked(&self) -> Result<bool> {
         if !self.is_available().await {
             Err(Error::Deleted)
@@ -42,6 +44,7 @@ impl<'a> Item<'a> {
         }
     }
 
+    /// Get the item label.
     pub async fn label(&self) -> Result<String> {
         if !self.is_available().await {
             Err(Error::Deleted)
@@ -50,6 +53,7 @@ impl<'a> Item<'a> {
         }
     }
 
+    /// Set the item label.
     pub async fn set_label(&self, label: &str) -> Result<()> {
         if !self.is_available().await {
             Err(Error::Deleted)
@@ -58,6 +62,7 @@ impl<'a> Item<'a> {
         }
     }
 
+    /// Get the UNIX time when the item was created.
     pub async fn created(&self) -> Result<Duration> {
         if !self.is_available().await {
             Err(Error::Deleted)
@@ -66,6 +71,7 @@ impl<'a> Item<'a> {
         }
     }
 
+    /// Get the UNIX time when the item was modified.
     pub async fn modified(&self) -> Result<Duration> {
         if !self.is_available().await {
             Err(Error::Deleted)
@@ -74,6 +80,7 @@ impl<'a> Item<'a> {
         }
     }
 
+    /// Retrieve the item attributes.
     pub async fn attributes(&self) -> Result<HashMap<String, String>> {
         if !self.is_available().await {
             Err(Error::Deleted)
@@ -82,6 +89,7 @@ impl<'a> Item<'a> {
         }
     }
 
+    /// Update the item attributes.
     pub async fn set_attributes(&self, attributes: HashMap<&str, &str>) -> Result<()> {
         if !self.is_available().await {
             Err(Error::Deleted)
@@ -90,6 +98,7 @@ impl<'a> Item<'a> {
         }
     }
 
+    /// Delete the item.
     pub async fn delete(&self) -> Result<()> {
         if !self.is_available().await {
             Err(Error::Deleted)
@@ -100,6 +109,7 @@ impl<'a> Item<'a> {
         }
     }
 
+    /// Retrieve the currently stored secret.
     pub async fn secret(&self) -> Result<Vec<u8>> {
         if !self.is_available().await {
             Err(Error::Deleted)
@@ -109,6 +119,12 @@ impl<'a> Item<'a> {
         }
     }
 
+    /// Modify the stored secret on the item.
+    ///
+    /// # Arguments
+    ///
+    /// * `secret` - The secret to store.
+    /// * `content_type` - The content type of the secret, usually something like `text/plain`.
     #[doc(alias = "SetSecret")]
     pub async fn set_secret(&self, secret: &[u8], content_type: &str) -> Result<()> {
         let secret = api::Secret::new(
@@ -121,15 +137,17 @@ impl<'a> Item<'a> {
         Ok(())
     }
 
+    /// Unlock the item.
     pub async fn unlock(&self) -> Result<()> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            self.service.lock(&[self.inner.inner().path()]).await?;
+            self.service.unlock(&[self.inner.inner().path()]).await?;
             Ok(())
         }
     }
 
+    /// Lock the item.
     pub async fn lock(&self) -> Result<()> {
         if !self.is_available().await {
             Err(Error::Deleted)

@@ -1,9 +1,11 @@
 use std::fmt;
 
+/// Alias for [`std::result::Result`] with the error type [`Error`].
 pub type Result<T> = std::result::Result<T, Error>;
 
 // TODO: support secret service errors
 // https://specifications.freedesktop.org/secret-service/latest/ch15.html
+/// The error type for oo7.
 #[derive(Debug)]
 pub enum Error {
     Zbus(zbus::Error),

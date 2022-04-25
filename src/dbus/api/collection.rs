@@ -71,7 +71,7 @@ impl<'a> Collection<'a> {
         Item::new(self.inner().connection(), object_path).await
     }
 
-    pub async fn items(&self) -> Result<Vec<Item<'_>>> {
+    pub async fn items(&self) -> Result<Vec<Item<'a>>> {
         let item_paths = self
             .inner()
             .get_property::<Vec<ObjectPath>>("Items")
@@ -122,7 +122,7 @@ impl<'a> Collection<'a> {
     }
 
     #[doc(alias = "SearchItems")]
-    pub async fn search_items(&self, attributes: HashMap<&str, &str>) -> Result<Vec<Item<'_>>> {
+    pub async fn search_items(&self, attributes: HashMap<&str, &str>) -> Result<Vec<Item<'a>>> {
         let msg = self
             .inner()
             .call_method("SearchItems", &(attributes))

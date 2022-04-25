@@ -6,6 +6,12 @@ use crate::{Error, Result};
 
 use super::{api, Algorithm, Item};
 
+/// A collection allows the user to store/retrieve items.
+///
+/// **Note**
+///
+/// If a collection is deleted using [`Collection::delete`] any future usage of its API
+/// will fail with [`Error::Deleted`].
 pub struct Collection<'a> {
     inner: Arc<api::Collection<'a>>,
     service: Arc<api::Service<'a>>,
@@ -35,7 +41,8 @@ impl<'a> Collection<'a> {
         *self.available.lock().await
     }
 
-    pub async fn items(&self) -> Result<Vec<Item<'_>>> {
+    /// Retrieve the list of available [`Item`] in the collection.
+    pub async fn items(&self) -> Result<Vec<Item<'a>>> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
@@ -56,6 +63,7 @@ impl<'a> Collection<'a> {
         }
     }
 
+    /// Get the collection label.
     pub async fn label(&self) -> Result<String> {
         if !self.is_available().await {
             Err(Error::Deleted)
@@ -64,6 +72,7 @@ impl<'a> Collection<'a> {
         }
     }
 
+    /// Set the collection label.
     pub async fn set_label(&self, label: &str) -> Result<()> {
         if !self.is_available().await {
             Err(Error::Deleted)
@@ -72,6 +81,7 @@ impl<'a> Collection<'a> {
         }
     }
 
+    /// Get whether the collection is locked.
     #[doc(alias = "Locked")]
     pub async fn is_locked(&self) -> Result<bool> {
         if !self.is_available().await {
@@ -81,6 +91,7 @@ impl<'a> Collection<'a> {
         }
     }
 
+    /// Get the UNIX time when the collection was created.
     pub async fn created(&self) -> Result<Duration> {
         if !self.is_available().await {
             Err(Error::Deleted)
@@ -89,6 +100,7 @@ impl<'a> Collection<'a> {
         }
     }
 
+    /// Get the UNIX time when the collection was modified.
     pub async fn modified(&self) -> Result<Duration> {
         if !self.is_available().await {
             Err(Error::Deleted)
@@ -97,7 +109,8 @@ impl<'a> Collection<'a> {
         }
     }
 
-    pub async fn search_items(&self, attributes: HashMap<&str, &str>) -> Result<Vec<Item<'_>>> {
+    /// Search for items based on their attributes.
+    pub async fn search_items(&self, attributes: HashMap<&str, &str>) -> Result<Vec<Item<'a>>> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
@@ -116,6 +129,15 @@ impl<'a> Collection<'a> {
         }
     }
 
+    /// Create a new item on the collection
+    ///
+    /// # Arguments
+    ///
+    /// * `label` - A user visible label of the item.
+    /// * `attributes` - A map of key/value attributes, used to find the item later.
+    /// * `secret` - The secret to store.
+    /// * `replace` - Whether to replace the value if the `attributes` matches an existing `secret`.
+    /// * `content_type` - The content type of the secret, usually something like `text/plain`.
     pub async fn create_item(
         &self,
         label: &str,
@@ -148,15 +170,17 @@ impl<'a> Collection<'a> {
         }
     }
 
+    /// Unlock the collection.
     pub async fn unlock(&self) -> Result<()> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            self.service.lock(&[self.inner.inner().path()]).await?;
+            self.service.unlock(&[self.inner.inner().path()]).await?;
             Ok(())
         }
     }
 
+    /// Lock the collection.
     pub async fn lock(&self) -> Result<()> {
         if !self.is_available().await {
             Err(Error::Deleted)
@@ -166,6 +190,7 @@ impl<'a> Collection<'a> {
         }
     }
 
+    /// Delete the collection.
     pub async fn delete(&self) -> Result<()> {
         if !self.is_available().await {
             Err(Error::Deleted)
