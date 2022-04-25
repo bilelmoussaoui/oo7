@@ -7,6 +7,14 @@ use crate::{Error, Result};
 
 /// A secret with a label and attributes to identify it.
 ///
+/// An item might be locked or unlocked, use [`Item::lock`] or [`Item::unlock`]
+/// to lock or unlock it. Note that the secret service might not be able to lock/unlock
+/// individual items and may lock/unlock the entire collection in such case.
+///
+/// The item is attributes are used to identify and find the item later using 
+/// [`Collection::search_items`](crate::dbus::Collection::search_items).
+/// They are not stored or transferred in a secure manner.
+///
 /// **Note**
 ///
 /// If the item is deleted using [`Item::delete`] any future usage of it API

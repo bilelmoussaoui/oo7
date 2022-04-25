@@ -7,6 +7,9 @@ use crate::Result;
 ///
 /// It will automatically create a session for you and allow you to retrieve collections or create new ones.
 ///
+/// Certain actions requires on the secret service implementation requires a user prompt to complete
+/// like creating a collection, locking or unlocking a collection. The library handles that automatically for you.
+///
 /// ```ignore
 /// let service = Service::new(Algorithm::Plain).await?;
 /// let collection = service.default_collection().await?;

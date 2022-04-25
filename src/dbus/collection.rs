@@ -8,6 +8,12 @@ use super::{api, Algorithm, Item};
 
 /// A collection allows to store and retrieve items.
 ///
+/// The collection can be either in a locked or unlocked state, use [`Collection::lock`]
+/// or [`Collection::unlock`] to lock or unlock it.
+///
+/// Using [`Collection::search_items`] or [`Collection::items`] will return no items if
+/// the collection is locked.
+///
 /// **Note**
 ///
 /// If the collection is deleted using [`Collection::delete`] any future usage of it API
