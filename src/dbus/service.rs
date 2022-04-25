@@ -8,7 +8,7 @@ pub struct Service<'a> {
     #[allow(unused)]
     service_key: Option<Vec<u8>>,
     session: Arc<api::Session<'a>>,
-    algorithm: Arc<Algorithm>,
+    algorithm: Algorithm,
 }
 
 impl<'a> Service<'a> {
@@ -21,7 +21,7 @@ impl<'a> Service<'a> {
             service_key,
             inner: service,
             session: Arc::new(session),
-            algorithm: Arc::new(algorithm),
+            algorithm: algorithm,
         })
     }
 
@@ -34,7 +34,7 @@ impl<'a> Service<'a> {
             Collection::new(
                 Arc::clone(&self.inner),
                 Arc::clone(&self.session),
-                Arc::clone(&self.algorithm),
+                self.algorithm,
                 collection,
             )
         }))
@@ -50,7 +50,7 @@ impl<'a> Service<'a> {
                 Collection::new(
                     Arc::clone(&self.inner),
                     Arc::clone(&self.session),
-                    Arc::clone(&self.algorithm),
+                    self.algorithm,
                     collection,
                 )
             })
@@ -65,7 +65,7 @@ impl<'a> Service<'a> {
                 Collection::new(
                     Arc::clone(&self.inner),
                     Arc::clone(&self.session),
-                    Arc::clone(&self.algorithm),
+                    self.algorithm,
                     collection,
                 )
             })

@@ -10,7 +10,7 @@ pub struct Collection<'a> {
     inner: Arc<api::Collection<'a>>,
     service: Arc<api::Service<'a>>,
     session: Arc<api::Session<'a>>,
-    algorithm: Arc<Algorithm>,
+    algorithm: Algorithm,
     /// Defines whether the Collection has been deleted or not
     available: Mutex<bool>,
 }
@@ -19,7 +19,7 @@ impl<'a> Collection<'a> {
     pub(crate) fn new(
         service: Arc<api::Service<'a>>,
         session: Arc<api::Session<'a>>,
-        algorithm: Arc<Algorithm>,
+        algorithm: Algorithm,
         collection: api::Collection<'a>,
     ) -> Collection<'a> {
         Self {
@@ -48,7 +48,7 @@ impl<'a> Collection<'a> {
                     Item::new(
                         Arc::clone(&self.service),
                         Arc::clone(&self.session),
-                        Arc::clone(&self.algorithm),
+                        self.algorithm,
                         item,
                     )
                 })
@@ -108,7 +108,7 @@ impl<'a> Collection<'a> {
                     Item::new(
                         Arc::clone(&self.service),
                         Arc::clone(&self.session),
-                        Arc::clone(&self.algorithm),
+                        self.algorithm,
                         item,
                     )
                 })
@@ -128,7 +128,7 @@ impl<'a> Collection<'a> {
             Err(Error::Deleted)
         } else {
             let secret = api::Secret::new(
-                Arc::clone(&self.algorithm),
+                self.algorithm,
                 Arc::clone(&self.session),
                 secret,
                 content_type,
@@ -142,7 +142,7 @@ impl<'a> Collection<'a> {
             Ok(Item::new(
                 Arc::clone(&self.service),
                 Arc::clone(&self.session),
-                Arc::clone(&self.algorithm),
+                self.algorithm,
                 item,
             ))
         }
@@ -193,7 +193,11 @@ mod tests {
 
         let collection = service.default_collection().await.unwrap().unwrap();
         let n_items = collection.items().await.unwrap().len();
-        let n_search_items = collection.search_items(attributes.clone()).await.unwrap().len();
+        let n_search_items = collection
+            .search_items(attributes.clone())
+            .await
+            .unwrap()
+            .len();
 
         let item = collection
             .create_item("A secret", attributes.clone(), secret, true, "text/plain")
@@ -204,11 +208,25 @@ mod tests {
         assert_eq!(item.attributes().await.unwrap()["type"], "plain-type-test");
 
         assert_eq!(collection.items().await.unwrap().len(), n_items + 1);
-        assert_eq!(collection.search_items(attributes.clone()).await.unwrap().len(), n_search_items + 1);
+        assert_eq!(
+            collection
+                .search_items(attributes.clone())
+                .await
+                .unwrap()
+                .len(),
+            n_search_items + 1
+        );
 
         item.delete().await.unwrap();
 
         assert_eq!(collection.items().await.unwrap().len(), n_items);
-        assert_eq!(collection.search_items(attributes.clone()).await.unwrap().len(), n_search_items);
+        assert_eq!(
+            collection
+                .search_items(attributes.clone())
+                .await
+                .unwrap()
+                .len(),
+            n_search_items
+        );
     }
 }
