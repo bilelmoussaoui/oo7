@@ -28,7 +28,7 @@ impl<'a> Secret<'a> {
     ) -> Self {
         let (value, parameters) = match algorithm.as_ref() {
             Algorithm::Plain => (secret.to_vec(), vec![]),
-            Algorithm::Dh(aes_key) => utils::encrypt(secret, aes_key).unwrap(),
+            Algorithm::Encrypted(aes_key) => utils::encrypt(secret, aes_key).unwrap(),
         };
         Self {
             session,

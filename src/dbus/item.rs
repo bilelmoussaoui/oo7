@@ -109,7 +109,7 @@ impl<'a> Item<'a> {
 
             let value = match self.algorithm.as_ref() {
                 Algorithm::Plain => secret.value,
-                Algorithm::Dh(aes_key) => {
+                Algorithm::Encrypted(aes_key) => {
                     let iv = secret.parameters;
                     utils::decrypt(&secret.value, aes_key, &iv).unwrap()
                 }
