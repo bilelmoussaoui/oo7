@@ -6,11 +6,24 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-zbus = "2.1"
+zbus = {version = "2.1", features = ["gvariant"]}
 serde = "1.0"
 tokio = {version = "1.17", features = ["macros", "rt-multi-thread"]}
 futures = "0.3"
 rand = {version = "0.8", default-features = false}
+async-std = {version = "1.11", features = ["attributes"]}
+byteorder = "1.0"
+
+aes = "0.8"
+cbc = "0.1"
+cipher = {version = "0.4", features = ["rand_core"]}
+digest = "0.10"
+hmac = "0.12"
+pbkdf2 = "0.11"
+sha2 = "0.10"
+zeroize = {version = "1.5", features = ["zeroize_derive"]}
+
+dirs = "4.0"
 
 [features]
 default = ["local_tests"]
@@ -21,6 +34,3 @@ local_tests = []
 [[bin]]
 name = "basic"
 path = "examples/basic.rs"
-
-[dev-dependencies]
-byteorder = "1.0"
