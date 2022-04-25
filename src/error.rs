@@ -9,6 +9,7 @@ pub enum Error {
     Zbus(zbus::Error),
     Deleted,
     Dismissed,
+    IO(std::io::Error),
 }
 
 impl From<zbus::Error> for Error {
@@ -28,12 +29,19 @@ impl From<zbus::zvariant::Error> for Error {
     }
 }
 
+impl From<std::io::Error> for Error {
+    fn from(e: std::io::Error) -> Self {
+        Self::IO(e)
+    }
+}
+
 impl std::error::Error for Error {}
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Zbus(err) => write!(f, "zbus error {err}"),
+            Self::IO(err) => write!(f, "IO error {err}"),
             Self::Deleted => write!(f, "Item/Collection was deleted, can no longer be used"),
             Self::Dismissed => write!(f, "Prompt was dismissed"),
         }

@@ -10,6 +10,7 @@ zbus = "2.1"
 serde = "1.0"
 tokio = {version = "1.17", features = ["macros", "rt-multi-thread"]}
 futures = "0.3"
+rand = {version = "0.8", default-features = false}
 
 [[bin]]
 name = "basic"
