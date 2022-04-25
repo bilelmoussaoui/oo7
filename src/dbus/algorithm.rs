@@ -5,14 +5,14 @@ use zbus::zvariant::{self, Type};
 #[zvariant(signature = "s")]
 pub enum Algorithm {
     Plain,
-    Dh(Vec<u8>),
+    Encrypted(Vec<u8>),
 }
 
 impl Algorithm {
     pub(crate) fn client_key(&self) -> zvariant::OwnedValue {
         match self {
             Self::Plain => zvariant::Str::default().into(),
-            Self::Dh(key) => {
+            Self::Encrypted(key) => {
                 let mut array = zvariant::Array::new(u8::signature());
                 for byte in key {
                     array
@@ -32,7 +32,7 @@ impl Serialize for Algorithm {
     {
         match self {
             Algorithm::Plain => String::serialize(&"plain".to_owned(), serializer),
-            Algorithm::Dh(_) => String::serialize(
+            Algorithm::Encrypted(_) => String::serialize(
                 &"dh-ietf1024-sha256-aes128-cbc-pkcs7".to_owned(),
                 serializer,
             ),
