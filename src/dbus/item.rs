@@ -6,7 +6,7 @@ use super::{api, Algorithm};
 use crate::{Error, Result};
 
 /// A secret with a label and attributes to identify it.
-/// 
+///
 /// **Note**
 ///
 /// If the item is deleted using [`Item::delete`] any future usage of it API
