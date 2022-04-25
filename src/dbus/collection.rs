@@ -192,6 +192,8 @@ mod tests {
         let secret = "a password".as_bytes();
 
         let collection = service.default_collection().await.unwrap().unwrap();
+        let n_items = collection.items().await.unwrap().len();
+        let n_search_items = collection.search_items(attributes.clone()).await.unwrap().len();
 
         let item = collection
             .create_item("A secret", attributes.clone(), secret, true, "text/plain")
@@ -201,8 +203,12 @@ mod tests {
         assert_eq!(item.secret().await.unwrap(), secret);
         assert_eq!(item.attributes().await.unwrap()["type"], "plain-type-test");
 
+        assert_eq!(collection.items().await.unwrap().len(), n_items + 1);
+        assert_eq!(collection.search_items(attributes.clone()).await.unwrap().len(), n_search_items + 1);
+
         item.delete().await.unwrap();
 
-        assert_eq!(collection.search_items(attributes).await.unwrap().len(), 0);
+        assert_eq!(collection.items().await.unwrap().len(), n_items);
+        assert_eq!(collection.search_items(attributes.clone()).await.unwrap().len(), n_search_items);
     }
 }
