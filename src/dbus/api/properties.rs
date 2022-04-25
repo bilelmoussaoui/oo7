@@ -52,14 +52,18 @@ impl<'a> Serialize for Properties<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use byteorder::LE;
+    use zbus::zvariant::{self, from_slice, to_bytes, EncodingContext as Context, Type};
 
     #[test]
     fn serialize_label() {
         let properties = Properties::with_label("some_label");
 
-        let encoded = serde_json::to_string(&properties).unwrap();
-        let decoded: HashMap<&str, &str> = serde_json::from_str(&encoded).unwrap();
-        assert_eq!(decoded[PROPERTY_LABEL], "some_label");
+        let ctxt = Context::<LE>::new_dbus(0);
+        let encoded = to_bytes(ctxt, &properties).unwrap();
+        let decoded: HashMap<&str, Value<'_>> = from_slice(&encoded, ctxt).unwrap();
+
+        assert_eq!(decoded[PROPERTY_LABEL], Value::from("some_label"));
         assert!(!decoded.contains_key(PROPERTY_ATTRIBUTES));
     }
 
@@ -67,13 +71,18 @@ mod tests {
     fn serialize_label_with_attributes() {
         let mut attributes = HashMap::new();
         attributes.insert("some", "attribute");
-        let properties = Properties::new("some_label", attributes);
+        let properties = Properties::new("some_label", attributes.clone());
 
-        let encoded = serde_json::to_string(&properties).unwrap();
-        let decoded: HashMap<&str, serde_json::Value> = serde_json::from_str(&encoded).unwrap();
-        assert_eq!(decoded[PROPERTY_LABEL], "some_label");
+        let ctxt = Context::<LE>::new_dbus(0);
+        let encoded = to_bytes(ctxt, &properties).unwrap();
+        let decoded: HashMap<&str, Value<'_>> = from_slice(&encoded, ctxt).unwrap();
+
+        assert_eq!(decoded[PROPERTY_LABEL], Value::from("some_label"));
         assert!(decoded.contains_key(PROPERTY_ATTRIBUTES));
-        assert_eq!(decoded[PROPERTY_ATTRIBUTES]["some"], "attribute");
+        assert_eq!(
+            decoded[PROPERTY_ATTRIBUTES],
+            zvariant::Dict::from(attributes).into()
+        );
     }
 
     #[test]

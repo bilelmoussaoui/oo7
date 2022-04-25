@@ -17,4 +17,4 @@ name = "basic"
 path = "examples/basic.rs"
 
 [dev-dependencies]
-serde_json = "1.0"
+byteorder = "1.0"
