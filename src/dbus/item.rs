@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use futures::lock::Mutex;
 
 use super::{api, Algorithm};
-use crate::{Error, Result};
+use crate::{dbus::utils, Error, Result};
 
 /// A secret with a label and attributes to identify it.
 ///
@@ -128,7 +128,15 @@ impl<'a> Item<'a> {
             Err(Error::Deleted)
         } else {
             let secret = self.inner.secret(&self.session).await?;
-            Ok(secret.value)
+
+            let value = match self.algorithm.as_ref() {
+                Algorithm::Plain => secret.value,
+                Algorithm::Dh(aes_key) => {
+                    let iv = secret.parameters;
+                    utils::decrypt(&secret.value, aes_key, &iv).unwrap()
+                }
+            };
+            Ok(value)
         }
     }
 
