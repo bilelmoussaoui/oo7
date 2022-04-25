@@ -21,6 +21,7 @@ impl<'a> Service<'a> {
             .path(PATH)?
             .destination(DESTINATION)?
             .interface("org.freedesktop.Secret.Service")?
+            .cache_properties(zbus::CacheProperties::No)
             .build()
             .await?;
         Ok(Self(inner))
@@ -89,11 +90,15 @@ impl<'a> Service<'a> {
     }
 
     #[doc(alias = "CreateCollection")]
-    pub async fn create_collection(&self, label: &str, alias: &str) -> Result<Collection<'a>> {
+    pub async fn create_collection(
+        &self,
+        label: &str,
+        alias: Option<&str>,
+    ) -> Result<Collection<'a>> {
         let properties = Properties::for_collection(label);
         let (collection_path, prompt_path) = self
             .inner()
-            .call_method("CreateCollection", &(properties, alias))
+            .call_method("CreateCollection", &(properties, alias.unwrap_or_default()))
             .await?
             .body::<(OwnedObjectPath, OwnedObjectPath)>()?;
 

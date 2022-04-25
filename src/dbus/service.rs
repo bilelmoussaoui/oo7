@@ -29,6 +29,9 @@ impl<'a> Service<'a> {
         self.with_alias(DEFAULT_COLLECTION).await
     }
 
+    /// Find a collection with it alias
+    ///
+    /// Applications should make use of [`Service::default_collection`] instead.
     pub async fn with_alias(&self, alias: &str) -> Result<Option<Collection<'a>>> {
         Ok(self.inner.read_alias(alias).await?.map(|collection| {
             Collection::new(
@@ -57,7 +60,14 @@ impl<'a> Service<'a> {
             .collect::<Vec<_>>())
     }
 
-    pub async fn create_collection(&self, label: &str, alias: &str) -> Result<Collection<'a>> {
+    /// Create a new collection
+    ///
+    /// The alias can only be equal to [`DEFAULT_COLLECTION`] otherwise it must not be set.
+    pub async fn create_collection(
+        &self,
+        label: &str,
+        alias: Option<&str>,
+    ) -> Result<Collection<'a>> {
         self.inner
             .create_collection(label, alias)
             .await
@@ -69,5 +79,40 @@ impl<'a> Service<'a> {
                     collection,
                 )
             })
+    }
+
+    /// Find a collection with it label
+    pub async fn with_label(&self, label: &str) -> Result<Option<Collection<'a>>> {
+        let collections = self.collections().await?;
+        for collection in collections.into_iter() {
+            if collection.label().await? == label {
+                return Ok(Some(collection));
+            }
+        }
+        Ok(None)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Service;
+
+    #[tokio::test]
+    async fn create_collection() {
+        let service = Service::new(crate::Algorithm::Plain).await.unwrap();
+        let collection = service.create_collection("somelabel", None).await.unwrap();
+
+        let found_collection = service.with_label("somelabel").await.unwrap();
+        assert!(found_collection.is_some());
+
+        assert_eq!(
+            found_collection.unwrap().label().await.unwrap(),
+            collection.label().await.unwrap()
+        );
+
+        collection.delete().await.unwrap();
+
+        let found_collection = service.with_label("somelabel").await.unwrap();
+        assert!(found_collection.is_none());
     }
 }
