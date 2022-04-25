@@ -188,23 +188,21 @@ mod tests {
         let service = Service::new(Algorithm::Plain).await.unwrap();
 
         let mut attributes = HashMap::new();
-        attributes.insert("type", "token");
+        attributes.insert("type", "plain-type-test");
         let secret = "a password".as_bytes();
 
         let collection = service.default_collection().await.unwrap().unwrap();
-        let n_items = collection.items().await.unwrap().len();
 
         let item = collection
-            .create_item("A secret", attributes, secret, true, "text/plain")
+            .create_item("A secret", attributes.clone(), secret, true, "text/plain")
             .await
             .unwrap();
 
         assert_eq!(item.secret().await.unwrap(), secret);
-        assert_eq!(item.attributes().await.unwrap()["type"], "token");
-        assert_eq!(collection.items().await.unwrap().len(), n_items + 1);
+        assert_eq!(item.attributes().await.unwrap()["type"], "plain-type-test");
 
         item.delete().await.unwrap();
 
-        assert_eq!(collection.items().await.unwrap().len(), n_items);
+        assert_eq!(collection.search_items(attributes).await.unwrap().len(), 0);
     }
 }
