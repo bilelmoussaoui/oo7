@@ -6,11 +6,11 @@ use crate::{Error, Result};
 
 use super::{api, Algorithm, Item};
 
-/// A collection allows the user to store/retrieve items.
+/// A collection allows to store and retrieve items.
 ///
 /// **Note**
 ///
-/// If a collection is deleted using [`Collection::delete`] any future usage of its API
+/// If the collection is deleted using [`Collection::delete`] any future usage of it API
 /// will fail with [`Error::Deleted`].
 pub struct Collection<'a> {
     inner: Arc<api::Collection<'a>>,
@@ -63,7 +63,7 @@ impl<'a> Collection<'a> {
         }
     }
 
-    /// Get the collection label.
+    /// The collection label.
     pub async fn label(&self) -> Result<String> {
         if !self.is_available().await {
             Err(Error::Deleted)
@@ -91,7 +91,7 @@ impl<'a> Collection<'a> {
         }
     }
 
-    /// Get the UNIX time when the collection was created.
+    /// The UNIX time when the collection was created.
     pub async fn created(&self) -> Result<Duration> {
         if !self.is_available().await {
             Err(Error::Deleted)
@@ -100,7 +100,7 @@ impl<'a> Collection<'a> {
         }
     }
 
-    /// Get the UNIX time when the collection was modified.
+    /// The UNIX time when the collection was modified.
     pub async fn modified(&self) -> Result<Duration> {
         if !self.is_available().await {
             Err(Error::Deleted)

@@ -6,6 +6,11 @@ use super::{api, Algorithm};
 use crate::{Error, Result};
 
 /// A secret with a label and attributes to identify it.
+/// 
+/// **Note**
+///
+/// If the item is deleted using [`Item::delete`] any future usage of it API
+/// will fail with [`Error::Deleted`].
 pub struct Item<'a> {
     inner: Arc<api::Item<'a>>,
     session: Arc<api::Session<'a>>,
@@ -44,7 +49,7 @@ impl<'a> Item<'a> {
         }
     }
 
-    /// Get the item label.
+    /// The item label.
     pub async fn label(&self) -> Result<String> {
         if !self.is_available().await {
             Err(Error::Deleted)
@@ -62,7 +67,7 @@ impl<'a> Item<'a> {
         }
     }
 
-    /// Get the UNIX time when the item was created.
+    /// The UNIX time when the item was created.
     pub async fn created(&self) -> Result<Duration> {
         if !self.is_available().await {
             Err(Error::Deleted)
@@ -71,7 +76,7 @@ impl<'a> Item<'a> {
         }
     }
 
-    /// Get the UNIX time when the item was modified.
+    /// The UNIX time when the item was modified.
     pub async fn modified(&self) -> Result<Duration> {
         if !self.is_available().await {
             Err(Error::Deleted)
