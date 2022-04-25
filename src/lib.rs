@@ -8,6 +8,7 @@ mod error;
 /// implementation.
 #[allow(unused)]
 pub mod portal;
+mod utils;
 
 pub use algorithm::Algorithm;
 pub use error::{Error, Result};
