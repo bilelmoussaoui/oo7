@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use super::{api, Collection, DEFAULT_COLLECTION};
-use crate::{Algorithm, Result};
+use super::{api, Algorithm, Collection, DEFAULT_COLLECTION};
+use crate::Result;
 
 pub struct Service<'a> {
     inner: Arc<api::Service<'a>>,
@@ -95,11 +95,11 @@ impl<'a> Service<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::Service;
+    use super::{Algorithm, Service};
 
     #[tokio::test]
     async fn create_collection() {
-        let service = Service::new(crate::Algorithm::Plain).await.unwrap();
+        let service = Service::new(Algorithm::Plain).await.unwrap();
         let collection = service.create_collection("somelabel", None).await.unwrap();
 
         let found_collection = service.with_label("somelabel").await.unwrap();

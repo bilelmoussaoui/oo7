@@ -2,9 +2,9 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use futures::lock::Mutex;
 
-use crate::{Algorithm, Error, Result};
+use crate::{Error, Result};
 
-use super::{api, Item};
+use super::{api, Algorithm, Item};
 
 pub struct Collection<'a> {
     inner: Arc<api::Collection<'a>>,

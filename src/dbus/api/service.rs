@@ -8,7 +8,7 @@ use super::{
     secret::SecretInner, Collection, Item, Prompt, Properties, Secret, Session, Unlockable,
     DESTINATION, PATH,
 };
-use crate::{Algorithm, Result};
+use crate::{dbus::Algorithm, Result};
 
 #[derive(Type)]
 #[zvariant(signature = "o")]

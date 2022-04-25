@@ -9,6 +9,8 @@ pub static DEFAULT_COLLECTION: &str = "default";
 /// the wrapper API doesn't provide functionality you need.
 pub mod api;
 
+mod algorithm;
+pub use algorithm::Algorithm;
 mod item;
 pub use item::Item;
 mod service;

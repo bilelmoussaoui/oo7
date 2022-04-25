@@ -2,9 +2,8 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use futures::lock::Mutex;
 
-use crate::{Algorithm, Error, Result};
-
-use super::api;
+use super::{api, Algorithm};
+use crate::{Error, Result};
 
 pub struct Item<'a> {
     inner: Arc<api::Item<'a>>,

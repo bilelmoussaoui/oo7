@@ -4,7 +4,7 @@ use serde::{ser::SerializeTuple, Deserialize, Serialize};
 use zbus::zvariant::{OwnedObjectPath, Type};
 
 use super::Session;
-use crate::{Algorithm, Result};
+use crate::{dbus::Algorithm, Result};
 
 #[derive(Debug, Serialize, Deserialize, Type)]
 #[zvariant(signature = "(oayays)")]
