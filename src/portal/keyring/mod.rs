@@ -9,6 +9,18 @@ Only use this if you know what you are doing.
 - Keep proxis around
 - Make more things async
 */
+pub(crate) const SALT_SIZE: usize = 32;
+pub(crate) const ITERATION_COUNT: u32 = 100000;
+
+pub(crate) const FILE_HEADER: &[u8] = b"GnomeKeyring\n\r\0\n";
+pub(crate) const FILE_HEADER_LEN: usize = FILE_HEADER.len();
+
+pub(crate) const MAJOR_VERSION: u8 = 1;
+pub(crate) const MINOR_VERSION: u8 = 0;
+
+pub(crate) type MacAlg = hmac::Hmac<sha2::Sha256>;
+pub(crate) type EncAlg = cbc::Encryptor<aes::Aes128>;
+pub(crate) type DecAlg = cbc::Decryptor<aes::Aes128>;
 
 use async_std::prelude::*;
 
@@ -26,10 +38,15 @@ use std::path::PathBuf;
 use zbus::zvariant::{self, Type};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
-use super::{
-    AttributeValue, DecAlg, EncAlg, EncryptedItem, Error, Item, MacAlg, FILE_HEADER,
-    FILE_HEADER_LEN, ITERATION_COUNT, MAJOR_VERSION, MINOR_VERSION, SALT_SIZE,
-};
+mod attribute_value;
+mod encrypted_item;
+mod item;
+
+pub use crate::portal::Error;
+pub use attribute_value::AttributeValue;
+pub use encrypted_item::EncryptedItem;
+pub use item::Item;
+
 use crate::Key;
 
 /// Logical contents of a keyring file
