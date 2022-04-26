@@ -111,9 +111,12 @@ impl<'a> Service<'a> {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "local_tests")]
     use super::{Algorithm, Service};
 
     #[tokio::test]
+    #[cfg(feature = "local_tests")]
+    #[ignore]
     async fn create_collection() {
         let service = Service::new(Algorithm::Plain).await.unwrap();
         let collection = service.create_collection("somelabel", None).await.unwrap();

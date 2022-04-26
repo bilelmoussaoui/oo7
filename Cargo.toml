@@ -12,6 +12,12 @@ tokio = {version = "1.17", features = ["macros", "rt-multi-thread"]}
 futures = "0.3"
 rand = {version = "0.8", default-features = false}
 
+[features]
+default = ["local_tests"]
+# Some tests requires a prompt to be displayed, which can't be easily
+# handled in CI unless we write a mock service. The feature allows to disabling those tests in CI
+local_tests = []
+
 [[bin]]
 name = "basic"
 path = "examples/basic.rs"

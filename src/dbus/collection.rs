@@ -210,11 +210,13 @@ impl<'a> Collection<'a> {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "local_tests")]
     use super::*;
-
+    #[cfg(feature = "local_tests")]
     use crate::dbus::Service;
 
     #[tokio::test]
+    #[cfg(feature = "local_tests")]
     async fn create_plain_item() {
         let service = Service::new(Algorithm::Plain).await.unwrap();
 
