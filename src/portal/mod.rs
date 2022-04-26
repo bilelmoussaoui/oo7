@@ -12,14 +12,16 @@ pub(crate) type EncAlg = cbc::Encryptor<aes::Aes128>;
 pub(crate) type DecAlg = cbc::Decryptor<aes::Aes128>;
 
 mod attribute_value;
+mod encrypted_item;
 mod error;
 mod item;
 mod keyring;
 
 pub use attribute_value::AttributeValue;
+pub use encrypted_item::EncryptedItem;
 pub use error::Error;
 pub use item::Item;
-pub use keyring::{gvariant_encoding, EncryptedItem, Key, Keyring};
+pub use keyring::{gvariant_encoding, Key, Keyring};
 mod secret;
 
 pub(crate) use secret::retrieve;
