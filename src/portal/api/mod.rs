@@ -12,34 +12,28 @@ Only use this if you know what you are doing.
 use async_std::prelude::*;
 
 use async_std::{fs, io, path::Path};
-use cipher::{
-    block_padding::Pkcs7, crypto_common::rand_core, BlockDecryptMut, BlockEncryptMut,
-    BlockSizeUser, IvSizeUser, KeyIvInit,
-};
-use digest::OutputSizeUser;
-use hmac::Mac;
+use cipher::BlockSizeUser;
 use once_cell::sync::Lazy;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use zbus::zvariant::{self, Type};
-use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
-pub(crate) const SALT_SIZE: usize = 32;
-pub(crate) const ITERATION_COUNT: u32 = 100000;
+const SALT_SIZE: usize = 32;
+const ITERATION_COUNT: u32 = 100000;
 
-pub(crate) const FILE_HEADER: &[u8] = b"GnomeKeyring\n\r\0\n";
-pub(crate) const FILE_HEADER_LEN: usize = FILE_HEADER.len();
+const FILE_HEADER: &[u8] = b"GnomeKeyring\n\r\0\n";
+const FILE_HEADER_LEN: usize = FILE_HEADER.len();
 
-pub(crate) const MAJOR_VERSION: u8 = 1;
-pub(crate) const MINOR_VERSION: u8 = 0;
+const MAJOR_VERSION: u8 = 1;
+const MINOR_VERSION: u8 = 0;
 
-pub(crate) type MacAlg = hmac::Hmac<sha2::Sha256>;
-pub(crate) type EncAlg = cbc::Encryptor<aes::Aes128>;
-pub(crate) type DecAlg = cbc::Decryptor<aes::Aes128>;
+type MacAlg = hmac::Hmac<sha2::Sha256>;
+type EncAlg = cbc::Encryptor<aes::Aes128>;
+type DecAlg = cbc::Decryptor<aes::Aes128>;
 
-pub(crate) static GVARIANT_ENCODING: Lazy<zvariant::EncodingContext<byteorder::LE>> =
+static GVARIANT_ENCODING: Lazy<zvariant::EncodingContext<byteorder::LE>> =
     Lazy::new(|| zvariant::EncodingContext::<byteorder::LE>::new_gvariant(0));
 
 mod attribute_value;
@@ -61,7 +55,7 @@ pub struct Keyring {
     iteration_count: u32,
     modified_time: u64,
     usage_count: u32,
-    pub(crate) items: Vec<EncryptedItem>,
+    pub(in crate::portal) items: Vec<EncryptedItem>,
 }
 
 impl Keyring {
@@ -81,12 +75,6 @@ impl Keyring {
             usage_count: 0,
             items: Vec::new(),
         }
-    }
-
-    /// Load from a keyring file
-    pub async fn load<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
-        let content = async_std::fs::read(path).await?;
-        Self::try_from(content.as_slice())
     }
 
     /// Write to a keyring file
@@ -210,7 +198,7 @@ impl Keyring {
         }
     }
 
-    pub(crate) fn derive_key(&self, secret: &[u8]) -> Key {
+    pub fn derive_key(&self, secret: &[u8]) -> Key {
         let mut key = Key(vec![0; EncAlg::block_size()]);
 
         pbkdf2::pbkdf2::<hmac::Hmac<sha2::Sha256>>(
@@ -299,7 +287,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn keyfile_dump_load() {
+    async fn keyfile_dump_load() -> Result<(), Error> {
         let _silent = std::fs::remove_file("/tmp/test.keyring");
 
         let mut new_keyring = Keyring::new();
@@ -311,18 +299,20 @@ mod tests {
                 HashMap::from([(String::from("my-tag"), String::from("my tag value"))]),
                 "A Password".as_bytes(),
             )
-            .encrypt(&key)
-            .unwrap(),
+            .encrypt(&key)?,
         );
-        new_keyring.dump("/tmp/test.keyring", None).await.unwrap();
+        new_keyring.dump("/tmp/test.keyring", None).await?;
 
-        let loaded_keyring = Keyring::load("/tmp/test.keyring").await.unwrap();
-        let loaded_items = loaded_keyring
-            .search_items(HashMap::from([("my-tag", "my tag value")]), &key)
-            .unwrap();
+        let blob = async_std::fs::read("/tmp/test.keyring").await?;
+
+        let loaded_keyring = Keyring::try_from(blob.as_slice())?;
+        let loaded_items =
+            loaded_keyring.search_items(HashMap::from([("my-tag", "my tag value")]), &key)?;
 
         assert_eq!(*loaded_items[0].password(), "A Password".as_bytes());
 
         let _silent = std::fs::remove_file("/tmp/test.keyring");
+
+        Ok(())
     }
 }

@@ -1,7 +1,7 @@
 use digest::Mac;
 use serde::{Deserialize, Serialize};
 use zbus::zvariant::Type;
-use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use super::MacAlg;
 use crate::Key;
@@ -10,7 +10,7 @@ use crate::Key;
 pub struct AttributeValue(String);
 
 impl AttributeValue {
-    pub(crate) fn mac(&self, key: &Key) -> digest::CtOutput<MacAlg> {
+    pub(super) fn mac(&self, key: &Key) -> digest::CtOutput<MacAlg> {
         let mut mac = MacAlg::new_from_slice(key.as_ref()).unwrap();
         mac.update(self.0.as_bytes());
         mac.finalize()
