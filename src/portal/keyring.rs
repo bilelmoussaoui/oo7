@@ -27,8 +27,8 @@ use zbus::zvariant::{self, Type};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 use super::{
-    AttributeValue, DecAlg, EncAlg, Error, MacAlg, FILE_HEADER, FILE_HEADER_LEN, ITERATION_COUNT,
-    MAJOR_VERSION, MINOR_VERSION, SALT_SIZE,
+    AttributeValue, DecAlg, EncAlg, Error, Item, MacAlg, FILE_HEADER, FILE_HEADER_LEN,
+    ITERATION_COUNT, MAJOR_VERSION, MINOR_VERSION, SALT_SIZE,
 };
 
 /// Logical contents of a keyring file
@@ -52,7 +52,10 @@ impl Keyring {
             salt,
             iteration_count: ITERATION_COUNT,
             // TODO: UTC?
-            modified_time: now(),
+            modified_time: std::time::SystemTime::UNIX_EPOCH
+                .elapsed()
+                .unwrap()
+                .as_secs(),
             usage_count: 0,
             items: Vec::new(),
         }
@@ -259,7 +262,7 @@ impl EncryptedItem {
         key: &Key,
     ) -> Result<(), Error> {
         for (attribute_key, hashed_attribute) in hashed_attributes.iter() {
-            if let Some(attribute_plaintext) = item.attributes.get(attribute_key) {
+            if let Some(attribute_plaintext) = item.attributes().get(attribute_key) {
                 let mut mac = MacAlg::new_from_slice(key.as_ref()).unwrap();
                 mac.update(attribute_plaintext.as_bytes());
                 if mac.verify_slice(hashed_attribute).is_err() {
@@ -271,100 +274,6 @@ impl EncryptedItem {
         }
 
         Ok(())
-    }
-}
-
-#[derive(Deserialize, Serialize, Type, Debug, Zeroize, ZeroizeOnDrop)]
-pub struct Item {
-    #[zeroize(skip)]
-    attributes: HashMap<String, AttributeValue>,
-    label: String,
-    created: u64,
-    modified: u64,
-    password: Vec<u8>,
-}
-
-impl Item {
-    pub fn new(
-        label: impl ToString,
-        attributes: HashMap<impl ToString, impl ToString>,
-        password: impl AsRef<[u8]>,
-    ) -> Self {
-        let now = now();
-
-        Item {
-            attributes: attributes
-                .into_iter()
-                .map(|(k, v)| (k.to_string(), v.into()))
-                .collect(),
-            label: label.to_string(),
-            created: now,
-            modified: now,
-            password: password.as_ref().to_vec(),
-        }
-    }
-
-    pub fn attributes(&self) -> &HashMap<String, AttributeValue> {
-        &self.attributes
-    }
-
-    pub fn label(&self) -> &str {
-        &self.label
-    }
-
-    pub fn set_label(&mut self, label: impl ToString) {
-        self.modified = now();
-        self.label = label.to_string();
-    }
-
-    pub fn password(&self) -> Zeroizing<Vec<u8>> {
-        Zeroizing::new(self.password.clone())
-    }
-
-    pub fn set_password<P: AsRef<[u8]>>(&mut self, password: P) {
-        self.modified = now();
-        self.password = password.as_ref().to_vec();
-    }
-
-    pub fn encrypt(&self, key: &Key) -> Result<EncryptedItem, Error> {
-        let decrypted = Zeroizing::new(zvariant::to_bytes(gvariant_encoding(), &self)?);
-
-        let iv = EncAlg::generate_iv(rand_core::OsRng);
-
-        let mut blob = vec![0; decrypted.len() + EncAlg::block_size()];
-
-        // Unwrapping since adding `CIPHER_BLOCK_SIZE` to array is enough space for PKCS7
-        let encrypted_len = EncAlg::new(key.as_ref().into(), &iv)
-            .encrypt_padded_b2b_mut::<Pkcs7>(&decrypted, &mut blob)
-            .unwrap()
-            .len();
-
-        blob.truncate(encrypted_len);
-        blob.append(&mut iv.as_slice().into());
-
-        // Unwrapping since arbitrary keylength allowed
-        let mut mac = MacAlg::new_from_slice(key.as_ref()).unwrap();
-        mac.update(&blob);
-        blob.append(&mut mac.finalize().into_bytes().as_slice().into());
-
-        let hashed_attributes = self
-            .attributes
-            .iter()
-            .map(|(k, v)| (k.to_string(), v.mac(key).into_bytes().as_slice().into()))
-            .collect();
-
-        Ok(EncryptedItem {
-            hashed_attributes,
-            blob,
-        })
-    }
-}
-
-impl TryFrom<&[u8]> for Item {
-    type Error = Error;
-
-    fn try_from(value: &[u8]) -> Result<Self, Error> {
-        Ok(zvariant::from_slice(value, gvariant_encoding())?)
     }
 }
 
@@ -405,11 +314,4 @@ pub fn hash_attributes<K: AsRef<str>>(
 
 pub fn gvariant_encoding() -> zvariant::EncodingContext<byteorder::LE> {
     zvariant::EncodingContext::<byteorder::LE>::new_gvariant(0)
-}
-
-fn now() -> u64 {
-    std::time::SystemTime::UNIX_EPOCH
-        .elapsed()
-        .unwrap()
-        .as_secs()
 }

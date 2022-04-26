@@ -13,11 +13,13 @@ pub(crate) type DecAlg = cbc::Decryptor<aes::Aes128>;
 
 mod attribute_value;
 mod error;
+mod item;
 mod keyring;
 
 pub use attribute_value::AttributeValue;
 pub use error::Error;
-pub use keyring::{EncryptedItem, Item, Key, Keyring};
+pub use item::Item;
+pub use keyring::{gvariant_encoding, EncryptedItem, Key, Keyring};
 mod secret;
 
 pub(crate) use secret::retrieve;
