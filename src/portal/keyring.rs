@@ -26,20 +26,10 @@ use std::path::PathBuf;
 use zbus::zvariant::{self, Type};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
-use super::Error;
-
-const SALT_SIZE: usize = 32;
-const ITERATION_COUNT: u32 = 100000;
-
-const FILE_HEADER: &[u8] = b"GnomeKeyring\n\r\0\n";
-const FILE_HEADER_LEN: usize = FILE_HEADER.len();
-
-const MAJOR_VERSION: u8 = 1;
-const MINOR_VERSION: u8 = 0;
-
-type MacAlg = hmac::Hmac<sha2::Sha256>;
-type EncAlg = cbc::Encryptor<aes::Aes128>;
-type DecAlg = cbc::Decryptor<aes::Aes128>;
+use super::{
+    AttributeValue, DecAlg, EncAlg, Error, MacAlg, FILE_HEADER, FILE_HEADER_LEN, ITERATION_COUNT,
+    MAJOR_VERSION, MINOR_VERSION, SALT_SIZE,
+};
 
 /// Logical contents of a keyring file
 #[derive(Deserialize, Serialize, Type, Debug)]
@@ -375,36 +365,6 @@ impl TryFrom<&[u8]> for Item {
 
     fn try_from(value: &[u8]) -> Result<Self, Error> {
         Ok(zvariant::from_slice(value, gvariant_encoding())?)
-    }
-}
-
-#[derive(Deserialize, Serialize, Type, Clone, Debug, Zeroize, ZeroizeOnDrop)]
-pub struct AttributeValue(String);
-
-impl AttributeValue {
-    pub fn mac(&self, key: &Key) -> digest::CtOutput<MacAlg> {
-        let mut mac = MacAlg::new_from_slice(key.as_ref()).unwrap();
-        mac.update(self.0.as_bytes());
-        mac.finalize()
-    }
-}
-
-impl<S: ToString> From<S> for AttributeValue {
-    fn from(value: S) -> Self {
-        Self(value.to_string())
-    }
-}
-
-impl AsRef<str> for AttributeValue {
-    fn as_ref(&self) -> &str {
-        self.0.as_str()
-    }
-}
-
-impl std::ops::Deref for AttributeValue {
-    type Target = str;
-    fn deref(&self) -> &Self::Target {
-        self.0.as_str()
     }
 }
 
