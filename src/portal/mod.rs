@@ -22,25 +22,26 @@ keyring::remove(HashMap::from([("account", "alice")])).await?;
 # Ok::<(), Error>(())
 # }).unwrap()
 ```
-
 */
+
 use async_std::prelude::*;
 
 use async_std::path::{Path, PathBuf};
 use async_std::{fs, io};
-use std::collections::HashMap;
 
+#[cfg(feature = "unstable")]
 pub mod api;
+#[cfg(not(feature = "unstable"))]
+mod api;
+
 mod error;
 mod helpers;
 pub use helpers::*;
 mod secret;
 
-pub(crate) use secret::retrieve;
-
 pub use error::Error;
 
-pub(crate) struct Keyring {
+struct Keyring {
     keyring: api::Keyring,
     path: PathBuf,
     /// Times are stored before reading the file to detect
@@ -52,7 +53,7 @@ pub(crate) struct Keyring {
 impl Keyring {
     /// Load from default keyring file
     pub async fn load_default() -> Result<Self, Error> {
-        let secret = crate::portal::retrieve().await?;
+        let secret = secret::retrieve().await?;
         Self::load(api::Keyring::default_path()?, &secret).await
     }
 

@@ -16,7 +16,7 @@ pub(crate) struct EncryptedItem {
 }
 
 impl EncryptedItem {
-    pub(crate) fn decrypt(mut self, key: &Key) -> Result<Item, Error> {
+    pub fn decrypt(mut self, key: &Key) -> Result<Item, Error> {
         let mac_tag = self.blob.split_off(self.blob.len() - MacAlg::output_size());
 
         // verify item
