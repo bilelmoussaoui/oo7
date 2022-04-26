@@ -10,7 +10,7 @@ use crate::Key;
 pub struct AttributeValue(String);
 
 impl AttributeValue {
-    pub fn mac(&self, key: &Key) -> digest::CtOutput<MacAlg> {
+    pub(crate) fn mac(&self, key: &Key) -> digest::CtOutput<MacAlg> {
         let mut mac = MacAlg::new_from_slice(key.as_ref()).unwrap();
         mac.update(self.0.as_bytes());
         mac.finalize()

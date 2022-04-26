@@ -210,7 +210,7 @@ impl Keyring {
         }
     }
 
-    pub fn derive_key(&self, secret: &[u8]) -> Key {
+    pub(crate) fn derive_key(&self, secret: &[u8]) -> Key {
         let mut key = Key(vec![0; EncAlg::block_size()]);
 
         pbkdf2::pbkdf2::<hmac::Hmac<sha2::Sha256>>(
