@@ -1,4 +1,4 @@
-use oo7::keyring;
+use oo7::portal;
 
 use std::collections::HashMap;
 
@@ -10,14 +10,14 @@ const SECRET: [u8; 64] = [
 ];
 
 #[async_std::test]
-async fn keyfile_add_remove() -> keyring::api::Result<()> {
+async fn keyfile_add_remove() -> portal::Result<()> {
     let needle = HashMap::from([(String::from("key"), String::from("value"))]);
 
-    let mut keyring = keyring::api::Keyring::new();
+    let mut keyring = portal::Keyring::new();
     let key = keyring.derive_key(&SECRET);
 
     keyring.items.push(
-        keyring::Item::new(String::from("Label"), needle.clone(), b"MyPassword").encrypt(&key)?,
+        portal::Item::new(String::from("Label"), needle.clone(), b"MyPassword").encrypt(&key)?,
     );
 
     assert_eq!(keyring.search_items(needle.clone(), &key)?.len(), 1);
@@ -33,11 +33,11 @@ async fn keyfile_add_remove() -> keyring::api::Result<()> {
 async fn keyfile_dump_load() {
     let _silent = std::fs::remove_file("/tmp/test.keyring");
 
-    let mut new_keyring = keyring::api::Keyring::new();
+    let mut new_keyring = portal::Keyring::new();
     let key = new_keyring.derive_key(&SECRET);
 
     new_keyring.items.push(
-        keyring::Item::new(
+        portal::Item::new(
             String::from("My Label"),
             HashMap::from([(String::from("my-tag"), String::from("my tag value"))]),
             "A Password".as_bytes(),
@@ -47,9 +47,7 @@ async fn keyfile_dump_load() {
     );
     new_keyring.dump("/tmp/test.keyring", None).await.unwrap();
 
-    let loaded_keyring = keyring::api::Keyring::load("/tmp/test.keyring")
-        .await
-        .unwrap();
+    let loaded_keyring = portal::Keyring::load("/tmp/test.keyring").await.unwrap();
     let loaded_items = loaded_keyring
         .search_items(HashMap::from([("my-tag", "my tag value")]), &key)
         .unwrap();
