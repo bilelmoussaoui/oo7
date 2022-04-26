@@ -23,7 +23,7 @@ static DH_PRIME: Lazy<BigUint> = Lazy::new(|| {
     ])
 });
 
-/// Struct representing a key
+/// A key.
 #[derive(Zeroize, ZeroizeOnDrop)]
 pub struct Key(pub(crate) Vec<u8>);
 

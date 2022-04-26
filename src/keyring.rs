@@ -8,16 +8,22 @@ use crate::{
     portal, Result,
 };
 
-/// A generic implementation of Keyring.
+/// A [Secret Service](crate::dbus) or [file](crate::portal) backed keyring implementation.
 ///
-/// It would automatically use the file backend if the application is sandboxed
+/// It will automatically use the file backend if the application is sandboxed
 /// and otherwise falls back to the DBus service.
+///
+/// The File backend requires a [`org.freedesktop.portal.Secret`](https://flatpak.github.io/xdg-desktop-portal/#gdbus-org.freedesktop.portal.Secret) implementation
+/// to retrieve the key that will be used to encrypt the backend file.
 pub enum Keyring {
+    #[doc(hidden)]
     File(portal::Keyring),
+    #[doc(hidden)]
     DBus(dbus::Collection<'static>),
 }
 
 impl Keyring {
+    /// Create a new instance of the Keyring.
     pub async fn new() -> Result<Self> {
         let is_sandboxed = crate::is_sandboxed();
         if is_sandboxed {
@@ -37,6 +43,9 @@ impl Keyring {
         }
     }
 
+    /// Retrieve all the items.
+    ///
+    /// If using the Secret Service, it will retrieve all the items in the [`DEFAULT_COLLECTION`].
     pub async fn items(&self) -> Result<Vec<Item>> {
         let items = match self {
             Self::DBus(backend) => {
@@ -51,28 +60,30 @@ impl Keyring {
         Ok(items)
     }
 
+    /// Create a new item.
     pub async fn create_item(
         &self,
         label: &str,
         attributes: HashMap<&str, &str>,
-        password: &[u8],
+        secret: &[u8],
         replace: bool,
     ) -> Result<()> {
         match self {
             Self::DBus(backend) => {
                 backend
-                    .create_item(label, attributes, password, replace, "text/plain")
+                    .create_item(label, attributes, secret, replace, "text/plain")
                     .await?;
             }
             Self::File(backend) => {
                 backend
-                    .create_item(label, attributes, password, replace)
+                    .create_item(label, attributes, secret, replace)
                     .await?;
             }
         };
         Ok(())
     }
 
+    /// Find items based on their attributes.
     pub async fn search_items(&self, attributes: HashMap<&str, &str>) -> Result<Vec<Item>> {
         let items = match self {
             Self::DBus(backend) => {
@@ -88,8 +99,11 @@ impl Keyring {
     }
 }
 
+/// A generic secret with a label and attributes.
 pub enum Item {
+    #[doc(hidden)]
     File(Mutex<crate::portal::Item>),
+    #[doc(hidden)]
     DBus(dbus::Item<'static>),
 }
 
@@ -102,6 +116,7 @@ impl Item {
         Self::DBus(item)
     }
 
+    /// The item label.
     pub async fn label(&self) -> Result<String> {
         let label = match self {
             Self::File(item) => item.lock().await.label().to_owned(),
@@ -110,6 +125,7 @@ impl Item {
         Ok(label)
     }
 
+    /// Sets the item label.
     pub async fn set_label(&self, label: &str) -> Result<()> {
         match self {
             Self::File(item) => item.lock().await.set_label(label),
@@ -118,6 +134,7 @@ impl Item {
         Ok(())
     }
 
+    /// Retrieve the item attributes.
     pub async fn attributes(&self) -> Result<HashMap<String, String>> {
         let attributes = match self {
             Self::File(item) => item
@@ -132,21 +149,23 @@ impl Item {
         Ok(attributes)
     }
 
-    pub async fn set_password<P: AsRef<[u8]>>(&self, password: P) -> Result<()> {
+    /// Sets a new secret.
+    pub async fn set_secret<P: AsRef<[u8]>>(&self, secret: P) -> Result<()> {
         match self {
             Self::File(item) => {
-                item.lock().await.set_password(password);
+                item.lock().await.set_secret(secret);
             }
-            Self::DBus(item) => item.set_secret(password, "text/plain").await?,
+            Self::DBus(item) => item.set_secret(secret, "text/plain").await?,
         };
         Ok(())
     }
 
-    pub async fn password(&self) -> Result<Zeroizing<Vec<u8>>> {
-        let password = match self {
-            Self::File(item) => item.lock().await.password(),
+    /// Retrieves the stored secret.
+    pub async fn secret(&self) -> Result<Zeroizing<Vec<u8>>> {
+        let secret = match self {
+            Self::File(item) => item.lock().await.secret(),
             Self::DBus(item) => item.secret().await?,
         };
-        Ok(password)
+        Ok(secret)
     }
 }

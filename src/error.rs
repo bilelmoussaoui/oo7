@@ -3,6 +3,7 @@ use std::fmt;
 /// Alias for [`std::result::Result`] with the error type [`Error`].
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// The error type for oo7.
 #[derive(Debug)]
 pub enum Error {
     Portal(crate::portal::Error),

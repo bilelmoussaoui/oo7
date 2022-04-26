@@ -1,5 +1,4 @@
-//! The implementation in this module allows you to interact with a
-//! [`org.freedesktop.Secrets`](https://specifications.freedesktop.org/secret-service/latest/index.html) implementation.
+//! A [Secret Service](https://specifications.freedesktop.org/secret-service/latest/index.html) implementation.
 //!
 //! That is usually done with
 //! ```ignore

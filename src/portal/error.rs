@@ -1,5 +1,6 @@
 use zbus::zvariant;
 
+/// File backend specific errors.
 #[derive(Debug)]
 pub enum Error {
     /// File header does not match `FILE_HEADER`
@@ -19,6 +20,7 @@ pub enum Error {
     TargetFileChanged(String),
     /// Portal DBus communication error.
     PortalBus(zbus::Error),
+    /// Portal request has been cancelled.
     CancelledPortalRequest,
 }
 

@@ -1,5 +1,6 @@
 /*!
-Keyring
+
+File backend implementation backed by the [Secret portal](https://flatpak.github.io/xdg-desktop-portal/#gdbus-org.freedesktop.portal.Secret).
 
 ```ignore
 # std::env::set_var("XDG_DATA_HOME", "/tmp/doctest");
@@ -45,6 +46,7 @@ pub use error::Error;
 
 pub use self::api::Item;
 
+/// File backed keyring.
 pub struct Keyring {
     keyring: Mutex<api::Keyring>,
     path: PathBuf,
@@ -121,7 +123,7 @@ impl Keyring {
         &self,
         label: &str,
         attributes: HashMap<&str, &str>,
-        password: &[u8],
+        secret: &[u8],
         replace: bool,
     ) -> Result<(), Error> {
         if replace {
@@ -130,7 +132,7 @@ impl Keyring {
                 .await
                 .remove_items(attributes.clone(), &self.key)?;
         }
-        let item = Item::new(label, attributes, password);
+        let item = Item::new(label, attributes, secret);
         let encrypted_item = item.encrypt(&self.key)?;
         self.keyring.lock().await.items.push(encrypted_item);
         Ok(())

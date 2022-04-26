@@ -309,7 +309,7 @@ mod tests {
         let loaded_items =
             loaded_keyring.search_items(HashMap::from([("my-tag", "my tag value")]), &key)?;
 
-        assert_eq!(*loaded_items[0].password(), "A Password".as_bytes());
+        assert_eq!(*loaded_items[0].secret(), "A Password".as_bytes());
 
         let _silent = std::fs::remove_file("/tmp/test.keyring");
 

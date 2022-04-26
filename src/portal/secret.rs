@@ -1,3 +1,6 @@
+//! Secret portal implementation code.
+//!
+//! It is a modified copy from ASHPD.
 use std::{collections::HashMap, io::Read, os::unix::prelude::AsRawFd};
 
 use futures::StreamExt;

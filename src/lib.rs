@@ -11,9 +11,6 @@ pub use key::Key;
 pub(crate) use key::Key;
 
 pub mod dbus;
-
-/// A [`org.freedesktop.portal.Secret`](https://flatpak.github.io/xdg-desktop-portal/#gdbus-org.freedesktop.portal.Secret) compatible
-/// implementation.
 pub mod portal;
 
 mod keyring;

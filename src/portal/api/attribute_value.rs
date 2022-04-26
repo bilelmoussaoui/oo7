@@ -6,6 +6,7 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 use super::MacAlg;
 use crate::Key;
 
+/// An encrypted attribute value.
 #[derive(Deserialize, Serialize, Type, Clone, Debug, Zeroize, ZeroizeOnDrop)]
 pub struct AttributeValue(String);
 

@@ -2,12 +2,16 @@ use std::fmt;
 
 // TODO: support secret service errors
 // https://specifications.freedesktop.org/secret-service/latest/ch15.html
-/// The error type for oo7.
+/// DBus Secret Service specific errors.
 #[derive(Debug)]
 pub enum Error {
+    /// Something went wrong on the wire.
     Zbus(zbus::Error),
+    /// The item/collection was removed.
     Deleted,
+    /// The prompt request was dimissed.
     Dismissed,
+    /// Input/Output.
     IO(std::io::Error),
 }
 
