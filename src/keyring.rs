@@ -43,6 +43,19 @@ impl Keyring {
         }
     }
 
+    /// Unlock the used collection if using the Secret service.
+    ///
+    /// The method does nothing if keyring is backed with a file backend.
+    pub async fn unlock(&self) -> Result<()> {
+        match self {
+            Self::DBus(backend) => {
+                backend.unlock().await?;
+            }
+            _ => (), // No unlocking is neeeded for the file backend
+        };
+        Ok(())
+    }
+
     /// Retrieve all the items.
     ///
     /// If using the Secret Service, it will retrieve all the items in the [`DEFAULT_COLLECTION`].
