@@ -248,7 +248,7 @@ impl TryFrom<&[u8]> for Keyring {
     }
 }
 
-pub fn hash_attributes<K: AsRef<str>>(
+fn hash_attributes<K: AsRef<str>>(
     attributes: HashMap<K, impl AsRef<str>>,
     key: &Key,
 ) -> Vec<(K, Vec<u8>)> {
