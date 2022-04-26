@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt;
 
 use futures::StreamExt;
-use zbus::zvariant::{Array, ObjectPath, OwnedObjectPath, OwnedValue, Type};
+use zbus::zvariant::{self, ObjectPath, OwnedObjectPath, OwnedValue, Type};
 
 use super::{
     secret::SecretInner, Collection, Item, Prompt, Properties, Secret, Session, Unlockable,
@@ -68,28 +68,20 @@ impl<'a> Service<'a> {
         &self,
         client_public_key: Option<&Key>,
     ) -> Result<(Option<Key>, Session<'a>)> {
-        let algorithm = match client_public_key {
-            Some(_) => Algorithm::Encrypted,
-            None => Algorithm::Plain,
+        let (algorithm, key) = match client_public_key {
+            None => (Algorithm::Plain, zvariant::Str::default().into()),
+            Some(key) => (Algorithm::Encrypted, key.to_value()),
         };
         let (service_key, session_path) = self
             .inner()
-            .call_method(
-                "OpenSession",
-                &(algorithm, client_public_key.map(Key::to_value)),
-            )
+            .call_method("OpenSession", &(&algorithm, key))
             .await?
             .body::<(OwnedValue, OwnedObjectPath)>()?;
         let session = Session::new(self.inner().connection(), session_path).await?;
 
-        let key = if algorithm == Algorithm::Plain {
-            None
-        } else {
-            let mut res = vec![];
-            for value in service_key.downcast_ref::<Array>().unwrap().get() {
-                res.push(*value.downcast_ref::<u8>().unwrap());
-            }
-            Some(Key(res))
+        let key = match algorithm {
+            Algorithm::Plain => None,
+            Algorithm::Encrypted => Some(Key::from(&service_key)),
         };
 
         Ok((key, session))

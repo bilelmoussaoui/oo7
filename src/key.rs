@@ -94,6 +94,16 @@ impl Key {
     }
 }
 
+impl From<&zvariant::OwnedValue> for Key {
+    fn from(value: &zvariant::OwnedValue) -> Self {
+        let mut key = zeroize::Zeroizing::new(vec![]);
+        for value in value.downcast_ref::<zvariant::Array>().unwrap().get() {
+            key.push(*value.downcast_ref::<u8>().unwrap());
+        }
+        Key(key.to_vec())
+    }
+}
+
 /// from https://github.com/plietar/librespot/blob/master/core/src/util/mod.rs#L53
 fn powm(base: &BigUint, exp: &BigUint, modulus: &BigUint) -> BigUint {
     let mut base = base.clone();
