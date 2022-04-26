@@ -1,6 +1,6 @@
 /*!
 
-File backend implementation backed by the [Secret portal](https://flatpak.github.io/xdg-desktop-portal/#gdbus-org.freedesktop.portal.Secret).
+File backend implementation backed by the [Secret portal](https://flatpak.github.io/xdg-desktop-portal/#gdbus-org.freedesktop.portal.Secret)    .
 
 ```ignore
 # std::env::set_var("XDG_DATA_HOME", "/tmp/doctest");
@@ -43,6 +43,7 @@ pub use helpers::*;
 mod secret;
 
 pub use error::Error;
+use zeroize::Zeroizing;
 
 pub use self::api::Item;
 
@@ -113,32 +114,48 @@ impl Keyring {
     }
 
     pub async fn delete(&self, attributes: HashMap<&str, &str>) -> Result<(), Error> {
-        self.keyring
-            .lock()
-            .await
-            .remove_items(attributes, &self.key)
+        let mut keyring = self.keyring.lock().await;
+        keyring.remove_items(attributes, &self.key)?;
+        self.write().await
     }
 
     pub async fn create_item(
         &self,
         label: &str,
         attributes: HashMap<&str, &str>,
-        secret: &[u8],
+        secret: impl AsRef<[u8]>,
         replace: bool,
     ) -> Result<(), Error> {
+        let mut keyring = self.keyring.lock().await;
         if replace {
-            self.keyring
-                .lock()
-                .await
-                .remove_items(attributes.clone(), &self.key)?;
+            keyring.remove_items(attributes.clone(), &self.key)?;
         }
         let item = Item::new(label, attributes, secret);
         let encrypted_item = item.encrypt(&self.key)?;
-        self.keyring.lock().await.items.push(encrypted_item);
+        keyring.items.push(encrypted_item);
+        self.write().await
+    }
+
+    /// Helper used for migration to avoid re-writing the file multiple times
+    pub(crate) async fn create_items(
+        &self,
+        items: Vec<(String, HashMap<String, String>, Zeroizing<Vec<u8>>, bool)>,
+    ) -> Result<(), Error> {
+        let mut keyring = self.keyring.lock().await;
+        for (label, attributes, secret, replace) in items {
+            if replace {
+                keyring.remove_items(attributes.clone(), &self.key)?;
+            }
+            let item = Item::new(label, attributes, &*secret);
+            let encrypted_item = item.encrypt(&self.key)?;
+            keyring.items.push(encrypted_item);
+        }
+
+        self.write().await?;
         Ok(())
     }
 
-    pub async fn write(self) -> Result<(), Error> {
-        self.keyring.lock().await.dump(self.path, self.mtime).await
+    pub async fn write(&self) -> Result<(), Error> {
+        self.keyring.lock().await.dump(&self.path, self.mtime).await
     }
 }
