@@ -23,23 +23,27 @@ pub struct Secret<'a> {
 }
 
 impl<'a> Secret<'a> {
-    pub(crate) fn new(session: Arc<Session<'a>>, secret: &[u8], content_type: &str) -> Self {
+    pub(crate) fn new<P: AsRef<[u8]>>(
+        session: Arc<Session<'a>>,
+        secret: P,
+        content_type: &str,
+    ) -> Self {
         Self {
             session,
             parameters: vec![],
-            value: secret.to_vec(),
+            value: secret.as_ref().to_vec(),
             content_type: content_type.to_owned(),
         }
     }
 
-    pub(crate) fn new_encrypted(
+    pub(crate) fn new_encrypted<P: AsRef<[u8]>>(
         session: Arc<Session<'a>>,
-        secret: &[u8],
+        secret: P,
         content_type: &str,
         aes_key: &Key,
     ) -> Self {
         let iv = utils::generate_iv();
-        let secret = utils::encrypt(secret, aes_key, &iv).unwrap();
+        let secret = utils::encrypt(secret.as_ref(), aes_key, &iv).unwrap();
         Self {
             session,
             parameters: iv,

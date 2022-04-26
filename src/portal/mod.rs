@@ -43,7 +43,7 @@ mod secret;
 
 pub use error::Error;
 
-use self::api::Item;
+pub use self::api::Item;
 
 pub struct Keyring {
     keyring: Mutex<api::Keyring>,

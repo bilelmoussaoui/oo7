@@ -16,9 +16,12 @@ pub mod dbus;
 /// implementation.
 pub mod portal;
 
+mod keyring;
+
 pub use error::{Error, Result};
+pub use keyring::{Item, Keyring};
 
 /// Checks whether the application is sandboxed or not.
-pub fn is_sandbox() -> bool {
+pub fn is_sandboxed() -> bool {
     std::path::PathBuf::from("/.flatpak-info").exists()
 }

@@ -252,7 +252,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(item.secret().await.unwrap(), secret);
+        assert_eq!(*item.secret().await.unwrap(), secret);
         assert_eq!(item.attributes().await.unwrap()["type"], value);
 
         assert_eq!(collection.items().await.unwrap().len(), n_items + 1);

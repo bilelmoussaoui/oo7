@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use futures::lock::Mutex;
+use zeroize::Zeroizing;
 
 use super::{api, Algorithm, Error};
 use crate::{dbus::utils, Key};
@@ -126,7 +127,7 @@ impl<'a> Item<'a> {
     }
 
     /// Retrieve the currently stored secret.
-    pub async fn secret(&self) -> Result<Vec<u8>, Error> {
+    pub async fn secret(&self) -> Result<Zeroizing<Vec<u8>>, Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
@@ -141,7 +142,7 @@ impl<'a> Item<'a> {
                     utils::decrypt(&secret.value, aes_key, &iv).unwrap()
                 }
             };
-            Ok(value)
+            Ok(Zeroizing::new(value))
         }
     }
 
@@ -152,7 +153,11 @@ impl<'a> Item<'a> {
     /// * `secret` - The secret to store.
     /// * `content_type` - The content type of the secret, usually something like `text/plain`.
     #[doc(alias = "SetSecret")]
-    pub async fn set_secret(&self, secret: &[u8], content_type: &str) -> Result<(), Error> {
+    pub async fn set_secret<P: AsRef<[u8]>>(
+        &self,
+        secret: P,
+        content_type: &str,
+    ) -> Result<(), Error> {
         let secret = match self.algorithm {
             Algorithm::Plain => api::Secret::new(Arc::clone(&self.session), secret, content_type),
             Algorithm::Encrypted => {
