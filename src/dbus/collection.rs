@@ -160,8 +160,17 @@ impl<'a> Collection<'a> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            let secret = api::Secret::new(Arc::clone(&self.session), secret, content_type);
-
+            let secret = match self.algorithm {
+                Algorithm::Plain => {
+                    api::Secret::new(Arc::clone(&self.session), secret, content_type)
+                }
+                Algorithm::Encrypted => api::Secret::new_encrypted(
+                    Arc::clone(&self.session),
+                    secret,
+                    content_type,
+                    self.aes_key.as_ref().unwrap(),
+                ),
+            };
             let item = self
                 .inner
                 .create_item(label, attributes, &secret, replace)
@@ -216,13 +225,15 @@ mod tests {
     #[cfg(feature = "local_tests")]
     use crate::dbus::Service;
 
-    #[async_std::test]
     #[cfg(feature = "local_tests")]
-    async fn create_plain_item() {
-        let service = Service::new(Algorithm::Plain).await.unwrap();
-
+    async fn create_item<'a>(service: Service<'a>, encrypted: bool) {
         let mut attributes = HashMap::new();
-        attributes.insert("type", "plain-type-test");
+        let value = if encrypted {
+            "encrypted-type-test"
+        } else {
+            "plain-type-test"
+        };
+        attributes.insert("type", value);
         let secret = "a password".as_bytes();
 
         let collection = service.default_collection().await.unwrap().unwrap();
@@ -239,7 +250,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(item.secret().await.unwrap(), secret);
-        assert_eq!(item.attributes().await.unwrap()["type"], "plain-type-test");
+        assert_eq!(item.attributes().await.unwrap()["type"], value);
 
         assert_eq!(collection.items().await.unwrap().len(), n_items + 1);
         assert_eq!(
@@ -262,5 +273,19 @@ mod tests {
                 .len(),
             n_search_items
         );
+    }
+
+    #[async_std::test]
+    #[cfg(feature = "local_tests")]
+    async fn create_plain_item() {
+        let service = Service::new(Algorithm::Plain).await.unwrap();
+        create_item(service, false).await;
+    }
+
+    #[async_std::test]
+    #[cfg(feature = "local_tests")]
+    async fn create_encrypted_item() {
+        let service = Service::new(Algorithm::Encrypted).await.unwrap();
+        create_item(service, true).await;
     }
 }
