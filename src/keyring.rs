@@ -56,6 +56,22 @@ impl Keyring {
         Ok(())
     }
 
+    /// Remove an item that matches the attributes.
+    pub async fn delete(&self, attributes: HashMap<&str, &str>) -> Result<()> {
+        match self {
+            Self::DBus(backend) => {
+                let items = backend.search_items(attributes).await?;
+                for item in items {
+                    item.delete().await?;
+                }
+            }
+            Self::File(backend) => {
+                backend.delete(attributes).await?;
+            }
+        };
+        Ok(())
+    }
+
     /// Retrieve all the items.
     ///
     /// If using the Secret Service, it will retrieve all the items in the [`DEFAULT_COLLECTION`].
