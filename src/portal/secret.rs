@@ -5,7 +5,7 @@ use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use zbus::zvariant::{Fd, ObjectPath, OwnedValue, SerializeDict, Type};
 
-use crate::{Error, Result};
+use super::Error;
 
 #[derive(SerializeDict, Type, Debug)]
 /// Specified options for a [`SecretProxy::retrieve_secret`] request.
@@ -32,7 +32,7 @@ pub struct SecretProxy<'a>(zbus::Proxy<'a>);
 
 impl<'a> SecretProxy<'a> {
     /// Create a new instance of [`SecretProxy`].
-    pub async fn new(connection: &zbus::Connection) -> Result<SecretProxy<'a>> {
+    pub async fn new(connection: &zbus::Connection) -> Result<SecretProxy<'a>, Error> {
         let proxy = zbus::ProxyBuilder::new_bare(connection)
             .interface("org.freedesktop.portal.Secret")?
             .path("/org/freedesktop/portal/desktop")?
@@ -48,7 +48,7 @@ impl<'a> SecretProxy<'a> {
     ///
     /// * `fd` - Writable file descriptor for transporting the secret.
     #[doc(alias = "RetrieveSecret")]
-    pub async fn retrieve_secret(&self, fd: &impl AsRawFd) -> Result<()> {
+    pub async fn retrieve_secret(&self, fd: &impl AsRawFd) -> Result<(), Error> {
         let options = RetrieveOptions::default();
         let cnx = self.0.connection();
 
@@ -76,7 +76,7 @@ impl<'a> SecretProxy<'a> {
                 if response == 0 {
                     Ok(())
                 } else {
-                    Err(Error::Dismissed)
+                    Err(Error::CancelledPortalRequest)
                 }
             },
             async {
@@ -90,7 +90,7 @@ impl<'a> SecretProxy<'a> {
     }
 }
 
-pub async fn retrieve() -> Result<Vec<u8>> {
+pub async fn retrieve() -> Result<Vec<u8>, Error> {
     let connection = zbus::Connection::session().await?;
     let proxy = SecretProxy::new(&connection).await?;
 
