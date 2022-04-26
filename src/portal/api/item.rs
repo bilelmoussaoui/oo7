@@ -72,7 +72,7 @@ impl Item {
         self.password = password.as_ref().to_vec();
     }
 
-    pub fn encrypt(&self, key: &Key) -> Result<EncryptedItem, Error> {
+    pub(crate) fn encrypt(&self, key: &Key) -> Result<EncryptedItem, Error> {
         let decrypted = Zeroizing::new(zvariant::to_bytes(*GVARIANT_ENCODING, &self)?);
 
         let iv = EncAlg::generate_iv(rand_core::OsRng);

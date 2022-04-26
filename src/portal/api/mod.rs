@@ -48,10 +48,10 @@ mod item;
 
 pub use crate::portal::Error;
 pub use attribute_value::AttributeValue;
-pub use encrypted_item::EncryptedItem;
 pub use item::Item;
 
 use crate::Key;
+use encrypted_item::EncryptedItem;
 
 /// Logical contents of a keyring file
 #[derive(Deserialize, Serialize, Type, Debug)]
@@ -60,8 +60,8 @@ pub struct Keyring {
     salt: Vec<u8>,
     iteration_count: u32,
     modified_time: u64,
-    pub usage_count: u32,
-    pub items: Vec<EncryptedItem>,
+    usage_count: u32,
+    pub(crate) items: Vec<EncryptedItem>,
 }
 
 impl Keyring {

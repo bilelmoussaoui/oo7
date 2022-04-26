@@ -10,13 +10,13 @@ use super::{DecAlg, Error, Item, MacAlg};
 use crate::Key;
 
 #[derive(Deserialize, Serialize, Type, Debug, Clone)]
-pub struct EncryptedItem {
-    pub hashed_attributes: HashMap<String, Vec<u8>>,
-    pub blob: Vec<u8>,
+pub(crate) struct EncryptedItem {
+    pub(crate) hashed_attributes: HashMap<String, Vec<u8>>,
+    pub(crate) blob: Vec<u8>,
 }
 
 impl EncryptedItem {
-    pub fn decrypt(mut self, key: &Key) -> Result<Item, Error> {
+    pub(crate) fn decrypt(mut self, key: &Key) -> Result<Item, Error> {
         let mac_tag = self.blob.split_off(self.blob.len() - MacAlg::output_size());
 
         // verify item
