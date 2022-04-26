@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use futures::lock::Mutex;
 
-use crate::{Error, Result};
+use crate::{Error, Key, Result};
 
 use super::{api, Algorithm, Item};
 
@@ -22,17 +22,19 @@ pub struct Collection<'a> {
     inner: Arc<api::Collection<'a>>,
     service: Arc<api::Service<'a>>,
     session: Arc<api::Session<'a>>,
-    algorithm: Arc<Algorithm>,
+    algorithm: Algorithm,
     /// Defines whether the Collection has been deleted or not
     available: Mutex<bool>,
+    aes_key: Option<Arc<Key>>,
 }
 
 impl<'a> Collection<'a> {
     pub(crate) fn new(
         service: Arc<api::Service<'a>>,
         session: Arc<api::Session<'a>>,
-        algorithm: Arc<Algorithm>,
+        algorithm: Algorithm,
         collection: api::Collection<'a>,
+        aes_key: Option<Arc<Key>>,
     ) -> Collection<'a> {
         Self {
             inner: Arc::new(collection),
@@ -40,6 +42,7 @@ impl<'a> Collection<'a> {
             service,
             algorithm,
             available: Mutex::new(true),
+            aes_key,
         }
     }
 
@@ -61,8 +64,9 @@ impl<'a> Collection<'a> {
                     Item::new(
                         Arc::clone(&self.service),
                         Arc::clone(&self.session),
-                        Arc::clone(&self.algorithm),
+                        self.algorithm,
                         item,
+                        self.aes_key.as_ref().map(Arc::clone),
                     )
                 })
                 .collect::<Vec<_>>())
@@ -127,8 +131,9 @@ impl<'a> Collection<'a> {
                     Item::new(
                         Arc::clone(&self.service),
                         Arc::clone(&self.session),
-                        Arc::clone(&self.algorithm),
+                        self.algorithm,
                         item,
+                        self.aes_key.as_ref().map(Arc::clone),
                     )
                 })
                 .collect::<Vec<_>>())
@@ -155,13 +160,17 @@ impl<'a> Collection<'a> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            let secret = api::Secret::new(
-                Arc::clone(&self.algorithm),
-                Arc::clone(&self.session),
-                secret,
-                content_type,
-            );
-
+            let secret = match self.algorithm {
+                Algorithm::Plain => {
+                    api::Secret::new(Arc::clone(&self.session), secret, content_type)
+                }
+                Algorithm::Encrypted => api::Secret::new_encrypted(
+                    Arc::clone(&self.session),
+                    secret,
+                    content_type,
+                    self.aes_key.as_ref().unwrap(),
+                ),
+            };
             let item = self
                 .inner
                 .create_item(label, attributes, &secret, replace)
@@ -170,8 +179,9 @@ impl<'a> Collection<'a> {
             Ok(Item::new(
                 Arc::clone(&self.service),
                 Arc::clone(&self.session),
-                Arc::clone(&self.algorithm),
+                self.algorithm,
                 item,
+                self.aes_key.as_ref().map(Arc::clone),
             ))
         }
     }
@@ -215,13 +225,15 @@ mod tests {
     #[cfg(feature = "local_tests")]
     use crate::dbus::Service;
 
-    #[async_std::test]
     #[cfg(feature = "local_tests")]
-    async fn create_plain_item() {
-        let service = Service::new(Algorithm::Plain).await.unwrap();
-
+    async fn create_item<'a>(service: Service<'a>, encrypted: bool) {
         let mut attributes = HashMap::new();
-        attributes.insert("type", "plain-type-test");
+        let value = if encrypted {
+            "encrypted-type-test"
+        } else {
+            "plain-type-test"
+        };
+        attributes.insert("type", value);
         let secret = "a password".as_bytes();
 
         let collection = service.default_collection().await.unwrap().unwrap();
@@ -238,7 +250,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(item.secret().await.unwrap(), secret);
-        assert_eq!(item.attributes().await.unwrap()["type"], "plain-type-test");
+        assert_eq!(item.attributes().await.unwrap()["type"], value);
 
         assert_eq!(collection.items().await.unwrap().len(), n_items + 1);
         assert_eq!(
@@ -261,5 +273,19 @@ mod tests {
                 .len(),
             n_search_items
         );
+    }
+
+    #[async_std::test]
+    #[cfg(feature = "local_tests")]
+    async fn create_plain_item() {
+        let service = Service::new(Algorithm::Plain).await.unwrap();
+        create_item(service, false).await;
+    }
+
+    #[async_std::test]
+    #[cfg(feature = "local_tests")]
+    async fn create_encrypted_item() {
+        let service = Service::new(Algorithm::Encrypted).await.unwrap();
+        create_item(service, true).await;
     }
 }

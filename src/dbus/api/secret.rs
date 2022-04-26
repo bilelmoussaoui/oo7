@@ -4,7 +4,7 @@ use serde::{ser::SerializeTuple, Deserialize, Serialize};
 use zbus::zvariant::{OwnedObjectPath, Type};
 
 use super::Session;
-use crate::{dbus::Algorithm, Result};
+use crate::{dbus::utils, Key, Result};
 
 #[derive(Debug, Serialize, Deserialize, Type)]
 #[zvariant(signature = "(oayays)")]
@@ -20,23 +20,27 @@ pub struct Secret<'a> {
 }
 
 impl<'a> Secret<'a> {
-    pub(crate) fn new(
-        algorithm: Arc<Algorithm>,
+    pub(crate) fn new(session: Arc<Session<'a>>, secret: &[u8], content_type: &str) -> Self {
+        Self {
+            session,
+            parameters: vec![],
+            value: secret.to_vec(),
+            content_type: content_type.to_owned(),
+        }
+    }
+
+    pub(crate) fn new_encrypted(
         session: Arc<Session<'a>>,
         secret: &[u8],
         content_type: &str,
+        aes_key: &Key,
     ) -> Self {
-        let (parameters, value) = match algorithm.as_ref() {
-            Algorithm::Plain => (vec![], secret.to_vec()),
-            Algorithm::Dh(_blob) => {
-                // See https://github.com/hwchen/secret-service-rs/blob/d6aaa774f0ec504ff5f26662279e07175b8ef111/src/util.rs#L52
-                unimplemented!()
-            }
-        };
+        let iv = utils::generate_iv();
+        let secret = utils::encrypt(secret, aes_key, &iv).unwrap();
         Self {
             session,
-            parameters,
-            value,
+            parameters: iv,
+            value: secret,
             content_type: content_type.to_owned(),
         }
     }

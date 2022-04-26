@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use futures::lock::Mutex;
 
 use super::{api, Algorithm};
-use crate::{Error, Result};
+use crate::{dbus::utils, Error, Key, Result};
 
 /// A secret with a label and attributes to identify it.
 ///
@@ -23,17 +23,19 @@ pub struct Item<'a> {
     inner: Arc<api::Item<'a>>,
     session: Arc<api::Session<'a>>,
     service: Arc<api::Service<'a>>,
-    algorithm: Arc<Algorithm>,
+    algorithm: Algorithm,
     /// Defines whether the Item has been deleted or not
     available: Mutex<bool>,
+    aes_key: Option<Arc<Key>>,
 }
 
 impl<'a> Item<'a> {
     pub(crate) fn new(
         service: Arc<api::Service<'a>>,
         session: Arc<api::Session<'a>>,
-        algorithm: Arc<Algorithm>,
+        algorithm: Algorithm,
         item: api::Item<'a>,
+        aes_key: Option<Arc<Key>>,
     ) -> Item<'a> {
         Self {
             inner: Arc::new(item),
@@ -41,6 +43,7 @@ impl<'a> Item<'a> {
             session,
             algorithm,
             available: Mutex::new(true),
+            aes_key,
         }
     }
 
@@ -128,7 +131,17 @@ impl<'a> Item<'a> {
             Err(Error::Deleted)
         } else {
             let secret = self.inner.secret(&self.session).await?;
-            Ok(secret.value)
+
+            let value = match self.algorithm {
+                Algorithm::Plain => secret.value,
+                Algorithm::Encrypted => {
+                    let iv = secret.parameters;
+                    // Safe unwrap as it is encrypted
+                    let aes_key = self.aes_key.as_ref().unwrap();
+                    utils::decrypt(&secret.value, aes_key, &iv).unwrap()
+                }
+            };
+            Ok(value)
         }
     }
 
@@ -140,12 +153,13 @@ impl<'a> Item<'a> {
     /// * `content_type` - The content type of the secret, usually something like `text/plain`.
     #[doc(alias = "SetSecret")]
     pub async fn set_secret(&self, secret: &[u8], content_type: &str) -> Result<()> {
-        let secret = api::Secret::new(
-            Arc::clone(&self.algorithm),
-            Arc::clone(&self.session),
-            secret,
-            content_type,
-        );
+        let secret = match self.algorithm {
+            Algorithm::Plain => api::Secret::new(Arc::clone(&self.session), secret, content_type),
+            Algorithm::Encrypted => {
+                let aes_key = self.aes_key.as_ref().unwrap();
+                api::Secret::new_encrypted(Arc::clone(&self.session), secret, content_type, aes_key)
+            }
+        };
         self.inner.set_secret(&secret).await?;
         Ok(())
     }
