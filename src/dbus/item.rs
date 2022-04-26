@@ -23,7 +23,7 @@ pub struct Item<'a> {
     inner: Arc<api::Item<'a>>,
     session: Arc<api::Session<'a>>,
     service: Arc<api::Service<'a>>,
-    algorithm: Arc<Algorithm>,
+    algorithm: Algorithm,
     /// Defines whether the Item has been deleted or not
     available: Mutex<bool>,
 }
@@ -32,7 +32,7 @@ impl<'a> Item<'a> {
     pub(crate) fn new(
         service: Arc<api::Service<'a>>,
         session: Arc<api::Session<'a>>,
-        algorithm: Arc<Algorithm>,
+        algorithm: Algorithm,
         item: api::Item<'a>,
     ) -> Item<'a> {
         Self {
@@ -129,9 +129,10 @@ impl<'a> Item<'a> {
         } else {
             let secret = self.inner.secret(&self.session).await?;
 
-            let value = match self.algorithm.as_ref() {
+            let value = match self.algorithm {
                 Algorithm::Plain => secret.value,
-                Algorithm::Encrypted(aes_key) => {
+                Algorithm::Encrypted => {
+                    let aes_key = todo!();
                     let iv = secret.parameters;
                     utils::decrypt(&secret.value, aes_key, &iv).unwrap()
                 }
@@ -149,7 +150,7 @@ impl<'a> Item<'a> {
     #[doc(alias = "SetSecret")]
     pub async fn set_secret(&self, secret: &[u8], content_type: &str) -> Result<()> {
         let secret = api::Secret::new(
-            Arc::clone(&self.algorithm),
+            self.algorithm,
             Arc::clone(&self.session),
             secret,
             content_type,

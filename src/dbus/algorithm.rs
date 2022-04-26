@@ -1,28 +1,11 @@
 use serde::Serialize;
-use zbus::zvariant::{self, Type};
+use zbus::zvariant;
 
-#[derive(Debug, zvariant::Type, PartialEq, Eq)]
+#[derive(Debug, zvariant::Type, PartialEq, Eq, Copy, Clone)]
 #[zvariant(signature = "s")]
 pub enum Algorithm {
     Plain,
-    Encrypted(Vec<u8>),
-}
-
-impl Algorithm {
-    pub(crate) fn client_key(&self) -> zvariant::OwnedValue {
-        match self {
-            Self::Plain => zvariant::Str::default().into(),
-            Self::Encrypted(key) => {
-                let mut array = zvariant::Array::new(u8::signature());
-                for byte in key {
-                    array
-                        .append(zvariant::Value::U8(*byte))
-                        .expect("Element of valid type");
-                }
-                array.into()
-            }
-        }
-    }
+    Encrypted,
 }
 
 impl Serialize for Algorithm {
@@ -32,7 +15,7 @@ impl Serialize for Algorithm {
     {
         match self {
             Algorithm::Plain => String::serialize(&"plain".to_owned(), serializer),
-            Algorithm::Encrypted(_) => String::serialize(
+            Algorithm::Encrypted => String::serialize(
                 &"dh-ietf1024-sha256-aes128-cbc-pkcs7".to_owned(),
                 serializer,
             ),

@@ -8,7 +8,7 @@ use super::{
     secret::SecretInner, Collection, Item, Prompt, Properties, Secret, Session, Unlockable,
     DESTINATION, PATH,
 };
-use crate::{dbus::Algorithm, Result};
+use crate::{dbus::Algorithm, Key, Result};
 
 #[derive(Type)]
 #[zvariant(signature = "o")]
@@ -66,24 +66,30 @@ impl<'a> Service<'a> {
     #[doc(alias = "OpenSession")]
     pub async fn open_session(
         &self,
-        algorithm: &Algorithm,
-    ) -> Result<(Option<Vec<u8>>, Session<'a>)> {
-        let client_key = algorithm.client_key();
+        client_public_key: Option<&Key>,
+    ) -> Result<(Option<Key>, Session<'a>)> {
+        let algorithm = match client_public_key {
+            Some(_) => Algorithm::Encrypted,
+            None => Algorithm::Plain,
+        };
         let (service_key, session_path) = self
             .inner()
-            .call_method("OpenSession", &(&algorithm, client_key))
+            .call_method(
+                "OpenSession",
+                &(algorithm, client_public_key.map(Key::to_value)),
+            )
             .await?
             .body::<(OwnedValue, OwnedObjectPath)>()?;
         let session = Session::new(self.inner().connection(), session_path).await?;
 
-        let key = if algorithm == &Algorithm::Plain {
+        let key = if algorithm == Algorithm::Plain {
             None
         } else {
             let mut res = vec![];
             for value in service_key.downcast_ref::<Array>().unwrap().get() {
                 res.push(*value.downcast_ref::<u8>().unwrap());
             }
-            Some(res)
+            Some(Key(res))
         };
 
         Ok((key, session))

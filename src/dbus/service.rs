@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use super::{api, Algorithm, Collection, DEFAULT_COLLECTION};
-use crate::Result;
+use crate::{Key, Result};
 
 /// The entry point of communicating with a [`org.freedesktop.Secrets`](https://specifications.freedesktop.org/secret-service/latest/index.html) implementation.
 ///
@@ -18,10 +18,9 @@ use crate::Result;
 /// ```
 pub struct Service<'a> {
     inner: Arc<api::Service<'a>>,
-    #[allow(unused)]
-    service_key: Option<Vec<u8>>,
+    aes_key: Option<Key>,
     session: Arc<api::Session<'a>>,
-    algorithm: Arc<Algorithm>,
+    algorithm: Algorithm,
 }
 
 impl<'a> Service<'a> {
@@ -29,13 +28,25 @@ impl<'a> Service<'a> {
     pub async fn new(algorithm: Algorithm) -> Result<Service<'a>> {
         let cnx = zbus::Connection::session().await?;
         let service = Arc::new(api::Service::new(&cnx).await?);
-        let (service_key, session) = service.open_session(&algorithm).await?;
+
+        let private_key = Key::generate_private_key();
+
+        let public_key = match algorithm {
+            Algorithm::Plain => None,
+            Algorithm::Encrypted => {
+                let public_key = Key::generate_public_key(&private_key);
+                Some(public_key)
+            }
+        };
+        let (service_key, session) = service.open_session(public_key.as_ref()).await?;
+        let aes_key =
+            service_key.map(|service_key| Key::generate_aes_key(&private_key, &service_key));
 
         Ok(Self {
-            service_key,
+            aes_key,
             inner: service,
             session: Arc::new(session),
-            algorithm: Arc::new(algorithm),
+            algorithm,
         })
     }
 
@@ -52,7 +63,7 @@ impl<'a> Service<'a> {
             Collection::new(
                 Arc::clone(&self.inner),
                 Arc::clone(&self.session),
-                Arc::clone(&self.algorithm),
+                self.algorithm,
                 collection,
             )
         }))
@@ -69,7 +80,7 @@ impl<'a> Service<'a> {
                 Collection::new(
                     Arc::clone(&self.inner),
                     Arc::clone(&self.session),
-                    Arc::clone(&self.algorithm),
+                    self.algorithm,
                     collection,
                 )
             })
@@ -91,7 +102,7 @@ impl<'a> Service<'a> {
                 Collection::new(
                     Arc::clone(&self.inner),
                     Arc::clone(&self.session),
-                    Arc::clone(&self.algorithm),
+                    self.algorithm,
                     collection,
                 )
             })

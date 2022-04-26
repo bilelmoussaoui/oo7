@@ -4,6 +4,7 @@ use once_cell::sync::Lazy;
 use rand::{rngs::OsRng, Rng};
 use sha2::Sha256;
 use std::ops::{Mul, Rem, Shr};
+use zbus::zvariant::{self, Type};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 // for key exchange
@@ -80,6 +81,16 @@ impl Key {
             .expect("hkdf expand should never fail");
 
         okm
+    }
+
+    pub(crate) fn to_value(&self) -> zvariant::OwnedValue {
+        let mut array = zvariant::Array::new(u8::signature());
+        for byte in self.as_ref() {
+            array
+                .append(zvariant::Value::U8(*byte))
+                .expect("Element of valid type");
+        }
+        array.into()
     }
 }
 

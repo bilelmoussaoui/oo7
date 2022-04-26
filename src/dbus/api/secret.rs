@@ -21,14 +21,17 @@ pub struct Secret<'a> {
 
 impl<'a> Secret<'a> {
     pub(crate) fn new(
-        algorithm: Arc<Algorithm>,
+        algorithm: Algorithm,
         session: Arc<Session<'a>>,
         secret: &[u8],
         content_type: &str,
     ) -> Self {
-        let (value, parameters) = match algorithm.as_ref() {
+        let (value, parameters) = match algorithm {
             Algorithm::Plain => (secret.to_vec(), vec![]),
-            Algorithm::Encrypted(aes_key) => utils::encrypt(secret, aes_key).unwrap(),
+            Algorithm::Encrypted => {
+                let aes_key = todo!();
+                utils::encrypt(secret, aes_key).unwrap()
+            }
         };
         Self {
             session,

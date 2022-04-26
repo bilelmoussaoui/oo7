@@ -22,7 +22,7 @@ pub struct Collection<'a> {
     inner: Arc<api::Collection<'a>>,
     service: Arc<api::Service<'a>>,
     session: Arc<api::Session<'a>>,
-    algorithm: Arc<Algorithm>,
+    algorithm: Algorithm,
     /// Defines whether the Collection has been deleted or not
     available: Mutex<bool>,
 }
@@ -31,7 +31,7 @@ impl<'a> Collection<'a> {
     pub(crate) fn new(
         service: Arc<api::Service<'a>>,
         session: Arc<api::Session<'a>>,
-        algorithm: Arc<Algorithm>,
+        algorithm: Algorithm,
         collection: api::Collection<'a>,
     ) -> Collection<'a> {
         Self {
@@ -61,7 +61,7 @@ impl<'a> Collection<'a> {
                     Item::new(
                         Arc::clone(&self.service),
                         Arc::clone(&self.session),
-                        Arc::clone(&self.algorithm),
+                        self.algorithm,
                         item,
                     )
                 })
@@ -127,7 +127,7 @@ impl<'a> Collection<'a> {
                     Item::new(
                         Arc::clone(&self.service),
                         Arc::clone(&self.session),
-                        Arc::clone(&self.algorithm),
+                        self.algorithm,
                         item,
                     )
                 })
@@ -156,7 +156,7 @@ impl<'a> Collection<'a> {
             Err(Error::Deleted)
         } else {
             let secret = api::Secret::new(
-                Arc::clone(&self.algorithm),
+                self.algorithm,
                 Arc::clone(&self.session),
                 secret,
                 content_type,
@@ -170,7 +170,7 @@ impl<'a> Collection<'a> {
             Ok(Item::new(
                 Arc::clone(&self.service),
                 Arc::clone(&self.session),
-                Arc::clone(&self.algorithm),
+                self.algorithm,
                 item,
             ))
         }
