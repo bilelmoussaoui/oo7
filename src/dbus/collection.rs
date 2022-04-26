@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use futures::lock::Mutex;
 
-use crate::{Error, Result};
+use crate::{Error, Key, Result};
 
 use super::{api, Algorithm, Item};
 
@@ -25,6 +25,7 @@ pub struct Collection<'a> {
     algorithm: Algorithm,
     /// Defines whether the Collection has been deleted or not
     available: Mutex<bool>,
+    aes_key: Option<Arc<Key>>,
 }
 
 impl<'a> Collection<'a> {
@@ -33,6 +34,7 @@ impl<'a> Collection<'a> {
         session: Arc<api::Session<'a>>,
         algorithm: Algorithm,
         collection: api::Collection<'a>,
+        aes_key: Option<Arc<Key>>,
     ) -> Collection<'a> {
         Self {
             inner: Arc::new(collection),
@@ -40,6 +42,7 @@ impl<'a> Collection<'a> {
             service,
             algorithm,
             available: Mutex::new(true),
+            aes_key,
         }
     }
 
@@ -63,6 +66,7 @@ impl<'a> Collection<'a> {
                         Arc::clone(&self.session),
                         self.algorithm,
                         item,
+                        self.aes_key.as_ref().map(Arc::clone),
                     )
                 })
                 .collect::<Vec<_>>())
@@ -129,6 +133,7 @@ impl<'a> Collection<'a> {
                         Arc::clone(&self.session),
                         self.algorithm,
                         item,
+                        self.aes_key.as_ref().map(Arc::clone),
                     )
                 })
                 .collect::<Vec<_>>())
@@ -155,12 +160,7 @@ impl<'a> Collection<'a> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            let secret = api::Secret::new(
-                self.algorithm,
-                Arc::clone(&self.session),
-                secret,
-                content_type,
-            );
+            let secret = api::Secret::new(Arc::clone(&self.session), secret, content_type);
 
             let item = self
                 .inner
@@ -172,6 +172,7 @@ impl<'a> Collection<'a> {
                 Arc::clone(&self.session),
                 self.algorithm,
                 item,
+                self.aes_key.as_ref().map(Arc::clone),
             ))
         }
     }

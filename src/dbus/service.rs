@@ -18,7 +18,7 @@ use crate::{Key, Result};
 /// ```
 pub struct Service<'a> {
     inner: Arc<api::Service<'a>>,
-    aes_key: Option<Key>,
+    aes_key: Option<Arc<Key>>,
     session: Arc<api::Session<'a>>,
     algorithm: Algorithm,
 }
@@ -29,18 +29,20 @@ impl<'a> Service<'a> {
         let cnx = zbus::Connection::session().await?;
         let service = Arc::new(api::Service::new(&cnx).await?);
 
-        let private_key = Key::generate_private_key();
-
-        let public_key = match algorithm {
-            Algorithm::Plain => None,
+        let (aes_key, session) = match algorithm {
+            Algorithm::Plain => {
+                let (_service_key, session) = service.open_session(None).await?;
+                (None, session)
+            }
             Algorithm::Encrypted => {
+                let private_key = Key::generate_private_key();
                 let public_key = Key::generate_public_key(&private_key);
-                Some(public_key)
+                let (service_key, session) = service.open_session(Some(&public_key)).await?;
+                let aes_key = service_key
+                    .map(|service_key| Arc::new(Key::generate_aes_key(&private_key, &service_key)));
+                (aes_key, session)
             }
         };
-        let (service_key, session) = service.open_session(public_key.as_ref()).await?;
-        let aes_key =
-            service_key.map(|service_key| Key::generate_aes_key(&private_key, &service_key));
 
         Ok(Self {
             aes_key,
@@ -65,6 +67,7 @@ impl<'a> Service<'a> {
                 Arc::clone(&self.session),
                 self.algorithm,
                 collection,
+                self.aes_key.as_ref().map(Arc::clone),
             )
         }))
     }
@@ -82,6 +85,7 @@ impl<'a> Service<'a> {
                     Arc::clone(&self.session),
                     self.algorithm,
                     collection,
+                    self.aes_key.as_ref().map(Arc::clone),
                 )
             })
             .collect::<Vec<_>>())
@@ -95,6 +99,7 @@ impl<'a> Service<'a> {
         label: &str,
         alias: Option<&str>,
     ) -> Result<Collection<'a>> {
+        let aes_key = self.aes_key.as_ref().map(Arc::clone);
         self.inner
             .create_collection(label, alias)
             .await
@@ -104,6 +109,7 @@ impl<'a> Service<'a> {
                     Arc::clone(&self.session),
                     self.algorithm,
                     collection,
+                    aes_key,
                 )
             })
     }

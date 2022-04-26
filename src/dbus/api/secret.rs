@@ -4,7 +4,7 @@ use serde::{ser::SerializeTuple, Deserialize, Serialize};
 use zbus::zvariant::{OwnedObjectPath, Type};
 
 use super::Session;
-use crate::{dbus::Algorithm, dbus::utils, Result};
+use crate::{dbus::utils, Key, Result};
 
 #[derive(Debug, Serialize, Deserialize, Type)]
 #[zvariant(signature = "(oayays)")]
@@ -20,23 +20,26 @@ pub struct Secret<'a> {
 }
 
 impl<'a> Secret<'a> {
-    pub(crate) fn new(
-        algorithm: Algorithm,
+    pub(crate) fn new(session: Arc<Session<'a>>, secret: &[u8], content_type: &str) -> Self {
+        Self {
+            session,
+            parameters: vec![],
+            value: secret.to_vec(),
+            content_type: content_type.to_owned(),
+        }
+    }
+
+    pub(crate) fn new_encrypted(
         session: Arc<Session<'a>>,
         secret: &[u8],
         content_type: &str,
+        aes_key: &Key,
     ) -> Self {
-        let (value, parameters) = match algorithm {
-            Algorithm::Plain => (secret.to_vec(), vec![]),
-            Algorithm::Encrypted => {
-                let aes_key = todo!();
-                utils::encrypt(secret, aes_key).unwrap()
-            }
-        };
+        let (secret, iv) = utils::encrypt(secret, aes_key).unwrap();
         Self {
             session,
-            parameters,
-            value,
+            parameters: iv,
+            value: secret,
             content_type: content_type.to_owned(),
         }
     }
