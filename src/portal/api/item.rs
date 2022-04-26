@@ -32,7 +32,7 @@ impl Item {
             .unwrap()
             .as_secs();
 
-        Item {
+        Self {
             attributes: attributes
                 .into_iter()
                 .map(|(k, v)| (k.to_string(), v.into()))
