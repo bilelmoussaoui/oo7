@@ -26,6 +26,8 @@ use std::path::PathBuf;
 use zbus::zvariant::{self, Type};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
+use super::Error;
+
 const SALT_SIZE: usize = 32;
 const ITERATION_COUNT: u32 = 100000;
 
@@ -38,53 +40,6 @@ const MINOR_VERSION: u8 = 0;
 type MacAlg = hmac::Hmac<sha2::Sha256>;
 type EncAlg = cbc::Encryptor<aes::Aes128>;
 type DecAlg = cbc::Decryptor<aes::Aes128>;
-
-pub type Result<T> = std::result::Result<T, Error>;
-
-#[derive(Debug)]
-pub enum Error {
-    /// File header does not match `FILE_HEADER`
-    FileHeaderMismatch(Option<String>),
-    /// Version bytes do not match `MAJOR_VERSION` or `MINOR_VERSION`
-    VersionMismatch(Option<Vec<u8>>),
-    /// No data behind header and version bytes
-    NoData,
-    NoParentDir(String),
-    /// Bytes don't have the expected GVariant format
-    GVariantDeserialization(zvariant::Error),
-    Io(std::io::Error),
-    MacError,
-    HashedAttributeMac(String),
-    /// XDG_DATA_HOME required for reading from default location
-    NoDataDir,
-    TargetFileChanged(String),
-    SecretPortal(crate::Error),
-}
-
-impl From<zvariant::Error> for Error {
-    fn from(value: zvariant::Error) -> Self {
-        Self::GVariantDeserialization(value)
-    }
-}
-
-impl From<std::io::Error> for Error {
-    fn from(value: std::io::Error) -> Self {
-        Self::Io(value)
-    }
-}
-
-impl From<digest::MacError> for Error {
-    fn from(_value: digest::MacError) -> Self {
-        Self::MacError
-    }
-}
-
-// TODO: This does not really make sense
-impl From<crate::Error> for Error {
-    fn from(value: crate::Error) -> Self {
-        Self::SecretPortal(value)
-    }
-}
 
 /// Logical contents of a keyring file
 #[derive(Deserialize, Serialize, Type, Debug)]
@@ -114,7 +69,7 @@ impl Keyring {
     }
 
     /// Load from a keyring file
-    pub async fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub async fn load<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         let content = async_std::fs::read(path).await?;
         Self::try_from(content.as_slice())
     }
@@ -124,7 +79,7 @@ impl Keyring {
         &self,
         path: P,
         mtime: Option<std::time::SystemTime>,
-    ) -> Result<()> {
+    ) -> Result<(), Error> {
         let tmp_path = if let Some(parent) = path.as_ref().parent() {
             let rnd: String = rand::thread_rng()
                 .sample_iter(&rand::distributions::Alphanumeric)
@@ -182,7 +137,7 @@ impl Keyring {
         &self,
         attributes: HashMap<impl AsRef<str>, impl AsRef<str>>,
         key: &Key,
-    ) -> Result<Vec<Item>> {
+    ) -> Result<Vec<Item>, Error> {
         let hashed_search = hash_attributes(attributes, key);
 
         self.items
@@ -200,7 +155,7 @@ impl Keyring {
         &mut self,
         attributes: HashMap<impl AsRef<str>, impl AsRef<str>>,
         key: &Key,
-    ) -> Result<()> {
+    ) -> Result<(), Error> {
         let hashed_search = hash_attributes(attributes, key);
 
         let (remove, keep): (Vec<EncryptedItem>, _) =
@@ -220,7 +175,7 @@ impl Keyring {
         Ok(())
     }
 
-    fn as_bytes(&self) -> Result<Vec<u8>> {
+    fn as_bytes(&self) -> Result<Vec<u8>, Error> {
         let mut blob = FILE_HEADER.to_vec();
 
         blob.push(MAJOR_VERSION);
@@ -230,7 +185,7 @@ impl Keyring {
         Ok(blob)
     }
 
-    pub fn default_path() -> Result<PathBuf> {
+    pub fn default_path() -> Result<PathBuf, Error> {
         if let Some(mut path) = dirs::data_dir() {
             path.push("keyrings");
             path.push("default.keyring");
@@ -257,7 +212,7 @@ impl Keyring {
 impl TryFrom<&[u8]> for Keyring {
     type Error = Error;
 
-    fn try_from(value: &[u8]) -> Result<Self> {
+    fn try_from(value: &[u8]) -> Result<Self, Error> {
         let header = value.get(..FILE_HEADER.len());
         if header != Some(FILE_HEADER) {
             return Err(Error::FileHeaderMismatch(
@@ -285,7 +240,7 @@ pub struct EncryptedItem {
 }
 
 impl EncryptedItem {
-    pub fn decrypt(mut self, key: &Key) -> Result<Item> {
+    pub fn decrypt(mut self, key: &Key) -> Result<Item, Error> {
         let mac_tag = self.blob.split_off(self.blob.len() - MacAlg::output_size());
 
         // verify item
@@ -312,7 +267,7 @@ impl EncryptedItem {
         hashed_attributes: &HashMap<String, Vec<u8>>,
         item: &Item,
         key: &Key,
-    ) -> Result<()> {
+    ) -> Result<(), Error> {
         for (attribute_key, hashed_attribute) in hashed_attributes.iter() {
             if let Some(attribute_plaintext) = item.attributes.get(attribute_key) {
                 let mut mac = MacAlg::new_from_slice(key.as_ref()).unwrap();
@@ -381,7 +336,7 @@ impl Item {
         self.password = password.as_ref().to_vec();
     }
 
-    pub fn encrypt(&self, key: &Key) -> Result<EncryptedItem> {
+    pub fn encrypt(&self, key: &Key) -> Result<EncryptedItem, Error> {
         let decrypted = Zeroizing::new(zvariant::to_bytes(gvariant_encoding(), &self)?);
 
         let iv = EncAlg::generate_iv(rand_core::OsRng);
@@ -418,7 +373,7 @@ impl Item {
 impl TryFrom<&[u8]> for Item {
     type Error = Error;
 
-    fn try_from(value: &[u8]) -> Result<Self> {
+    fn try_from(value: &[u8]) -> Result<Self, Error> {
         Ok(zvariant::from_slice(value, gvariant_encoding())?)
     }
 }

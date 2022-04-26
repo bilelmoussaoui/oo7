@@ -10,7 +10,7 @@ const SECRET: [u8; 64] = [
 ];
 
 #[async_std::test]
-async fn keyfile_add_remove() -> portal::Result<()> {
+async fn keyfile_add_remove() -> Result<(), portal::Error> {
     let needle = HashMap::from([(String::from("key"), String::from("value"))]);
 
     let mut keyring = portal::Keyring::new();
