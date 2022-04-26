@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::keyring::Item;
+use super::api::Item;
 use super::{Error, Keyring};
 
 pub async fn insert_replace(item: &Item) -> Result<(), Error> {

@@ -30,9 +30,9 @@ use async_std::path::{Path, PathBuf};
 use async_std::{fs, io};
 use std::collections::HashMap;
 
+pub mod api;
 mod error;
 mod helpers;
-pub mod keyring;
 pub use helpers::*;
 mod secret;
 
@@ -41,7 +41,7 @@ pub(crate) use secret::retrieve;
 pub use error::Error;
 
 pub(crate) struct Keyring {
-    keyring: keyring::Keyring,
+    keyring: api::Keyring,
     path: PathBuf,
     /// Times are stored before reading the file to detect
     /// file changes before writing
@@ -53,13 +53,13 @@ impl Keyring {
     /// Load from default keyring file
     pub async fn load_default() -> Result<Self, Error> {
         let secret = crate::portal::retrieve().await?;
-        Self::load(keyring::Keyring::default_path()?, &secret).await
+        Self::load(api::Keyring::default_path()?, &secret).await
     }
 
     /// Load from a keyring file
     pub async fn load(path: impl AsRef<Path>, secret: &[u8]) -> Result<Self, Error> {
         let (mtime, keyring) = match fs::File::open(&path).await {
-            Err(err) if err.kind() == io::ErrorKind::NotFound => (None, keyring::Keyring::new()),
+            Err(err) if err.kind() == io::ErrorKind::NotFound => (None, api::Keyring::new()),
             Err(err) => return Err(err.into()),
             Ok(mut file) => {
                 let mtime = file.metadata().await?.modified().ok();
@@ -67,7 +67,7 @@ impl Keyring {
                 let mut content = Vec::new();
                 file.read_to_end(&mut content).await?;
 
-                let keyring = keyring::Keyring::try_from(content.as_slice())?;
+                let keyring = api::Keyring::try_from(content.as_slice())?;
 
                 (mtime, keyring)
             }
