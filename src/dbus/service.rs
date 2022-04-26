@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use super::{api, Algorithm, Collection, DEFAULT_COLLECTION};
-use crate::{Key, Result};
+use super::{api, Algorithm, Collection, Error, DEFAULT_COLLECTION};
+use crate::Key;
 
 /// The entry point of communicating with a [`org.freedesktop.Secrets`](https://specifications.freedesktop.org/secret-service/latest/index.html) implementation.
 ///
@@ -25,7 +25,7 @@ pub struct Service<'a> {
 
 impl<'a> Service<'a> {
     /// Create a new instance of the Service.
-    pub async fn new(algorithm: Algorithm) -> Result<Service<'a>> {
+    pub async fn new(algorithm: Algorithm) -> Result<Service<'a>, Error> {
         let cnx = zbus::Connection::session().await?;
         let service = Arc::new(api::Service::new(&cnx).await?);
 
@@ -53,14 +53,14 @@ impl<'a> Service<'a> {
     }
 
     /// Retrieve the default collection.
-    pub async fn default_collection(&self) -> Result<Option<Collection<'a>>> {
+    pub async fn default_collection(&self) -> Result<Option<Collection<'a>>, Error> {
         self.with_alias(DEFAULT_COLLECTION).await
     }
 
     /// Find a collection with it alias.
     ///
     /// Applications should make use of [`Service::default_collection`] instead.
-    pub async fn with_alias(&self, alias: &str) -> Result<Option<Collection<'a>>> {
+    pub async fn with_alias(&self, alias: &str) -> Result<Option<Collection<'a>>, Error> {
         Ok(self.inner.read_alias(alias).await?.map(|collection| {
             Collection::new(
                 Arc::clone(&self.inner),
@@ -73,7 +73,7 @@ impl<'a> Service<'a> {
     }
 
     /// Get a list of all the available collections.
-    pub async fn collections(&self) -> Result<Vec<Collection<'a>>> {
+    pub async fn collections(&self) -> Result<Vec<Collection<'a>>, Error> {
         Ok(self
             .inner
             .collections()
@@ -98,7 +98,7 @@ impl<'a> Service<'a> {
         &self,
         label: &str,
         alias: Option<&str>,
-    ) -> Result<Collection<'a>> {
+    ) -> Result<Collection<'a>, Error> {
         let aes_key = self.aes_key.as_ref().map(Arc::clone);
         self.inner
             .create_collection(label, alias)
@@ -115,7 +115,7 @@ impl<'a> Service<'a> {
     }
 
     /// Find a collection with it label.
-    pub async fn with_label(&self, label: &str) -> Result<Option<Collection<'a>>> {
+    pub async fn with_label(&self, label: &str) -> Result<Option<Collection<'a>>, Error> {
         let collections = self.collections().await?;
         for collection in collections.into_iter() {
             if collection.label().await? == label {

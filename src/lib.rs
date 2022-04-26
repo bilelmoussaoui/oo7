@@ -17,3 +17,8 @@ pub mod dbus;
 pub mod portal;
 
 pub use error::{Error, Result};
+
+/// Checks whether the application is sandboxed or not.
+pub fn is_sandbox() -> bool {
+    std::path::PathBuf::from("/.flatpak-info").exists()
+}

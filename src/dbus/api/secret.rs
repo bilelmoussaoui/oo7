@@ -4,7 +4,10 @@ use serde::{ser::SerializeTuple, Deserialize, Serialize};
 use zbus::zvariant::{OwnedObjectPath, Type};
 
 use super::Session;
-use crate::{dbus::utils, Key, Result};
+use crate::{
+    dbus::{utils, Error},
+    Key,
+};
 
 #[derive(Debug, Serialize, Deserialize, Type)]
 #[zvariant(signature = "(oayays)")]
@@ -48,7 +51,7 @@ impl<'a> Secret<'a> {
     pub(crate) async fn from_inner(
         cnx: &zbus::Connection,
         inner: SecretInner,
-    ) -> Result<Secret<'_>> {
+    ) -> Result<Secret<'_>, Error> {
         let secret = Secret {
             session: Arc::new(Session::new(cnx, inner.0).await?),
             parameters: inner.1,

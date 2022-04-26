@@ -1,7 +1,8 @@
 use std::fmt;
 
 use super::DESTINATION;
-use crate::{Error, Result};
+use crate::dbus::Error;
+
 use futures::StreamExt;
 use serde::Serialize;
 use zbus::zvariant::{ObjectPath, OwnedValue, Type};
@@ -12,7 +13,10 @@ use zbus::zvariant::{ObjectPath, OwnedValue, Type};
 pub struct Prompt<'a>(zbus::Proxy<'a>);
 
 impl<'a> Prompt<'a> {
-    pub async fn new<P>(connection: &zbus::Connection, object_path: P) -> Result<Option<Prompt<'a>>>
+    pub async fn new<P>(
+        connection: &zbus::Connection,
+        object_path: P,
+    ) -> Result<Option<Prompt<'a>>, Error>
     where
         P: TryInto<ObjectPath<'a>>,
         P::Error: Into<zbus::Error>,
@@ -35,18 +39,18 @@ impl<'a> Prompt<'a> {
         &self.0
     }
 
-    pub async fn prompt(&self, window_id: &str) -> Result<()> {
+    pub async fn prompt(&self, window_id: &str) -> Result<(), Error> {
         self.inner().call_method("Prompt", &(window_id)).await?;
         Ok(())
     }
 
     #[allow(unused)]
-    pub async fn dismiss(&self) -> Result<()> {
+    pub async fn dismiss(&self) -> Result<(), Error> {
         self.inner().call_method("Dismiss", &()).await?;
         Ok(())
     }
 
-    pub async fn receive_completed(&self) -> Result<OwnedValue> {
+    pub async fn receive_completed(&self) -> Result<OwnedValue, Error> {
         let mut stream = self.inner().receive_signal("Completed").await?;
         // TODO: figure out how to come with a window-id without depending on ashpd for it WindowIdentifier thingy
         let (value, _) = futures::try_join!(

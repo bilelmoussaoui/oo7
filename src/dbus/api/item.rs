@@ -1,7 +1,8 @@
 use std::{collections::HashMap, fmt, hash::Hash, time::Duration};
 
 use super::{secret::SecretInner, Prompt, Secret, Session, Unlockable, DESTINATION};
-use crate::Result;
+use crate::dbus::Error;
+
 use serde::Serialize;
 use zbus::zvariant::{ObjectPath, Type};
 
@@ -11,7 +12,7 @@ use zbus::zvariant::{ObjectPath, Type};
 pub struct Item<'a>(zbus::Proxy<'a>);
 
 impl<'a> Item<'a> {
-    pub async fn new<P>(connection: &zbus::Connection, object_path: P) -> Result<Item<'a>>
+    pub async fn new<P>(connection: &zbus::Connection, object_path: P) -> Result<Item<'a>, Error>
     where
         P: TryInto<ObjectPath<'a>>,
         P::Error: Into<zbus::Error>,
@@ -28,7 +29,7 @@ impl<'a> Item<'a> {
     pub(crate) async fn from_paths<P>(
         connection: &zbus::Connection,
         paths: Vec<P>,
-    ) -> Result<Vec<Item<'a>>>
+    ) -> Result<Vec<Item<'a>>, Error>
     where
         P: TryInto<ObjectPath<'a>>,
         P::Error: Into<zbus::Error>,
@@ -45,18 +46,18 @@ impl<'a> Item<'a> {
     }
 
     #[doc(alias = "Locked")]
-    pub async fn is_locked(&self) -> Result<bool> {
+    pub async fn is_locked(&self) -> Result<bool, Error> {
         self.inner()
             .get_property("Locked")
             .await
             .map_err(From::from)
     }
 
-    pub async fn label(&self) -> Result<String> {
+    pub async fn label(&self) -> Result<String, Error> {
         self.inner().get_property("Label").await.map_err(From::from)
     }
 
-    pub async fn set_label(&self, label: &str) -> Result<()> {
+    pub async fn set_label(&self, label: &str) -> Result<(), Error> {
         self.inner()
             .set_property("Label", label)
             .await
@@ -64,24 +65,24 @@ impl<'a> Item<'a> {
         Ok(())
     }
 
-    pub async fn created(&self) -> Result<Duration> {
+    pub async fn created(&self) -> Result<Duration, Error> {
         let secs = self.inner().get_property::<u64>("Created").await?;
         Ok(Duration::from_secs(secs))
     }
 
-    pub async fn modified(&self) -> Result<Duration> {
+    pub async fn modified(&self) -> Result<Duration, Error> {
         let secs = self.inner().get_property::<u64>("Modified").await?;
         Ok(Duration::from_secs(secs))
     }
 
-    pub async fn attributes(&self) -> Result<HashMap<String, String>> {
+    pub async fn attributes(&self) -> Result<HashMap<String, String>, Error> {
         self.inner()
             .get_property("Attributes")
             .await
             .map_err(From::from)
     }
 
-    pub async fn set_attributes(&self, attributes: HashMap<&str, &str>) -> Result<()> {
+    pub async fn set_attributes(&self, attributes: HashMap<&str, &str>) -> Result<(), Error> {
         self.inner()
             .set_property("Attributes", attributes)
             .await
@@ -89,7 +90,7 @@ impl<'a> Item<'a> {
         Ok(())
     }
 
-    pub async fn delete(&self) -> Result<()> {
+    pub async fn delete(&self) -> Result<(), Error> {
         let prompt_path = self
             .inner()
             .call_method("Delete", &())
@@ -102,7 +103,7 @@ impl<'a> Item<'a> {
     }
 
     #[doc(alias = "GetSecret")]
-    pub async fn secret(&self, session: &Session<'_>) -> Result<Secret<'_>> {
+    pub async fn secret(&self, session: &Session<'_>) -> Result<Secret<'_>, Error> {
         let inner = self
             .inner()
             .call_method("GetSecret", &(session))
@@ -112,7 +113,7 @@ impl<'a> Item<'a> {
     }
 
     #[doc(alias = "SetSecret")]
-    pub async fn set_secret(&self, secret: &Secret<'_>) -> Result<()> {
+    pub async fn set_secret(&self, secret: &Secret<'_>) -> Result<(), Error> {
         self.inner().call_method("SetSecret", &(secret)).await?;
         Ok(())
     }

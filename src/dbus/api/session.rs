@@ -1,7 +1,8 @@
 use std::fmt;
 
 use super::DESTINATION;
-use crate::Result;
+use crate::dbus::Error;
+
 use serde::Serialize;
 use zbus::zvariant::{ObjectPath, Type};
 
@@ -11,7 +12,7 @@ use zbus::zvariant::{ObjectPath, Type};
 pub struct Session<'a>(zbus::Proxy<'a>);
 
 impl<'a> Session<'a> {
-    pub async fn new<P>(connection: &zbus::Connection, object_path: P) -> Result<Session<'a>>
+    pub async fn new<P>(connection: &zbus::Connection, object_path: P) -> Result<Session<'a>, Error>
     where
         P: TryInto<ObjectPath<'a>>,
         P::Error: Into<zbus::Error>,
@@ -29,7 +30,7 @@ impl<'a> Session<'a> {
         &self.0
     }
 
-    pub async fn close(&self) -> Result<()> {
+    pub async fn close(&self) -> Result<(), Error> {
         self.inner().call_method("Close", &()).await?;
         Ok(())
     }

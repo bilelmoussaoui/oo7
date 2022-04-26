@@ -2,8 +2,8 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use futures::lock::Mutex;
 
-use super::{api, Algorithm};
-use crate::{dbus::utils, Error, Key, Result};
+use super::{api, Algorithm, Error};
+use crate::{dbus::utils, Key};
 
 /// A secret with a label and attributes to identify it.
 ///
@@ -52,7 +52,7 @@ impl<'a> Item<'a> {
     }
 
     /// Get whether the item is locked.
-    pub async fn is_locked(&self) -> Result<bool> {
+    pub async fn is_locked(&self) -> Result<bool, Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
@@ -61,7 +61,7 @@ impl<'a> Item<'a> {
     }
 
     /// The item label.
-    pub async fn label(&self) -> Result<String> {
+    pub async fn label(&self) -> Result<String, Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
@@ -70,7 +70,7 @@ impl<'a> Item<'a> {
     }
 
     /// Set the item label.
-    pub async fn set_label(&self, label: &str) -> Result<()> {
+    pub async fn set_label(&self, label: &str) -> Result<(), Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
@@ -79,7 +79,7 @@ impl<'a> Item<'a> {
     }
 
     /// The UNIX time when the item was created.
-    pub async fn created(&self) -> Result<Duration> {
+    pub async fn created(&self) -> Result<Duration, Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
@@ -88,7 +88,7 @@ impl<'a> Item<'a> {
     }
 
     /// The UNIX time when the item was modified.
-    pub async fn modified(&self) -> Result<Duration> {
+    pub async fn modified(&self) -> Result<Duration, Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
@@ -97,7 +97,7 @@ impl<'a> Item<'a> {
     }
 
     /// Retrieve the item attributes.
-    pub async fn attributes(&self) -> Result<HashMap<String, String>> {
+    pub async fn attributes(&self) -> Result<HashMap<String, String>, Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
@@ -106,7 +106,7 @@ impl<'a> Item<'a> {
     }
 
     /// Update the item attributes.
-    pub async fn set_attributes(&self, attributes: HashMap<&str, &str>) -> Result<()> {
+    pub async fn set_attributes(&self, attributes: HashMap<&str, &str>) -> Result<(), Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
@@ -115,7 +115,7 @@ impl<'a> Item<'a> {
     }
 
     /// Delete the item.
-    pub async fn delete(&self) -> Result<()> {
+    pub async fn delete(&self) -> Result<(), Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
@@ -126,7 +126,7 @@ impl<'a> Item<'a> {
     }
 
     /// Retrieve the currently stored secret.
-    pub async fn secret(&self) -> Result<Vec<u8>> {
+    pub async fn secret(&self) -> Result<Vec<u8>, Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
@@ -152,7 +152,7 @@ impl<'a> Item<'a> {
     /// * `secret` - The secret to store.
     /// * `content_type` - The content type of the secret, usually something like `text/plain`.
     #[doc(alias = "SetSecret")]
-    pub async fn set_secret(&self, secret: &[u8], content_type: &str) -> Result<()> {
+    pub async fn set_secret(&self, secret: &[u8], content_type: &str) -> Result<(), Error> {
         let secret = match self.algorithm {
             Algorithm::Plain => api::Secret::new(Arc::clone(&self.session), secret, content_type),
             Algorithm::Encrypted => {
@@ -165,7 +165,7 @@ impl<'a> Item<'a> {
     }
 
     /// Unlock the item.
-    pub async fn unlock(&self) -> Result<()> {
+    pub async fn unlock(&self) -> Result<(), Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
@@ -175,7 +175,7 @@ impl<'a> Item<'a> {
     }
 
     /// Lock the item.
-    pub async fn lock(&self) -> Result<()> {
+    pub async fn lock(&self) -> Result<(), Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
