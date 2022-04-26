@@ -24,7 +24,9 @@ keyring::remove(HashMap::from([("account", "alice")])).await?;
 ```
 */
 
-use async_std::prelude::*;
+use std::collections::HashMap;
+
+use async_std::{prelude::*, sync::Mutex};
 
 use async_std::path::{Path, PathBuf};
 use async_std::{fs, io};
@@ -41,8 +43,10 @@ mod secret;
 
 pub use error::Error;
 
-struct Keyring {
-    keyring: api::Keyring,
+pub use self::api::Item;
+
+pub struct Keyring {
+    keyring: Mutex<api::Keyring>,
     path: PathBuf,
     /// Times are stored before reading the file to detect
     /// file changes before writing
@@ -57,7 +61,12 @@ impl Keyring {
         Self::load(api::Keyring::default_path()?, &secret).await
     }
 
-    /// Load from a keyring file
+    /// Load from a keyring file.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The path to the file backend.
+    /// * `secret` - The service key, usually retrieved from the Secrets portal.
     pub async fn load(path: impl AsRef<Path>, secret: &[u8]) -> Result<Self, Error> {
         let (mtime, keyring) = match fs::File::open(&path).await {
             Err(err) if err.kind() == io::ErrorKind::NotFound => (None, api::Keyring::new()),
@@ -77,14 +86,57 @@ impl Keyring {
         let key = keyring.derive_key(secret);
 
         Ok(Self {
-            keyring,
+            keyring: Mutex::new(keyring),
             path: path.as_ref().to_path_buf(),
             mtime,
             key,
         })
     }
 
+    pub async fn items(&self) -> Result<Vec<Item>, Error> {
+        self.keyring
+            .lock()
+            .await
+            .items
+            .iter()
+            .map(|e| (*e).clone().decrypt(&self.key))
+            .collect()
+    }
+
+    pub async fn search_items(&self, attributes: HashMap<&str, &str>) -> Result<Vec<Item>, Error> {
+        self.keyring
+            .lock()
+            .await
+            .search_items(attributes, &self.key)
+    }
+
+    pub async fn delete(&self, attributes: HashMap<&str, &str>) -> Result<(), Error> {
+        self.keyring
+            .lock()
+            .await
+            .remove_items(attributes, &self.key)
+    }
+
+    pub async fn create_item(
+        &self,
+        label: &str,
+        attributes: HashMap<&str, &str>,
+        password: &[u8],
+        replace: bool,
+    ) -> Result<(), Error> {
+        if replace {
+            self.keyring
+                .lock()
+                .await
+                .remove_items(attributes.clone(), &self.key)?;
+        }
+        let item = Item::new(label, attributes, password);
+        let encrypted_item = item.encrypt(&self.key)?;
+        self.keyring.lock().await.items.push(encrypted_item);
+        Ok(())
+    }
+
     pub async fn write(self) -> Result<(), Error> {
-        self.keyring.dump(self.path, self.mtime).await
+        self.keyring.lock().await.dump(self.path, self.mtime).await
     }
 }

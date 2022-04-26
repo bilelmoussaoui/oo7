@@ -8,7 +8,10 @@ use super::{
     secret::SecretInner, Collection, Item, Prompt, Properties, Secret, Session, Unlockable,
     DESTINATION, PATH,
 };
-use crate::{dbus::Algorithm, Key, Result};
+use crate::{
+    dbus::{Algorithm, Error},
+    Key,
+};
 
 #[derive(Type)]
 #[zvariant(signature = "o")]
@@ -16,7 +19,7 @@ use crate::{dbus::Algorithm, Key, Result};
 pub struct Service<'a>(zbus::Proxy<'a>);
 
 impl<'a> Service<'a> {
-    pub async fn new(connection: &zbus::Connection) -> Result<Service<'a>> {
+    pub async fn new(connection: &zbus::Connection) -> Result<Service<'a>, Error> {
         let inner = zbus::ProxyBuilder::new_bare(connection)
             .path(PATH)?
             .destination(DESTINATION)?
@@ -32,7 +35,7 @@ impl<'a> Service<'a> {
     }
 
     #[doc(alias = "CollectionCreated")]
-    pub async fn receive_collection_created(&self) -> Result<Collection<'a>> {
+    pub async fn receive_collection_created(&self) -> Result<Collection<'a>, Error> {
         let mut stream = self.inner().receive_signal("CollectionCreated").await?;
         let message = stream.next().await.unwrap();
         let object_path = message.body::<OwnedObjectPath>()?;
@@ -40,7 +43,7 @@ impl<'a> Service<'a> {
     }
 
     #[doc(alias = "CollectionDeleted")]
-    pub async fn receive_collection_deleted(&self) -> Result<Collection<'a>> {
+    pub async fn receive_collection_deleted(&self) -> Result<Collection<'a>, Error> {
         let mut stream = self.inner().receive_signal("CollectionDeleted").await?;
         let message = stream.next().await.unwrap();
         let object_path = message.body::<OwnedObjectPath>()?;
@@ -48,14 +51,14 @@ impl<'a> Service<'a> {
     }
 
     #[doc(alias = "CollectionChanged")]
-    pub async fn receive_collection_changed(&self) -> Result<Collection<'a>> {
+    pub async fn receive_collection_changed(&self) -> Result<Collection<'a>, Error> {
         let mut stream = self.inner().receive_signal("CollectionChanged").await?;
         let message = stream.next().await.unwrap();
         let object_path = message.body::<OwnedObjectPath>()?;
         Collection::new(self.inner().connection(), object_path).await
     }
 
-    pub async fn collections(&self) -> Result<Vec<Collection<'a>>> {
+    pub async fn collections(&self) -> Result<Vec<Collection<'a>>, Error> {
         let collections_paths = self
             .inner()
             .get_property::<Vec<ObjectPath>>("Collections")
@@ -67,7 +70,7 @@ impl<'a> Service<'a> {
     pub async fn open_session(
         &self,
         client_public_key: Option<&Key>,
-    ) -> Result<(Option<Key>, Session<'a>)> {
+    ) -> Result<(Option<Key>, Session<'a>), Error> {
         let (algorithm, key) = match client_public_key {
             None => (Algorithm::Plain, zvariant::Str::default().into()),
             Some(key) => (Algorithm::Encrypted, key.to_value()),
@@ -92,7 +95,7 @@ impl<'a> Service<'a> {
         &self,
         label: &str,
         alias: Option<&str>,
-    ) -> Result<Collection<'a>> {
+    ) -> Result<Collection<'a>, Error> {
         let properties = Properties::for_collection(label);
         let (collection_path, prompt_path) = self
             .inner()
@@ -115,7 +118,7 @@ impl<'a> Service<'a> {
     pub async fn search_items(
         &self,
         attributes: HashMap<&str, &str>,
-    ) -> Result<(Vec<Item<'_>>, Vec<Item<'_>>)> {
+    ) -> Result<(Vec<Item<'_>>, Vec<Item<'_>>), Error> {
         let (unlocked_item_paths, locked_item_paths) = self
             .inner()
             .call_method("SearchItems", &(attributes))
@@ -129,7 +132,7 @@ impl<'a> Service<'a> {
         Ok((unlocked_items, locked_items))
     }
 
-    pub async fn unlock(&self, items: &[impl Unlockable]) -> Result<Vec<OwnedObjectPath>> {
+    pub async fn unlock(&self, items: &[impl Unlockable]) -> Result<Vec<OwnedObjectPath>, Error> {
         let (mut unlocked_item_paths, prompt_path) = self
             .inner()
             .call_method("Unlock", &(items))
@@ -146,7 +149,7 @@ impl<'a> Service<'a> {
         Ok(unlocked_item_paths)
     }
 
-    pub async fn lock(&self, items: &[impl Unlockable]) -> Result<Vec<OwnedObjectPath>> {
+    pub async fn lock(&self, items: &[impl Unlockable]) -> Result<Vec<OwnedObjectPath>, Error> {
         let (mut locked_item_paths, prompt_path) = self
             .inner()
             .call_method("Lock", &(items))
@@ -169,7 +172,7 @@ impl<'a> Service<'a> {
         &self,
         items: &[Item<'_>],
         session: &Session<'_>,
-    ) -> Result<HashMap<Item<'_>, Secret<'_>>> {
+    ) -> Result<HashMap<Item<'_>, Secret<'_>>, Error> {
         let secrets = self
             .inner()
             .call_method("GetSecrets", &(items, session))
@@ -189,7 +192,7 @@ impl<'a> Service<'a> {
     }
 
     #[doc(alias = "ReadAlias")]
-    pub async fn read_alias(&self, name: &str) -> Result<Option<Collection<'a>>> {
+    pub async fn read_alias(&self, name: &str) -> Result<Option<Collection<'a>>, Error> {
         let collection_path = self
             .inner()
             .call_method("ReadAlias", &(name))
@@ -205,7 +208,7 @@ impl<'a> Service<'a> {
     }
 
     #[doc(alias = "SetAlias")]
-    pub async fn set_alias(&self, name: &str, collection: &Collection<'_>) -> Result<()> {
+    pub async fn set_alias(&self, name: &str, collection: &Collection<'_>) -> Result<(), Error> {
         self.inner()
             .call_method("SetAlias", &(name, collection))
             .await?;

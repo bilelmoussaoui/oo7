@@ -2,9 +2,9 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use futures::lock::Mutex;
 
-use crate::{Error, Key, Result};
+use crate::Key;
 
-use super::{api, Algorithm, Item};
+use super::{api, Algorithm, Error, Item};
 
 /// A collection allows to store and retrieve items.
 ///
@@ -51,7 +51,7 @@ impl<'a> Collection<'a> {
     }
 
     /// Retrieve the list of available [`Item`] in the collection.
-    pub async fn items(&self) -> Result<Vec<Item<'a>>> {
+    pub async fn items(&self) -> Result<Vec<Item<'a>>, Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
@@ -74,7 +74,7 @@ impl<'a> Collection<'a> {
     }
 
     /// The collection label.
-    pub async fn label(&self) -> Result<String> {
+    pub async fn label(&self) -> Result<String, Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
@@ -83,7 +83,7 @@ impl<'a> Collection<'a> {
     }
 
     /// Set the collection label.
-    pub async fn set_label(&self, label: &str) -> Result<()> {
+    pub async fn set_label(&self, label: &str) -> Result<(), Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
@@ -93,7 +93,7 @@ impl<'a> Collection<'a> {
 
     /// Get whether the collection is locked.
     #[doc(alias = "Locked")]
-    pub async fn is_locked(&self) -> Result<bool> {
+    pub async fn is_locked(&self) -> Result<bool, Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
@@ -102,7 +102,7 @@ impl<'a> Collection<'a> {
     }
 
     /// The UNIX time when the collection was created.
-    pub async fn created(&self) -> Result<Duration> {
+    pub async fn created(&self) -> Result<Duration, Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
@@ -111,7 +111,7 @@ impl<'a> Collection<'a> {
     }
 
     /// The UNIX time when the collection was modified.
-    pub async fn modified(&self) -> Result<Duration> {
+    pub async fn modified(&self) -> Result<Duration, Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
@@ -120,7 +120,10 @@ impl<'a> Collection<'a> {
     }
 
     /// Search for items based on their attributes.
-    pub async fn search_items(&self, attributes: HashMap<&str, &str>) -> Result<Vec<Item<'a>>> {
+    pub async fn search_items(
+        &self,
+        attributes: HashMap<&str, &str>,
+    ) -> Result<Vec<Item<'a>>, Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
@@ -156,7 +159,7 @@ impl<'a> Collection<'a> {
         secret: &[u8],
         replace: bool,
         content_type: &str,
-    ) -> Result<Item<'_>> {
+    ) -> Result<Item<'_>, Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
@@ -187,7 +190,7 @@ impl<'a> Collection<'a> {
     }
 
     /// Unlock the collection.
-    pub async fn unlock(&self) -> Result<()> {
+    pub async fn unlock(&self) -> Result<(), Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
@@ -197,7 +200,7 @@ impl<'a> Collection<'a> {
     }
 
     /// Lock the collection.
-    pub async fn lock(&self) -> Result<()> {
+    pub async fn lock(&self) -> Result<(), Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
@@ -207,7 +210,7 @@ impl<'a> Collection<'a> {
     }
 
     /// Delete the collection.
-    pub async fn delete(&self) -> Result<()> {
+    pub async fn delete(&self) -> Result<(), Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
@@ -249,7 +252,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(item.secret().await.unwrap(), secret);
+        assert_eq!(*item.secret().await.unwrap(), secret);
         assert_eq!(item.attributes().await.unwrap()["type"], value);
 
         assert_eq!(collection.items().await.unwrap().len(), n_items + 1);

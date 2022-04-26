@@ -4,7 +4,10 @@ use serde::{ser::SerializeTuple, Deserialize, Serialize};
 use zbus::zvariant::{OwnedObjectPath, Type};
 
 use super::Session;
-use crate::{dbus::utils, Key, Result};
+use crate::{
+    dbus::{utils, Error},
+    Key,
+};
 
 #[derive(Debug, Serialize, Deserialize, Type)]
 #[zvariant(signature = "(oayays)")]
@@ -20,23 +23,27 @@ pub struct Secret<'a> {
 }
 
 impl<'a> Secret<'a> {
-    pub(crate) fn new(session: Arc<Session<'a>>, secret: &[u8], content_type: &str) -> Self {
+    pub(crate) fn new<P: AsRef<[u8]>>(
+        session: Arc<Session<'a>>,
+        secret: P,
+        content_type: &str,
+    ) -> Self {
         Self {
             session,
             parameters: vec![],
-            value: secret.to_vec(),
+            value: secret.as_ref().to_vec(),
             content_type: content_type.to_owned(),
         }
     }
 
-    pub(crate) fn new_encrypted(
+    pub(crate) fn new_encrypted<P: AsRef<[u8]>>(
         session: Arc<Session<'a>>,
-        secret: &[u8],
+        secret: P,
         content_type: &str,
         aes_key: &Key,
     ) -> Self {
         let iv = utils::generate_iv();
-        let secret = utils::encrypt(secret, aes_key, &iv).unwrap();
+        let secret = utils::encrypt(secret.as_ref(), aes_key, &iv).unwrap();
         Self {
             session,
             parameters: iv,
@@ -48,7 +55,7 @@ impl<'a> Secret<'a> {
     pub(crate) async fn from_inner(
         cnx: &zbus::Connection,
         inner: SecretInner,
-    ) -> Result<Secret<'_>> {
+    ) -> Result<Secret<'_>, Error> {
         let secret = Secret {
             session: Arc::new(Session::new(cnx, inner.0).await?),
             parameters: inner.1,

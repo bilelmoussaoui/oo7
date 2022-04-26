@@ -5,7 +5,7 @@ use serde::Serialize;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath, Type};
 
 use super::{Item, Prompt, Properties, Secret, Unlockable, DESTINATION};
-use crate::Result;
+use crate::dbus::Error;
 
 #[derive(Type)]
 #[zvariant(signature = "o")]
@@ -13,7 +13,10 @@ use crate::Result;
 pub struct Collection<'a>(zbus::Proxy<'a>);
 
 impl<'a> Collection<'a> {
-    pub async fn new<P>(connection: &zbus::Connection, object_path: P) -> Result<Collection<'a>>
+    pub async fn new<P>(
+        connection: &zbus::Connection,
+        object_path: P,
+    ) -> Result<Collection<'a>, Error>
     where
         P: TryInto<ObjectPath<'a>>,
         P::Error: Into<zbus::Error>,
@@ -35,7 +38,7 @@ impl<'a> Collection<'a> {
     pub(crate) async fn from_paths<P>(
         connection: &zbus::Connection,
         paths: Vec<P>,
-    ) -> Result<Vec<Collection<'a>>>
+    ) -> Result<Vec<Collection<'a>>, Error>
     where
         P: TryInto<ObjectPath<'a>>,
         P::Error: Into<zbus::Error>,
@@ -48,7 +51,7 @@ impl<'a> Collection<'a> {
     }
 
     #[doc(alias = "ItemCreated")]
-    pub async fn receive_item_created(&self) -> Result<Item<'_>> {
+    pub async fn receive_item_created(&self) -> Result<Item<'a>, Error> {
         let mut stream = self.inner().receive_signal("ItemCreated").await?;
         let message = stream.next().await.unwrap();
         let object_path = message.body::<OwnedObjectPath>()?;
@@ -56,7 +59,7 @@ impl<'a> Collection<'a> {
     }
 
     #[doc(alias = "ItemDeleted")]
-    pub async fn receive_item_deleted(&self) -> Result<Item<'_>> {
+    pub async fn receive_item_deleted(&self) -> Result<Item<'a>, Error> {
         let mut stream = self.inner().receive_signal("ItemDeleted").await?;
         let message = stream.next().await.unwrap();
         let object_path = message.body::<OwnedObjectPath>()?;
@@ -64,14 +67,14 @@ impl<'a> Collection<'a> {
     }
 
     #[doc(alias = "ItemChanged")]
-    pub async fn receive_item_changed(&self) -> Result<Item<'_>> {
+    pub async fn receive_item_changed(&self) -> Result<Item<'a>, Error> {
         let mut stream = self.inner().receive_signal("ItemChanged").await?;
         let message = stream.next().await.unwrap();
         let object_path = message.body::<OwnedObjectPath>()?;
         Item::new(self.inner().connection(), object_path).await
     }
 
-    pub async fn items(&self) -> Result<Vec<Item<'a>>> {
+    pub async fn items(&self) -> Result<Vec<Item<'a>>, Error> {
         let item_paths = self
             .inner()
             .get_property::<Vec<ObjectPath>>("Items")
@@ -79,11 +82,11 @@ impl<'a> Collection<'a> {
         Item::from_paths(self.inner().connection(), item_paths).await
     }
 
-    pub async fn label(&self) -> Result<String> {
+    pub async fn label(&self) -> Result<String, Error> {
         self.inner().get_property("Label").await.map_err(From::from)
     }
 
-    pub async fn set_label(&self, label: &str) -> Result<()> {
+    pub async fn set_label(&self, label: &str) -> Result<(), Error> {
         self.inner()
             .set_property("Label", label)
             .await
@@ -92,24 +95,24 @@ impl<'a> Collection<'a> {
     }
 
     #[doc(alias = "Locked")]
-    pub async fn is_locked(&self) -> Result<bool> {
+    pub async fn is_locked(&self) -> Result<bool, Error> {
         self.inner()
             .get_property("Locked")
             .await
             .map_err(From::from)
     }
 
-    pub async fn created(&self) -> Result<Duration> {
+    pub async fn created(&self) -> Result<Duration, Error> {
         let time = self.inner().get_property::<u64>("Created").await?;
         Ok(Duration::from_secs(time))
     }
 
-    pub async fn modified(&self) -> Result<Duration> {
+    pub async fn modified(&self) -> Result<Duration, Error> {
         let time = self.inner().get_property::<u64>("Modified").await?;
         Ok(Duration::from_secs(time))
     }
 
-    pub async fn delete(&self) -> Result<()> {
+    pub async fn delete(&self) -> Result<(), Error> {
         let prompt_path = self
             .inner()
             .call_method("Delete", &())
@@ -122,7 +125,10 @@ impl<'a> Collection<'a> {
     }
 
     #[doc(alias = "SearchItems")]
-    pub async fn search_items(&self, attributes: HashMap<&str, &str>) -> Result<Vec<Item<'a>>> {
+    pub async fn search_items(
+        &self,
+        attributes: HashMap<&str, &str>,
+    ) -> Result<Vec<Item<'a>>, Error> {
         let msg = self
             .inner()
             .call_method("SearchItems", &(attributes))
@@ -139,7 +145,7 @@ impl<'a> Collection<'a> {
         attributes: HashMap<&str, &str>,
         secret: &Secret<'_>,
         replace: bool,
-    ) -> Result<Item<'_>> {
+    ) -> Result<Item<'_>, Error> {
         let properties = Properties::for_item(label, attributes);
         let (item_path, prompt_path) = self
             .inner()
