@@ -2,6 +2,8 @@
 #![doc = include_str!("../README.md")]
 
 mod error;
+mod key;
+pub use key::Key;
 
 pub mod dbus;
 

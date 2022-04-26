@@ -30,6 +30,7 @@ use super::{
     AttributeValue, DecAlg, EncAlg, EncryptedItem, Error, Item, MacAlg, FILE_HEADER,
     FILE_HEADER_LEN, ITERATION_COUNT, MAJOR_VERSION, MINOR_VERSION, SALT_SIZE,
 };
+use crate::Key;
 
 /// Logical contents of a keyring file
 #[derive(Deserialize, Serialize, Type, Debug)]
@@ -223,22 +224,6 @@ impl TryFrom<&[u8]> for Keyring {
         } else {
             Err(Error::NoData)
         }
-    }
-}
-
-/// AES key
-#[derive(Zeroize, ZeroizeOnDrop)]
-pub struct Key(Vec<u8>);
-
-impl AsRef<[u8]> for Key {
-    fn as_ref(&self) -> &[u8] {
-        self.0.as_slice()
-    }
-}
-
-impl AsMut<[u8]> for Key {
-    fn as_mut(&mut self) -> &mut [u8] {
-        &mut self.0
     }
 }
 

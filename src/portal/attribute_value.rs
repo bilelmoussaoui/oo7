@@ -3,7 +3,8 @@ use serde::{Deserialize, Serialize};
 use zbus::zvariant::Type;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
-use super::{Key, MacAlg};
+use super::MacAlg;
+use crate::Key;
 
 #[derive(Deserialize, Serialize, Type, Clone, Debug, Zeroize, ZeroizeOnDrop)]
 pub struct AttributeValue(String);

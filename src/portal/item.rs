@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 use zbus::zvariant::{self, Type};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
-use super::{gvariant_encoding, AttributeValue, EncAlg, EncryptedItem, Error, Key, MacAlg};
+use super::{gvariant_encoding, AttributeValue, EncAlg, EncryptedItem, Error, MacAlg};
+use crate::Key;
 
 #[derive(Deserialize, Serialize, Type, Debug, Zeroize, ZeroizeOnDrop)]
 pub struct Item {

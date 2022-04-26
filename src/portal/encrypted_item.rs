@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 use zbus::zvariant::Type;
 use zeroize::Zeroizing;
 
-use super::{DecAlg, Error, Item, Key, MacAlg};
+use super::{DecAlg, Error, Item, MacAlg};
+use crate::Key;
 
 #[derive(Deserialize, Serialize, Type, Debug, Clone)]
 pub struct EncryptedItem {

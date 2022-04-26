@@ -21,7 +21,7 @@ pub use attribute_value::AttributeValue;
 pub use encrypted_item::EncryptedItem;
 pub use error::Error;
 pub use item::Item;
-pub use keyring::{gvariant_encoding, Key, Keyring};
+pub use keyring::{gvariant_encoding, Keyring};
 mod secret;
 
 pub(crate) use secret::retrieve;
