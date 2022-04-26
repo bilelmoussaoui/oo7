@@ -40,7 +40,7 @@ pub(crate) use secret::retrieve;
 
 pub use error::Error;
 
-pub struct Keyring {
+pub(crate) struct Keyring {
     keyring: keyring::Keyring,
     path: PathBuf,
     /// Times are stored before reading the file to detect
