@@ -11,7 +11,7 @@ use crate::{Error, Result};
 /// to lock or unlock it. Note that the secret service might not be able to lock/unlock
 /// individual items and may lock/unlock the entire collection in such case.
 ///
-/// The item is attributes are used to identify and find the item later using 
+/// The item is attributes are used to identify and find the item later using
 /// [`Collection::search_items`](crate::dbus::Collection::search_items).
 /// They are not stored or transferred in a secure manner.
 ///

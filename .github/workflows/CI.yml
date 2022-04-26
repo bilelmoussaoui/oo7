@@ -36,7 +36,7 @@ jobs:
           override: true
       - name: Build and test
         run: |
-          dbus-run-session -- cargo test --verbose
+          dbus-run-session -- cargo test --no-default-features
 
   fmt:
     name: Rustfmt
