@@ -35,7 +35,8 @@ impl<'a> Secret<'a> {
         content_type: &str,
         aes_key: &Key,
     ) -> Self {
-        let (secret, iv) = utils::encrypt(secret, aes_key).unwrap();
+        let iv = utils::generate_iv();
+        let secret = utils::encrypt(secret, aes_key, &iv).unwrap();
         Self {
             session,
             parameters: iv,

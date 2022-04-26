@@ -1,51 +1,61 @@
 use aes::cipher::{
     block_padding::Pkcs7, BlockDecryptMut, BlockEncryptMut, BlockSizeUser, KeyIvInit,
 };
-use hmac::{digest::OutputSizeUser, Mac};
 
 use crate::{error::Result, Key};
 
-type MacAlg = hmac::Hmac<sha2::Sha256>;
 type EncAlg = cbc::Encryptor<aes::Aes128>;
 type DecAlg = cbc::Decryptor<aes::Aes128>;
 
-pub(crate) fn encrypt(data: &[u8], key: &Key) -> Result<(Vec<u8>, Vec<u8>)> {
+pub(crate) fn encrypt(data: &[u8], key: &Key, iv: &[u8]) -> Result<Vec<u8>> {
     let mut blob = vec![0; data.len() + EncAlg::block_size()];
 
-    let iv = EncAlg::generate_iv(cipher::rand_core::OsRng);
-
-    // Unwrapping since adding `CIPHER_BLOCK_SIZE` to array is enough space for PKCS7
-    let encrypted_len = EncAlg::new(key.as_ref().into(), &iv)
+    let encrypted_len = EncAlg::new(key.as_ref().into(), iv.into())
         .encrypt_padded_b2b_mut::<Pkcs7>(data, &mut blob)
         .unwrap()
         .len();
 
     blob.truncate(encrypted_len);
 
-    // Unwrapping since arbitrary keylength allowed
-    let mut mac = MacAlg::new_from_slice(key.as_ref()).unwrap();
-    mac.update(&blob);
-    blob.append(&mut mac.finalize().into_bytes().as_slice().into());
-
-    Ok((blob, iv.to_vec()))
+    Ok(blob)
 }
 
 pub(crate) fn decrypt(data: &[u8], key: &Key, iv: &[u8]) -> Result<Vec<u8>> {
-    let data_len = data.len();
-    let mut data = data.to_vec();
+    let mut data = zeroize::Zeroizing::new(data.to_vec());
 
-    let mac_tag = data.split_off(data_len - hmac::HmacCore::<sha2::Sha256>::output_size());
-
-    // verify item
-    let mut mac = MacAlg::new_from_slice(key.as_ref()).unwrap();
-    mac.update(data.as_ref());
-    mac.verify_slice(&mac_tag).unwrap();
-
-    // decrypt item
     let decrypted = DecAlg::new(key.as_ref().into(), iv.into())
         .decrypt_padded_mut::<Pkcs7>(data.as_mut())
         .unwrap()
         .to_vec();
 
     Ok(decrypted)
+}
+
+pub(crate) fn generate_iv() -> Vec<u8> {
+    EncAlg::generate_iv(cipher::rand_core::OsRng).to_vec()
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_encrypt() {
+        let data = b"some data";
+        let expected_encrypted = &[
+            241, 233, 175, 173, 142, 44, 63, 240, 77, 154, 211, 233, 217, 170, 49, 142,
+        ];
+        let aes_key = Key(vec![
+            132, 3, 113, 222, 81, 209, 49, 43, 81, 232, 243, 46, 1, 103, 184, 42,
+        ]);
+        let aes_iv = &[
+            78, 82, 67, 158, 214, 102, 48, 109, 84, 107, 94, 54, 225, 29, 186, 246,
+        ];
+
+        let encrypted = encrypt(data, &aes_key, aes_iv).unwrap();
+        assert_eq!(encrypted, expected_encrypted);
+
+        let decrypted = decrypt(&encrypted, &aes_key, aes_iv).unwrap();
+        assert_eq!(decrypted, data);
+    }
 }
