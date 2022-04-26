@@ -4,6 +4,7 @@
 
 mod error;
 mod key;
+mod migration;
 
 #[cfg(feature = "unstable")]
 pub use key::Key;
@@ -17,6 +18,7 @@ mod keyring;
 
 pub use error::{Error, Result};
 pub use keyring::{Item, Keyring};
+pub use migration::migrate;
 
 /// Checks whether the application is sandboxed or not.
 pub fn is_sandboxed() -> bool {

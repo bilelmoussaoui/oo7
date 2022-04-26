@@ -53,8 +53,10 @@ impl<'a> Service<'a> {
     }
 
     /// Retrieve the default collection.
-    pub async fn default_collection(&self) -> Result<Option<Collection<'a>>, Error> {
-        self.with_alias(DEFAULT_COLLECTION).await
+    pub async fn default_collection(&self) -> Result<Collection<'a>, Error> {
+        self.with_alias(DEFAULT_COLLECTION)
+            .await?
+            .ok_or_else(|| Error::NotFound(DEFAULT_COLLECTION.to_string()))
     }
 
     /// Find a collection with it alias.

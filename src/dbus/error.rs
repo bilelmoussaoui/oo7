@@ -11,6 +11,8 @@ pub enum Error {
     Deleted,
     /// The prompt request was dimissed.
     Dismissed,
+    /// The collection doesn't exists
+    NotFound(String),
     /// Input/Output.
     IO(std::io::Error),
 }
@@ -46,6 +48,7 @@ impl fmt::Display for Error {
             Self::Zbus(err) => write!(f, "zbus error {err}"),
             Self::IO(err) => write!(f, "IO error {err}"),
             Self::Deleted => write!(f, "Item/Collection was deleted, can no longer be used"),
+            Self::NotFound(name) => write!(f, "The collection '{name}' doesn't exists"),
             Self::Dismissed => write!(f, "Prompt was dismissed"),
         }
     }

@@ -31,8 +31,8 @@ impl Keyring {
         } else {
             let service = dbus::Service::new(Algorithm::Encrypted).await?;
             let collection = match service.default_collection().await {
-                Ok(Some(c)) => Ok(c),
-                Ok(None) => {
+                Ok(c) => Ok(c),
+                Err(crate::dbus::Error::NotFound(_)) => {
                     service
                         .create_collection("Login", Some(DEFAULT_COLLECTION))
                         .await

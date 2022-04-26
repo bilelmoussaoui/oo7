@@ -239,7 +239,7 @@ mod tests {
         attributes.insert("type", value);
         let secret = "a password".as_bytes();
 
-        let collection = service.default_collection().await.unwrap().unwrap();
+        let collection = service.default_collection().await.unwrap();
         let n_items = collection.items().await.unwrap().len();
         let n_search_items = collection
             .search_items(attributes.clone())
