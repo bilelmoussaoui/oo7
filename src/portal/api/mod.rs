@@ -66,7 +66,7 @@ pub struct Keyring {
 
 impl Keyring {
     #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let salt = rand::thread_rng().gen::<[u8; SALT_SIZE]>().to_vec();
 
         Self {
