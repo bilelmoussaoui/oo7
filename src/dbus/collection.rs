@@ -215,7 +215,7 @@ mod tests {
     #[cfg(feature = "local_tests")]
     use crate::dbus::Service;
 
-    #[tokio::test]
+    #[async_std::test]
     #[cfg(feature = "local_tests")]
     async fn create_plain_item() {
         let service = Service::new(Algorithm::Plain).await.unwrap();
