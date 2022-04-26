@@ -9,6 +9,23 @@ Only use this if you know what you are doing.
 - Keep proxis around
 - Make more things async
 */
+use async_std::prelude::*;
+
+use async_std::{fs, io, path::Path};
+use cipher::{
+    block_padding::Pkcs7, crypto_common::rand_core, BlockDecryptMut, BlockEncryptMut,
+    BlockSizeUser, IvSizeUser, KeyIvInit,
+};
+use digest::OutputSizeUser;
+use hmac::Mac;
+use once_cell::sync::Lazy;
+use rand::Rng;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::PathBuf;
+use zbus::zvariant::{self, Type};
+use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
+
 pub(crate) const SALT_SIZE: usize = 32;
 pub(crate) const ITERATION_COUNT: u32 = 100000;
 
@@ -22,21 +39,8 @@ pub(crate) type MacAlg = hmac::Hmac<sha2::Sha256>;
 pub(crate) type EncAlg = cbc::Encryptor<aes::Aes128>;
 pub(crate) type DecAlg = cbc::Decryptor<aes::Aes128>;
 
-use async_std::prelude::*;
-
-use async_std::{fs, io, path::Path};
-use cipher::{
-    block_padding::Pkcs7, crypto_common::rand_core, BlockDecryptMut, BlockEncryptMut,
-    BlockSizeUser, IvSizeUser, KeyIvInit,
-};
-use digest::OutputSizeUser;
-use hmac::Mac;
-use rand::Rng;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::path::PathBuf;
-use zbus::zvariant::{self, Type};
-use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
+pub(crate) static GVARIANT_ENCODING: Lazy<zvariant::EncodingContext<byteorder::LE>> =
+    Lazy::new(|| zvariant::EncodingContext::<byteorder::LE>::new_gvariant(0));
 
 mod attribute_value;
 mod encrypted_item;
@@ -191,7 +195,7 @@ impl Keyring {
 
         blob.push(MAJOR_VERSION);
         blob.push(MINOR_VERSION);
-        blob.append(&mut zvariant::to_bytes(gvariant_encoding(), &self)?);
+        blob.append(&mut zvariant::to_bytes(*GVARIANT_ENCODING, &self)?);
 
         Ok(blob)
     }
@@ -237,7 +241,7 @@ impl TryFrom<&[u8]> for Keyring {
         }
 
         if let Some(data) = value.get((FILE_HEADER_LEN + 2)..) {
-            Ok(zvariant::from_slice(data, gvariant_encoding())?)
+            Ok(zvariant::from_slice(data, *GVARIANT_ENCODING)?)
         } else {
             Err(Error::NoData)
         }
@@ -261,8 +265,4 @@ pub fn hash_attributes<K: AsRef<str>>(
             )
         })
         .collect()
-}
-
-pub fn gvariant_encoding() -> zvariant::EncodingContext<byteorder::LE> {
-    zvariant::EncodingContext::<byteorder::LE>::new_gvariant(0)
 }

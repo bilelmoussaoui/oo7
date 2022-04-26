@@ -22,6 +22,7 @@ pbkdf2 = "0.11"
 sha2 = "0.10"
 zeroize = {version = "1.5", features = ["zeroize_derive"]}
 
+once_cell = "1.9"
 dirs = "4.0"
 
 [features]

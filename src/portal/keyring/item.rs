@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use zbus::zvariant::{self, Type};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
-use super::{gvariant_encoding, AttributeValue, EncAlg, EncryptedItem, Error, MacAlg};
+use super::{AttributeValue, EncAlg, EncryptedItem, Error, MacAlg, GVARIANT_ENCODING};
 use crate::Key;
 
 #[derive(Deserialize, Serialize, Type, Debug, Zeroize, ZeroizeOnDrop)]
@@ -73,7 +73,7 @@ impl Item {
     }
 
     pub fn encrypt(&self, key: &Key) -> Result<EncryptedItem, Error> {
-        let decrypted = Zeroizing::new(zvariant::to_bytes(gvariant_encoding(), &self)?);
+        let decrypted = Zeroizing::new(zvariant::to_bytes(*GVARIANT_ENCODING, &self)?);
 
         let iv = EncAlg::generate_iv(rand_core::OsRng);
 
@@ -110,6 +110,6 @@ impl TryFrom<&[u8]> for Item {
     type Error = Error;
 
     fn try_from(value: &[u8]) -> Result<Self, Error> {
-        Ok(zvariant::from_slice(value, gvariant_encoding())?)
+        Ok(zvariant::from_slice(value, *GVARIANT_ENCODING)?)
     }
 }
