@@ -31,13 +31,22 @@ impl Keyring {
     /// Create a new instance of the Keyring.
     pub async fn new() -> Result<Self> {
         let is_sandboxed = crate::is_sandboxed();
+
         if is_sandboxed {
+            #[cfg(feature = "tracing")]
+            tracing::debug!("Application is sandboxed, using the file backend");
             Ok(Self::File(portal::Keyring::load_default().await?))
         } else {
+            #[cfg(feature = "tracing")]
+            tracing::debug!(
+                "Application is not sandboxed, falling back to the Sercret Service backend"
+            );
             let service = dbus::Service::new(Algorithm::Encrypted).await?;
             let collection = match service.default_collection().await {
                 Ok(c) => Ok(c),
                 Err(crate::dbus::Error::NotFound(_)) => {
+                    #[cfg(feature = "tracing")]
+                    tracing::debug!("Default collection doesn't exists, trying to create it");
                     service
                         .create_collection("Login", Some(DEFAULT_COLLECTION))
                         .await

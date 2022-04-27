@@ -32,10 +32,14 @@ impl<'a> Service<'a> {
 
         let (aes_key, session) = match algorithm {
             Algorithm::Plain => {
+                #[cfg(feature = "tracing")]
+                tracing::debug!("Starting an unecrypted secret service session");
                 let (_service_key, session) = service.open_session(None).await?;
                 (None, session)
             }
             Algorithm::Encrypted => {
+                #[cfg(feature = "tracing")]
+                tracing::debug!("Starting an encrypted secret service session");
                 let private_key = Key::generate_private_key();
                 let public_key = Key::generate_public_key(&private_key);
                 let (service_key, session) = service.open_session(Some(&public_key)).await?;
