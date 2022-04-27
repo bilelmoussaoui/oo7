@@ -51,11 +51,9 @@ impl Keyring {
     ///
     /// The method does nothing if keyring is backed with a file backend.
     pub async fn unlock(&self) -> Result<()> {
-        match self {
-            Self::DBus(backend) => {
-                backend.unlock().await?;
-            }
-            _ => (), // No unlocking is neeeded for the file backend
+        // No unlocking is neeeded for the file backend
+        if let Self::DBus(backend) = self {
+            backend.unlock().await?;
         };
         Ok(())
     }

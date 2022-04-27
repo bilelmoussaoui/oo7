@@ -230,7 +230,7 @@ mod tests {
     use crate::dbus::Service;
 
     #[cfg(feature = "local_tests")]
-    async fn create_item<'a>(service: Service<'a>, encrypted: bool) {
+    async fn create_item(service: Service<'_>, encrypted: bool) {
         let mut attributes = HashMap::new();
         let value = if encrypted {
             "encrypted-type-test"
