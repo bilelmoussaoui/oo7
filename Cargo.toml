@@ -2,7 +2,13 @@
 name = "oo7"
 version = "0.1.0"
 edition = "2021"
-
+authors = ["Bilal Elmoussaoui", "Sophie Herold", "Maximiliano Sandoval"]
+description = "Easy to use Secret Service implementation with sandboxed file backend support"
+repository = "https://github.com/bilelmoussaoui/oo7"
+homepage = "https://github.com/bilelmoussaoui/oo7"
+keywords = ["keyring", "secret", "service", "portal", "keychain"]
+exclude = ["org.freedesktop.Secrets.xml"]
+categories = ["os::linux-apis", "os", "api-bindings"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
