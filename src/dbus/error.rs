@@ -9,7 +9,7 @@ pub enum Error {
     Zbus(zbus::Error),
     /// The item/collection was removed.
     Deleted,
-    /// The prompt request was dimissed.
+    /// The prompt request was dismissed.
     Dismissed,
     /// The collection doesn't exists
     NotFound(String),
