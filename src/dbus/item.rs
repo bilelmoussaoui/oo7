@@ -20,6 +20,7 @@ use crate::{dbus::utils, Key};
 ///
 /// If the item is deleted using [`Item::delete`] any future usage of it API
 /// will fail with [`Error::Deleted`].
+#[derive(Debug)]
 pub struct Item<'a> {
     inner: Arc<api::Item<'a>>,
     session: Arc<api::Session<'a>>,

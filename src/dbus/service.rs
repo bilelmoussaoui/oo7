@@ -16,6 +16,7 @@ use crate::Key;
 ///
 /// // Do something with the collection
 /// ```
+#[derive(Debug)]
 pub struct Service<'a> {
     inner: Arc<api::Service<'a>>,
     aes_key: Option<Arc<Key>>,

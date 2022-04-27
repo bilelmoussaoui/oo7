@@ -18,6 +18,7 @@ use super::{api, Algorithm, Error, Item};
 ///
 /// If the collection is deleted using [`Collection::delete`] any future usage of it API
 /// will fail with [`Error::Deleted`].
+#[derive(Debug)]
 pub struct Collection<'a> {
     inner: Arc<api::Collection<'a>>,
     service: Arc<api::Service<'a>>,

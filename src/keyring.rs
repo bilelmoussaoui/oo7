@@ -19,6 +19,7 @@ use crate::{
 ///
 /// The File backend requires a [`org.freedesktop.portal.Secret`](https://flatpak.github.io/xdg-desktop-portal/#gdbus-org.freedesktop.portal.Secret) implementation
 /// to retrieve the key that will be used to encrypt the backend file.
+#[derive(Debug)]
 pub enum Keyring {
     #[doc(hidden)]
     File(portal::Keyring),
@@ -131,6 +132,7 @@ impl Keyring {
 }
 
 /// A generic secret with a label and attributes.
+#[derive(Debug)]
 pub enum Item {
     #[doc(hidden)]
     File(Mutex<crate::portal::Item>),

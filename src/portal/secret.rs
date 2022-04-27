@@ -31,6 +31,7 @@ impl Default for RetrieveOptions {
     }
 }
 
+#[derive(Debug)]
 pub struct SecretProxy<'a>(zbus::Proxy<'a>);
 
 impl<'a> SecretProxy<'a> {

@@ -53,6 +53,7 @@ pub use self::api::Item;
 type ItemDefinition = (String, HashMap<String, String>, Zeroizing<Vec<u8>>, bool);
 
 /// File backed keyring.
+#[derive(Debug)]
 pub struct Keyring {
     keyring: Mutex<api::Keyring>,
     path: PathBuf,

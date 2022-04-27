@@ -24,7 +24,7 @@ static DH_PRIME: Lazy<BigUint> = Lazy::new(|| {
 });
 
 /// A key.
-#[derive(Zeroize, ZeroizeOnDrop)]
+#[derive(Debug, Zeroize, ZeroizeOnDrop)]
 pub struct Key(pub(crate) Vec<u8>);
 
 impl AsRef<[u8]> for Key {
