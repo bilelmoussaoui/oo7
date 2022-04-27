@@ -83,7 +83,7 @@ impl Keyring {
 
     /// Write to a keyring file
     pub async fn dump<P: AsRef<Path>>(
-        &self,
+        &mut self,
         path: P,
         mtime: Option<std::time::SystemTime>,
     ) -> Result<(), Error> {
@@ -118,6 +118,12 @@ impl Keyring {
         tmpfile_builder.write(true).create_new(true);
         tmpfile_builder.mode(0o600);
         let mut tmpfile = tmpfile_builder.open(&tmp_path).await?;
+
+        self.modified_time = std::time::SystemTime::UNIX_EPOCH
+            .elapsed()
+            .unwrap()
+            .as_secs();
+        self.usage_count += 1;
 
         let blob = self.as_bytes()?;
 
@@ -159,6 +165,24 @@ impl Keyring {
             })
             .map(|e| (*e).clone().decrypt(key))
             .collect()
+    }
+
+    pub fn lookup_item(
+        &self,
+        attributes: HashMap<impl AsRef<str>, impl AsRef<str>>,
+        key: &Key,
+    ) -> Result<Option<Item>, Error> {
+        let hashed_search = hash_attributes(attributes, key);
+
+        self.items
+            .iter()
+            .find(|e| {
+                hashed_search.iter().all(|(search_key, search_hash)| {
+                    e.hashed_attributes.get(search_key.as_ref()) == Some(search_hash)
+                })
+            })
+            .map(|e| (*e).clone().decrypt(key))
+            .transpose()
     }
 
     pub fn remove_items(

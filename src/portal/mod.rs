@@ -25,6 +25,7 @@ keyring::remove(HashMap::from([("account", "alice")])).await?;
 ```
 */
 
+use std::cell::Cell;
 use std::collections::HashMap;
 
 #[cfg(feature = "async-std")]
@@ -58,7 +59,7 @@ pub struct Keyring {
     path: PathBuf,
     /// Times are stored before reading the file to detect
     /// file changes before writing
-    mtime: Option<std::time::SystemTime>,
+    mtime: Cell<Option<std::time::SystemTime>>,
     key: crate::Key,
 }
 
@@ -106,7 +107,7 @@ impl Keyring {
         Ok(Self {
             keyring: Mutex::new(keyring),
             path: path.as_ref().to_path_buf(),
-            mtime,
+            mtime: Cell::new(mtime),
             key,
         })
     }
@@ -126,6 +127,13 @@ impl Keyring {
             .lock()
             .await
             .search_items(attributes, &self.key)
+    }
+
+    pub async fn lookup_item(
+        &self,
+        attributes: HashMap<&str, &str>,
+    ) -> Result<Option<Item>, Error> {
+        self.keyring.lock().await.lookup_item(attributes, &self.key)
     }
 
     pub async fn delete(&self, attributes: HashMap<&str, &str>) -> Result<(), Error> {
@@ -165,7 +173,7 @@ impl Keyring {
 
         #[cfg(feature = "tracing")]
         tracing::debug!("Writing keyring back to the file");
-        keyring.dump(&self.path, self.mtime).await?;
+        keyring.dump(&self.path, self.mtime.get()).await?;
         Ok(())
     }
 
@@ -175,8 +183,32 @@ impl Keyring {
         self.keyring
             .lock()
             .await
-            .dump(&self.path, self.mtime)
+            .dump(&self.path, self.mtime.get())
             .await?;
+
+        self.mtime
+            .set(fs::metadata(&self.path).await?.modified().ok());
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "async-std")]
+mod tests {
+    use super::*;
+
+    const SECRET: [u8; 2] = [1, 2];
+
+    #[async_std::test]
+    async fn repeated_write() -> Result<(), Error> {
+        let path = std::path::PathBuf::from("../../tests/test.keyring");
+
+        let keyring = Keyring::load(&path, &SECRET).await?;
+
+        keyring.write().await?;
+        keyring.write().await?;
+
         Ok(())
     }
 }
