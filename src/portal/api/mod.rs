@@ -1,28 +1,25 @@
-/*!
-GNOME Keyring file format low level API.
-*/
+//! GNOME Keyring file format low level API.
 
-/*
-TODO:
-- Order user calls
-- Keep proxis around
-- Make more things async
-*/
+// TODO:
+// - Order user calls
+// - Keep proxis around
+// - Make more things async
+
+use std::{
+    collections::HashMap,
+    os::unix::fs::OpenOptionsExt,
+    path::{Path, PathBuf},
+};
 
 #[cfg(feature = "async-std")]
 use async_std::{fs, io, prelude::*};
-#[cfg(feature = "tokio")]
-#[cfg(not(feature = "async-std"))]
-use tokio::{fs, io, io::AsyncWriteExt};
-
-use std::os::unix::fs::OpenOptionsExt;
-
 use cipher::BlockSizeUser;
 use once_cell::sync::Lazy;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+#[cfg(feature = "tokio")]
+#[cfg(not(feature = "async-std"))]
+use tokio::{fs, io, io::AsyncWriteExt};
 use zbus::zvariant::{self, Type};
 
 const SALT_SIZE: usize = 32;
@@ -44,12 +41,11 @@ pub(super) static GVARIANT_ENCODING: Lazy<zvariant::EncodingContext<byteorder::L
 mod attribute_value;
 mod encrypted_item;
 
-use super::Item;
-use crate::portal::Error;
 pub use attribute_value::AttributeValue;
-
-use crate::Key;
 pub(super) use encrypted_item::EncryptedItem;
+
+use super::Item;
+use crate::{portal::Error, Key};
 
 /// Logical contents of a keyring file
 #[derive(Deserialize, Serialize, Type, Debug)]

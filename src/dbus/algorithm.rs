@@ -5,8 +5,8 @@ use zbus::zvariant;
 #[zvariant(signature = "s")]
 /// Algorithm used to start a new session.
 ///
-/// The communication between the Secret Service and the application can either be encrypted
-/// or the items can be sent in plain text.
+/// The communication between the Secret Service and the application can either
+/// be encrypted or the items can be sent in plain text.
 pub enum Algorithm {
     /// Plain text, per <https://specifications.freedesktop.org/secret-service/latest/ch07s02.html>.
     Plain,

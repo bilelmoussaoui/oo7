@@ -1,10 +1,10 @@
 use std::fmt;
 
-use super::DESTINATION;
-use crate::dbus::Error;
-
 use serde::Serialize;
 use zbus::zvariant::{ObjectPath, Type};
+
+use super::DESTINATION;
+use crate::dbus::Error;
 
 #[derive(Type)]
 #[zvariant(signature = "o")]

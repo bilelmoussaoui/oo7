@@ -9,8 +9,9 @@ use crate::{dbus::utils, Key};
 /// A secret with a label and attributes to identify it.
 ///
 /// An item might be locked or unlocked, use [`Item::lock`] or [`Item::unlock`]
-/// to lock or unlock it. Note that the secret service might not be able to lock/unlock
-/// individual items and may lock/unlock the entire collection in such case.
+/// to lock or unlock it. Note that the secret service might not be able to
+/// lock/unlock individual items and may lock/unlock the entire collection in
+/// such case.
 ///
 /// The item is attributes are used to identify and find the item later using
 /// [`Collection::search_items`](crate::dbus::Collection::search_items).
@@ -152,7 +153,8 @@ impl<'a> Item<'a> {
     /// # Arguments
     ///
     /// * `secret` - The secret to store.
-    /// * `content_type` - The content type of the secret, usually something like `text/plain`.
+    /// * `content_type` - The content type of the secret, usually something
+    ///   like `text/plain`.
     #[doc(alias = "SetSecret")]
     pub async fn set_secret<P: AsRef<[u8]>>(
         &self,

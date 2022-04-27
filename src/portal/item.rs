@@ -8,8 +8,10 @@ use serde::{Deserialize, Serialize};
 use zbus::zvariant::{self, Type};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
-use super::api::{AttributeValue, EncAlg, EncryptedItem, MacAlg, GVARIANT_ENCODING};
-use super::Error;
+use super::{
+    api::{AttributeValue, EncAlg, EncryptedItem, MacAlg, GVARIANT_ENCODING},
+    Error,
+};
 use crate::Key;
 
 /// An item stored in the file backend.
@@ -86,7 +88,8 @@ impl Item {
 
         let mut blob = vec![0; decrypted.len() + EncAlg::block_size()];
 
-        // Unwrapping since adding `CIPHER_BLOCK_SIZE` to array is enough space for PKCS7
+        // Unwrapping since adding `CIPHER_BLOCK_SIZE` to array is enough space for
+        // PKCS7
         let encrypted_len = EncAlg::new(key.as_ref().into(), &iv)
             .encrypt_padded_b2b_mut::<Pkcs7>(&decrypted, &mut blob)
             .unwrap()

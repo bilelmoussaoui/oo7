@@ -1,9 +1,10 @@
+use std::ops::{Mul, Rem, Shr};
+
 use hkdf::Hkdf;
 use num::{bigint::BigUint, FromPrimitive, Integer, One, Zero};
 use once_cell::sync::Lazy;
 use rand::{rngs::OsRng, Rng};
 use sha2::Sha256;
-use std::ops::{Mul, Rem, Shr};
 use zbus::zvariant::{self, Type};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
@@ -64,7 +65,7 @@ impl Key {
 
         let mut common_secret_bytes = common_secret.to_bytes_be();
         let mut common_secret_padded = vec![0; 128 - common_secret_bytes.len()];
-        //inefficient, but ok for now
+        // inefficient, but ok for now
         common_secret_padded.append(&mut common_secret_bytes);
 
         // hkdf

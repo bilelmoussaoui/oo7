@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
 use futures::StreamExt;
 use zbus::zvariant::{self, ObjectPath, OwnedObjectPath, OwnedValue, Type};

@@ -5,10 +5,12 @@ use crate::Key;
 
 /// The entry point of communicating with a [`org.freedesktop.Secrets`](https://specifications.freedesktop.org/secret-service/latest/index.html) implementation.
 ///
-/// It will automatically create a session for you and allow you to retrieve collections or create new ones.
+/// It will automatically create a session for you and allow you to retrieve
+/// collections or create new ones.
 ///
-/// Certain actions requires on the secret service implementation requires a user prompt to complete
-/// like creating a collection, locking or unlocking a collection. The library handles that automatically for you.
+/// Certain actions requires on the secret service implementation requires a
+/// user prompt to complete like creating a collection, locking or unlocking a
+/// collection. The library handles that automatically for you.
 ///
 /// ```ignore
 /// let service = Service::new(Algorithm::Plain).await?;
@@ -100,7 +102,8 @@ impl<'a> Service<'a> {
 
     /// Create a new collection.
     ///
-    /// The alias can only be equal to [`DEFAULT_COLLECTION`] otherwise it must not be set.
+    /// The alias can only be equal to [`DEFAULT_COLLECTION`] otherwise it must
+    /// not be set.
     pub async fn create_collection(
         &self,
         label: &str,

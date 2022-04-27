@@ -1,40 +1,38 @@
-/*!
+//! File backend implementation backed by the [Secret portal](https://flatpak.github.io/xdg-desktop-portal/#gdbus-org.freedesktop.portal.Secret)    .
+//!
+//! ```ignore
+//! # std::env::set_var("XDG_DATA_HOME", "/tmp/doctest");
+//! # use oo7::keyring::{self, Error};
+//! # use std::collections::HashMap;
+//! # async_std::task::block_on(async {
+//! #
+//! keyring::insert_replace(&keyring::Item::new(
+//! "My Label",
+//! HashMap::from([("account", "alice")]),
+//! b"My Password",
+//! ))
+//! .await?;
+//!
+//! let items = keyring::lookup(HashMap::from([("account", "alice")])).await?;
+//! assert_eq!(*items[0].password(), b"My Password");
+//!
+//! keyring::remove(HashMap::from([("account", "alice")])).await?;
+//! #
+//! # Ok::<(), Error>(())
+//! # }).unwrap()
+//! ```
 
-File backend implementation backed by the [Secret portal](https://flatpak.github.io/xdg-desktop-portal/#gdbus-org.freedesktop.portal.Secret)    .
-
-```ignore
-# std::env::set_var("XDG_DATA_HOME", "/tmp/doctest");
-# use oo7::keyring::{self, Error};
-# use std::collections::HashMap;
-# async_std::task::block_on(async {
-#
-keyring::insert_replace(&keyring::Item::new(
-    "My Label",
-    HashMap::from([("account", "alice")]),
-    b"My Password",
-))
-.await?;
-
-let items = keyring::lookup(HashMap::from([("account", "alice")])).await?;
-assert_eq!(*items[0].password(), b"My Password");
-
-keyring::remove(HashMap::from([("account", "alice")])).await?;
-#
-# Ok::<(), Error>(())
-# }).unwrap()
-```
-*/
-
-use std::cell::Cell;
-use std::collections::HashMap;
+use std::{
+    cell::Cell,
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 #[cfg(feature = "async-std")]
 use async_std::{fs, io, prelude::*, sync::Mutex};
 #[cfg(feature = "tokio")]
 #[cfg(not(feature = "async-std"))]
 use tokio::{fs, io, io::AsyncReadExt, sync::Mutex};
-
-use std::path::{Path, PathBuf};
 
 #[cfg(feature = "unstable")]
 pub mod api;
@@ -46,9 +44,8 @@ mod item;
 mod secret;
 
 pub use error::Error;
-use zeroize::Zeroizing;
-
 pub use item::Item;
+use zeroize::Zeroizing;
 
 type ItemDefinition = (String, HashMap<String, String>, Zeroizing<Vec<u8>>, bool);
 

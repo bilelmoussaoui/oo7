@@ -12,7 +12,8 @@ use crate::{
     portal, Result,
 };
 
-/// A [Secret Service](crate::dbus) or [file](crate::portal) backed keyring implementation.
+/// A [Secret Service](crate::dbus) or [file](crate::portal) backed keyring
+/// implementation.
 ///
 /// It will automatically use the file backend if the application is sandboxed
 /// and otherwise falls back to the DBus service.
@@ -97,7 +98,8 @@ impl Keyring {
 
     /// Retrieve all the items.
     ///
-    /// If using the Secret Service, it will retrieve all the items in the [`DEFAULT_COLLECTION`].
+    /// If using the Secret Service, it will retrieve all the items in the
+    /// [`DEFAULT_COLLECTION`].
     pub async fn items(&self) -> Result<Vec<Item>> {
         let items = match self {
             Self::DBus(backend) => {

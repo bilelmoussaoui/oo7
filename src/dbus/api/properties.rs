@@ -59,9 +59,10 @@ impl<'a> Serialize for Properties<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use byteorder::LE;
     use zbus::zvariant::{self, from_slice, to_bytes, EncodingContext as Context, Type};
+
+    use super::*;
 
     #[test]
     fn serialize_label() {

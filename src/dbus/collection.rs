@@ -2,22 +2,21 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use futures::lock::Mutex;
 
-use crate::Key;
-
 use super::{api, Algorithm, Error, Item};
+use crate::Key;
 
 /// A collection allows to store and retrieve items.
 ///
-/// The collection can be either in a locked or unlocked state, use [`Collection::lock`]
-/// or [`Collection::unlock`] to lock or unlock it.
+/// The collection can be either in a locked or unlocked state, use
+/// [`Collection::lock`] or [`Collection::unlock`] to lock or unlock it.
 ///
-/// Using [`Collection::search_items`] or [`Collection::items`] will return no items if
-/// the collection is locked.
+/// Using [`Collection::search_items`] or [`Collection::items`] will return no
+/// items if the collection is locked.
 ///
 /// **Note**
 ///
-/// If the collection is deleted using [`Collection::delete`] any future usage of it API
-/// will fail with [`Error::Deleted`].
+/// If the collection is deleted using [`Collection::delete`] any future usage
+/// of it API will fail with [`Error::Deleted`].
 #[derive(Debug)]
 pub struct Collection<'a> {
     inner: Arc<api::Collection<'a>>,
@@ -149,10 +148,13 @@ impl<'a> Collection<'a> {
     /// # Arguments
     ///
     /// * `label` - A user visible label of the item.
-    /// * `attributes` - A map of key/value attributes, used to find the item later.
+    /// * `attributes` - A map of key/value attributes, used to find the item
+    ///   later.
     /// * `secret` - The secret to store.
-    /// * `replace` - Whether to replace the value if the `attributes` matches an existing `secret`.
-    /// * `content_type` - The content type of the secret, usually something like `text/plain`.
+    /// * `replace` - Whether to replace the value if the `attributes` matches
+    ///   an existing `secret`.
+    /// * `content_type` - The content type of the secret, usually something
+    ///   like `text/plain`.
     pub async fn create_item(
         &self,
         label: &str,

@@ -1,10 +1,10 @@
 use std::{collections::HashMap, fmt, hash::Hash, time::Duration};
 
-use super::{secret::SecretInner, Prompt, Secret, Session, Unlockable, DESTINATION};
-use crate::dbus::Error;
-
 use serde::Serialize;
 use zbus::zvariant::{ObjectPath, Type};
+
+use super::{secret::SecretInner, Prompt, Secret, Session, Unlockable, DESTINATION};
+use crate::dbus::Error;
 
 #[derive(Type)]
 #[zvariant(signature = "o")]

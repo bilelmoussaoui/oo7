@@ -4,8 +4,7 @@
 use std::{collections::HashMap, io::Read, os::unix::prelude::AsRawFd};
 
 use futures::StreamExt;
-use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
+use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use zbus::zvariant::{Fd, ObjectPath, OwnedValue, SerializeDict, Type};
 
 use super::Error;
