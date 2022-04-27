@@ -30,6 +30,7 @@ use std::collections::HashMap;
 #[cfg(feature = "async-std")]
 use async_std::{fs, io, prelude::*, sync::Mutex};
 #[cfg(feature = "tokio")]
+#[cfg(not(feature = "async-std"))]
 use tokio::{fs, io, io::AsyncReadExt, sync::Mutex};
 
 use std::path::{Path, PathBuf};

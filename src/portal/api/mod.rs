@@ -12,6 +12,7 @@ Only use this if you know what you are doing.
 #[cfg(feature = "async-std")]
 use async_std::{fs, io, prelude::*};
 #[cfg(feature = "tokio")]
+#[cfg(not(feature = "async-std"))]
 use tokio::{fs, io, io::AsyncWriteExt};
 
 use cipher::BlockSizeUser;
