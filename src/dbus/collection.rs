@@ -159,7 +159,7 @@ impl<'a> Collection<'a> {
         &self,
         label: &str,
         attributes: HashMap<&str, &str>,
-        secret: &[u8],
+        secret: impl AsRef<[u8]>,
         replace: bool,
         content_type: &str,
     ) -> Result<Item<'_>, Error> {

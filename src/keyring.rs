@@ -119,7 +119,7 @@ impl Keyring {
         &self,
         label: &str,
         attributes: HashMap<&str, &str>,
-        secret: &[u8],
+        secret: impl AsRef<[u8]>,
         replace: bool,
     ) -> Result<()> {
         match self {
