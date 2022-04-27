@@ -1,6 +1,6 @@
 use std::fmt;
 
-// TODO: support secret service errors
+// TODO: support Secret Service errors
 // https://specifications.freedesktop.org/secret-service/latest/ch15.html
 /// DBus Secret Service specific errors.
 #[derive(Debug)]

@@ -36,7 +36,7 @@ pub static DEFAULT_COLLECTION: &str = "default";
 /// The collection is cleared when the user ends the session.
 pub static SESSION_COLLECTION: &str = "session";
 
-/// Barebone DBus API of the secret service specifications.
+/// Barebone DBus API of the Secret Service specifications.
 ///
 /// The API is not supposed to be used by the applications in general unless
 /// the wrapper API doesn't provide functionality you need.

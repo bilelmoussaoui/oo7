@@ -4,7 +4,7 @@
 
 WIP!
 
-James Bond went on a new mission and this time as a [secret service provider](https://specifications.freedesktop.org/secret-service/latest/).
+James Bond went on a new mission and this time as a [Secret Service provider](https://specifications.freedesktop.org/secret-service/latest/).
 
 The library consists of two modules:
 
@@ -71,7 +71,7 @@ fn main() {
     SOME_RUNTIME.block_on(async {
         let keyring = Keyring::new()
             .await
-            .expect("Failed to start secret service");
+            .expect("Failed to start Secret Service");
         KEYRING.set(keyring);
     });
 

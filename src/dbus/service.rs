@@ -8,7 +8,7 @@ use crate::Key;
 /// It will automatically create a session for you and allow you to retrieve
 /// collections or create new ones.
 ///
-/// Certain actions requires on the secret service implementation requires a
+/// Certain actions requires on the Secret Service implementation requires a
 /// user prompt to complete like creating a collection, locking or unlocking a
 /// collection. The library handles that automatically for you.
 ///
@@ -35,13 +35,13 @@ impl<'a> Service<'a> {
         let (aes_key, session) = match algorithm {
             Algorithm::Plain => {
                 #[cfg(feature = "tracing")]
-                tracing::debug!("Starting an unecrypted secret service session");
+                tracing::debug!("Starting an unecrypted Secret Service session");
                 let (_service_key, session) = service.open_session(None).await?;
                 (None, session)
             }
             Algorithm::Encrypted => {
                 #[cfg(feature = "tracing")]
-                tracing::debug!("Starting an encrypted secret service session");
+                tracing::debug!("Starting an encrypted Secret Service session");
                 let private_key = Key::generate_private_key();
                 let public_key = Key::generate_public_key(&private_key);
                 let (service_key, session) = service.open_session(Some(&public_key)).await?;

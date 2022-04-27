@@ -9,7 +9,7 @@ use crate::{dbus::utils, Key};
 /// A secret with a label and attributes to identify it.
 ///
 /// An item might be locked or unlocked, use [`Item::lock`] or [`Item::unlock`]
-/// to lock or unlock it. Note that the secret service might not be able to
+/// to lock or unlock it. Note that the Secret Service might not be able to
 /// lock/unlock individual items and may lock/unlock the entire collection in
 /// such case.
 ///
