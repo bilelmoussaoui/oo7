@@ -1,25 +1,24 @@
-//! File backend implementation backed by the [Secret portal](https://flatpak.github.io/xdg-desktop-portal/#gdbus-org.freedesktop.portal.Secret)    .
+//! File backend implementation backed by the [Secret portal](https://flatpak.github.io/xdg-desktop-portal/#gdbus-org.freedesktop.portal.Secret).
 //!
 //! ```ignore
-//! # std::env::set_var("XDG_DATA_HOME", "/tmp/doctest");
-//! # use oo7::keyring::{self, Error};
-//! # use std::collections::HashMap;
-//! # async_std::task::block_on(async {
-//! #
-//! keyring::insert_replace(&keyring::Item::new(
-//! "My Label",
-//! HashMap::from([("account", "alice")]),
-//! b"My Password",
-//! ))
-//! .await?;
+//! let keyring = Keyring::load_default().await?;
+//! keyring
+//!     .create_item(
+//!         "My Label",
+//!         HashMap::from([("account", "alice")]),
+//!         b"My Password",
+//!         true,
+//!     )
+//!     .await?;
 //!
-//! let items = keyring::lookup(HashMap::from([("account", "alice")])).await?;
+//! let items = keyring
+//!     .search_items(HashMap::from([("account", "alice")]))
+//!     .await?;
 //! assert_eq!(*items[0].password(), b"My Password");
 //!
-//! keyring::remove(HashMap::from([("account", "alice")])).await?;
-//! #
-//! # Ok::<(), Error>(())
-//! # }).unwrap()
+//! keyring
+//!     .delete(HashMap::from([("account", "alice")]))
+//!     .await?;
 //! ```
 
 use std::{
