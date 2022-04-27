@@ -29,7 +29,7 @@ The library provides helper methods to store and retrieve secrets and uses eithe
 
 ### Basic usage
 
-```rust
+```rust,ignore
 use std::collections::HashMap;
 
 let keyring = oo7::Keyring::new().await?;
@@ -58,7 +58,7 @@ keyring.unlock().await?;
 
 If your application makes heavy usage of the keyring like a password manager. You could store an instance of the `Keyring` in a `OnceCell`
 
-```rust
+```rust,ignore
 use once_cell::sync::OnceCell;
 
 static KEYRING: OnceCell<oo7::Keyring> = OnceCell::new();
@@ -87,10 +87,10 @@ fn main() {
 
 The library also comes with API to migrate your secrets from the host Secret Service to the sandboxed file backend. Note that the items are removed from the host keyring if they are migrated successfully.
 
-```rust
+```rust,ignore
 // SOME_RUNTIME could be a tokio/async-std/glib runtime
 SOME_RUNTIME.block_on(async {
-    match oo7::migrate(vec![HashMap::from([("attribute", "attribute_value")])]).await {
+    match oo7::migrate(vec![HashMap::from([("attribute", "attribute_value")])], true).await {
         Ok(_) => {
             // Store somewhere the migration happened, to avoid re-doing it at every startup
         }
