@@ -47,13 +47,16 @@ let items = keyring
     .search_items(HashMap::from([("attribute", "attribute_value")]))
     .await?;
 
-/// Delete a stored secret
+// Delete a stored secret
 keyring
     .delete(HashMap::from([("attribute", "attribute_value")]))
     .await?;
 
-/// Unlock the collection if the dbus service is used
+// Unlock the collection if the Secret Service is used
 keyring.unlock().await?;
+
+// Lock the collection if the Secret Service is used
+keyring.lock().await?;
 ```
 
 If your application makes heavy usage of the keyring like a password manager. You could store an instance of the `Keyring` in a `OnceCell`
