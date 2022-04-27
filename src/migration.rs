@@ -4,6 +4,9 @@ use crate::{dbus::Service, portal::Keyring, Result};
 
 /// Helper to migrate your secrets from the host Secret Service
 /// to the sandboxed file backend.
+///
+/// If the migration is successful, the items are removed from the host
+/// Secret Service.
 pub async fn migrate(attributes: Vec<HashMap<&str, &str>>, replace: bool) -> Result<()> {
     let service = Service::new(crate::dbus::Algorithm::Encrypted).await?;
     let file_backend = Keyring::load_default().await?;
@@ -26,6 +29,10 @@ pub async fn migrate(attributes: Vec<HashMap<&str, &str>>, replace: bool) -> Res
     }
 
     file_backend.create_items(new_items).await?;
+
+    for item in all_items.iter() {
+        item.delete().await?;
+    }
 
     Ok(())
 }
