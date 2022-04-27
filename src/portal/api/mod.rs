@@ -1,14 +1,14 @@
 /*!
-GNOME Keyring format low level api
+GNOME Keyring file format low level API.
+*/
 
-Only use this if you know what you are doing.
-
-### To Do
-
+/*
+TODO:
 - Order user calls
 - Keep proxis around
 - Make more things async
 */
+
 #[cfg(feature = "async-std")]
 use async_std::{fs, io, prelude::*};
 #[cfg(feature = "tokio")]
