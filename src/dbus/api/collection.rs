@@ -145,7 +145,7 @@ impl<'a> Collection<'a> {
         attributes: HashMap<&str, &str>,
         secret: &Secret<'_>,
         replace: bool,
-    ) -> Result<Item<'_>, Error> {
+    ) -> Result<Item<'a>, Error> {
         let properties = Properties::for_item(label, attributes);
         let (item_path, prompt_path) = self
             .inner()

@@ -162,7 +162,7 @@ impl<'a> Collection<'a> {
         secret: impl AsRef<[u8]>,
         replace: bool,
         content_type: &str,
-    ) -> Result<Item<'_>, Error> {
+    ) -> Result<Item<'a>, Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
