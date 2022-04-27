@@ -50,6 +50,8 @@ use zeroize::Zeroizing;
 
 pub use self::api::Item;
 
+type ItemDefinition = (String, HashMap<String, String>, Zeroizing<Vec<u8>>, bool);
+
 /// File backed keyring.
 pub struct Keyring {
     keyring: Mutex<api::Keyring>,
@@ -140,10 +142,7 @@ impl Keyring {
     }
 
     /// Helper used for migration to avoid re-writing the file multiple times
-    pub(crate) async fn create_items(
-        &self,
-        items: Vec<(String, HashMap<String, String>, Zeroizing<Vec<u8>>, bool)>,
-    ) -> Result<(), Error> {
+    pub(crate) async fn create_items(&self, items: Vec<ItemDefinition>) -> Result<(), Error> {
         let mut keyring = self.keyring.lock().await;
         for (label, attributes, secret, replace) in items {
             if replace {
