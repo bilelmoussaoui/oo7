@@ -68,6 +68,17 @@ impl Keyring {
         Ok(())
     }
 
+    /// Lock the used collection if using the Secret service.
+    ///
+    /// The method does nothing if keyring is backed with a file backend.
+    pub async fn lock(&self) -> Result<()> {
+        // No locking is neeeded for the file backend
+        if let Self::DBus(backend) = self {
+            backend.lock().await?;
+        };
+        Ok(())
+    }
+
     /// Remove an item that matches the attributes.
     pub async fn delete(&self, attributes: HashMap<&str, &str>) -> Result<()> {
         match self {
