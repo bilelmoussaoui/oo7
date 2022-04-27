@@ -34,23 +34,22 @@ const FILE_HEADER_LEN: usize = FILE_HEADER.len();
 const MAJOR_VERSION: u8 = 1;
 const MINOR_VERSION: u8 = 0;
 
-type MacAlg = hmac::Hmac<sha2::Sha256>;
-type EncAlg = cbc::Encryptor<aes::Aes128>;
+pub(super) type MacAlg = hmac::Hmac<sha2::Sha256>;
+pub(super) type EncAlg = cbc::Encryptor<aes::Aes128>;
 type DecAlg = cbc::Decryptor<aes::Aes128>;
 
-static GVARIANT_ENCODING: Lazy<zvariant::EncodingContext<byteorder::LE>> =
+pub(super) static GVARIANT_ENCODING: Lazy<zvariant::EncodingContext<byteorder::LE>> =
     Lazy::new(|| zvariant::EncodingContext::<byteorder::LE>::new_gvariant(0));
 
 mod attribute_value;
 mod encrypted_item;
-mod item;
 
+use super::Item;
 pub use crate::portal::Error;
 pub use attribute_value::AttributeValue;
-pub use item::Item;
 
 use crate::Key;
-use encrypted_item::EncryptedItem;
+pub(super) use encrypted_item::EncryptedItem;
 
 /// Logical contents of a keyring file
 #[derive(Deserialize, Serialize, Type, Debug)]

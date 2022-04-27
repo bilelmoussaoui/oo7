@@ -41,12 +41,13 @@ pub mod api;
 mod api;
 
 mod error;
+mod item;
 mod secret;
 
 pub use error::Error;
 use zeroize::Zeroizing;
 
-pub use self::api::Item;
+pub use item::Item;
 
 type ItemDefinition = (String, HashMap<String, String>, Zeroizing<Vec<u8>>, bool);
 
