@@ -45,7 +45,7 @@ mod attribute_value;
 mod encrypted_item;
 
 use super::Item;
-pub use crate::portal::Error;
+use crate::portal::Error;
 pub use attribute_value::AttributeValue;
 
 use crate::Key;

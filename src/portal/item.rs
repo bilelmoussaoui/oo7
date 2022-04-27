@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 use zbus::zvariant::{self, Type};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
-use super::api::{AttributeValue, EncAlg, EncryptedItem, Error, MacAlg, GVARIANT_ENCODING};
+use super::api::{AttributeValue, EncAlg, EncryptedItem, MacAlg, GVARIANT_ENCODING};
+use super::Error;
 use crate::Key;
 
 /// An item stored in the file backend.
