@@ -41,8 +41,6 @@ pub mod api;
 mod api;
 
 mod error;
-mod helpers;
-pub use helpers::*;
 mod secret;
 
 pub use error::Error;
