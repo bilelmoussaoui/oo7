@@ -77,7 +77,7 @@ impl Keyring {
     /// * `secret` - The service key, usually retrieved from the Secrets portal.
     pub async fn load(path: impl AsRef<Path>, secret: &[u8]) -> Result<Self, Error> {
         #[cfg(feature = "tracing")]
-        tracing::debug!("Tyring to load keyring file at {:?}", path.as_ref());
+        tracing::debug!("Trying to load keyring file at {:?}", path.as_ref());
         let (mtime, keyring) = match fs::File::open(path.as_ref()).await {
             Err(err) if err.kind() == io::ErrorKind::NotFound => {
                 #[cfg(feature = "tracing")]
