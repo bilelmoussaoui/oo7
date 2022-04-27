@@ -66,6 +66,8 @@ pub struct Keyring {
 impl Keyring {
     /// Load from default keyring file
     pub async fn load_default() -> Result<Self, Error> {
+        #[cfg(feature = "tracing")]
+        tracing::debug!("Loading default keyring file");
         let secret = secret::retrieve().await?;
         Self::load(api::Keyring::default_path()?, &secret).await
     }
@@ -77,10 +79,18 @@ impl Keyring {
     /// * `path` - The path to the file backend.
     /// * `secret` - The service key, usually retrieved from the Secrets portal.
     pub async fn load(path: impl AsRef<Path>, secret: &[u8]) -> Result<Self, Error> {
+        #[cfg(feature = "tracing")]
+        tracing::debug!("Tyring to load keyring file at {:?}", path.as_ref());
         let (mtime, keyring) = match fs::File::open(path.as_ref()).await {
-            Err(err) if err.kind() == io::ErrorKind::NotFound => (None, api::Keyring::new()),
+            Err(err) if err.kind() == io::ErrorKind::NotFound => {
+                #[cfg(feature = "tracing")]
+                tracing::debug!("Keyring file not found, creating a new one");
+                (None, api::Keyring::new())
+            }
             Err(err) => return Err(err.into()),
             Ok(mut file) => {
+                #[cfg(feature = "tracing")]
+                tracing::debug!("Keyring file found, loading it content");
                 let mtime = file.metadata().await?.modified().ok();
 
                 let mut content = Vec::new();
@@ -154,11 +164,20 @@ impl Keyring {
             keyring.items.push(encrypted_item);
         }
 
-        self.write().await?;
+        #[cfg(feature = "tracing")]
+        tracing::debug!("Writing keyring back to the file");
+        keyring.dump(&self.path, self.mtime).await?;
         Ok(())
     }
 
     pub async fn write(&self) -> Result<(), Error> {
-        self.keyring.lock().await.dump(&self.path, self.mtime).await
+        #[cfg(feature = "tracing")]
+        tracing::debug!("Writing keyring back to the file {:?}", self.path);
+        self.keyring
+            .lock()
+            .await
+            .dump(&self.path, self.mtime)
+            .await?;
+        Ok(())
     }
 }

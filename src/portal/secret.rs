@@ -64,6 +64,11 @@ impl<'a> SecretProxy<'a> {
         ))
         .unwrap();
 
+        #[cfg(feature = "tracing")]
+        tracing::debug!(
+            "Creating a '{}' proxy and listening for a response",
+            path.as_str()
+        );
         let request_proxy: zbus::Proxy = zbus::ProxyBuilder::new_bare(cnx)
             .interface("org.freedesktop.portal.Request")?
             .destination("org.freedesktop.portal.Desktop")?
@@ -96,6 +101,8 @@ impl<'a> SecretProxy<'a> {
 
 pub async fn retrieve() -> Result<Vec<u8>, Error> {
     let connection = zbus::Connection::session().await?;
+    #[cfg(feature = "tracing")]
+    tracing::debug!("Retrieve service key using org.freedesktop.portal.Secrets");
     let proxy = SecretProxy::new(&connection).await?;
 
     let (mut x1, x2) = std::os::unix::net::UnixStream::pair()?;
@@ -103,6 +110,9 @@ pub async fn retrieve() -> Result<Vec<u8>, Error> {
     drop(x2);
     let mut buf = Vec::new();
     x1.read_to_end(&mut buf)?;
+
+    #[cfg(feature = "tracing")]
+    tracing::debug!("Secret received from the portal successfully");
 
     Ok(buf)
 }

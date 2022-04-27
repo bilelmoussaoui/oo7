@@ -15,6 +15,8 @@ use async_std::{fs, io, prelude::*};
 #[cfg(not(feature = "async-std"))]
 use tokio::{fs, io, io::AsyncWriteExt};
 
+use std::os::unix::fs::OpenOptionsExt;
+
 use cipher::BlockSizeUser;
 use once_cell::sync::Lazy;
 use rand::Rng;
@@ -97,6 +99,8 @@ impl Keyring {
             tmp_path.push(format!(".tmpkeyring{}", rnd));
 
             if !parent.exists() {
+                #[cfg(feature = "tracing")]
+                tracing::debug!("Parent directory {:?} deosn't exists, creating it", parent);
                 fs::DirBuilder::new().recursive(true).create(parent).await?;
             }
 
@@ -104,16 +108,16 @@ impl Keyring {
         } else {
             Err(Error::NoParentDir(path.as_ref().display().to_string()))
         }?;
+        #[cfg(feature = "tracing")]
+        tracing::debug!(
+            "Created a temporary file to store the keyring on {:?}",
+            tmp_path
+        );
 
         let mut tmpfile_builder = fs::OpenOptions::new();
 
         tmpfile_builder.write(true).create_new(true);
-        #[cfg(unix)]
-        {
-            #[cfg(feature = "async-std")]
-            use std::os::unix::fs::OpenOptionsExt;
-            tmpfile_builder.mode(0o600);
-        }
+        tmpfile_builder.mode(0o600);
         let mut tmpfile = tmpfile_builder.open(&tmp_path).await?;
 
         let blob = self.as_bytes()?;
