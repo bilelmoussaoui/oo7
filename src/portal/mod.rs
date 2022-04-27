@@ -27,10 +27,12 @@ keyring::remove(HashMap::from([("account", "alice")])).await?;
 
 use std::collections::HashMap;
 
-use async_std::{prelude::*, sync::Mutex};
+#[cfg(feature = "async-std")]
+use async_std::{fs, io, prelude::*, sync::Mutex};
+#[cfg(feature = "tokio")]
+use tokio::{fs, io, io::AsyncReadExt, sync::Mutex};
 
-use async_std::path::{Path, PathBuf};
-use async_std::{fs, io};
+use std::path::{Path, PathBuf};
 
 #[cfg(feature = "unstable")]
 pub mod api;
@@ -71,7 +73,7 @@ impl Keyring {
     /// * `path` - The path to the file backend.
     /// * `secret` - The service key, usually retrieved from the Secrets portal.
     pub async fn load(path: impl AsRef<Path>, secret: &[u8]) -> Result<Self, Error> {
-        let (mtime, keyring) = match fs::File::open(&path).await {
+        let (mtime, keyring) = match fs::File::open(path.as_ref()).await {
             Err(err) if err.kind() == io::ErrorKind::NotFound => (None, api::Keyring::new()),
             Err(err) => return Err(err.into()),
             Ok(mut file) => {

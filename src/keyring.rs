@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
+#[cfg(feature = "async-std")]
 use async_std::sync::Mutex;
+#[cfg(feature = "tokio")]
+use tokio::sync::Mutex;
 use zeroize::Zeroizing;
 
 use crate::{

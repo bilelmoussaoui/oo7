@@ -129,6 +129,7 @@ impl<'a> Service<'a> {
 }
 
 #[cfg(test)]
+#[cfg(feature = "async-std")]
 mod tests {
     #[cfg(feature = "local_tests")]
     use super::{Algorithm, Service};

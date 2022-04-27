@@ -9,15 +9,17 @@ Only use this if you know what you are doing.
 - Keep proxis around
 - Make more things async
 */
-use async_std::prelude::*;
+#[cfg(feature = "async-std")]
+use async_std::{fs, io, prelude::*};
+#[cfg(feature = "tokio")]
+use tokio::{fs, io, io::AsyncWriteExt};
 
-use async_std::{fs, io, path::Path};
 use cipher::BlockSizeUser;
 use once_cell::sync::Lazy;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use zbus::zvariant::{self, Type};
 
 const SALT_SIZE: usize = 32;
@@ -93,7 +95,7 @@ impl Keyring {
             let mut tmp_path = parent.to_path_buf();
             tmp_path.push(format!(".tmpkeyring{}", rnd));
 
-            if !parent.exists().await {
+            if !parent.exists() {
                 fs::DirBuilder::new().recursive(true).create(parent).await?;
             }
 
@@ -107,6 +109,7 @@ impl Keyring {
         tmpfile_builder.write(true).create_new(true);
         #[cfg(unix)]
         {
+            #[cfg(feature = "async-std")]
             use std::os::unix::fs::OpenOptionsExt;
             tmpfile_builder.mode(0o600);
         }
@@ -117,7 +120,7 @@ impl Keyring {
         tmpfile.write_all(&blob).await?;
         tmpfile.sync_all().await?;
 
-        let target_file = fs::File::open(&path).await;
+        let target_file = fs::File::open(path.as_ref()).await;
 
         let target_mtime = match target_file {
             Err(err) if err.kind() == io::ErrorKind::NotFound => None,
@@ -131,7 +134,7 @@ impl Keyring {
             ));
         }
 
-        fs::rename(tmp_path, path).await?;
+        fs::rename(tmp_path, path.as_ref()).await?;
 
         Ok(())
     }
@@ -256,6 +259,7 @@ fn hash_attributes<K: AsRef<str>>(
 }
 
 #[cfg(test)]
+#[cfg(feature = "async-std")]
 mod tests {
     use super::*;
 
