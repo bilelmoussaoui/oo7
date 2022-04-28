@@ -63,7 +63,7 @@ impl<'a> Service<'a> {
     pub async fn default_collection(&self) -> Result<Collection<'a>, Error> {
         self.with_alias(DEFAULT_COLLECTION)
             .await?
-            .ok_or_else(|| Error::NotFound(DEFAULT_COLLECTION.to_string()))
+            .ok_or_else(|| Error::NotFound(DEFAULT_COLLECTION.to_owned()))
     }
 
     /// Find a collection with it alias.

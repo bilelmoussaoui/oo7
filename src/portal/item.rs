@@ -98,7 +98,7 @@ impl Item {
         let hashed_attributes = self
             .attributes
             .iter()
-            .map(|(k, v)| (k.to_string(), v.mac(key).into_bytes().as_slice().into()))
+            .map(|(k, v)| (k.to_owned(), v.mac(key).into_bytes().as_slice().into()))
             .collect();
 
         Ok(EncryptedItem {

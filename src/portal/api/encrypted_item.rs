@@ -48,10 +48,10 @@ impl EncryptedItem {
                 let mut mac = MacAlg::new_from_slice(key.as_ref()).unwrap();
                 mac.update(attribute_plaintext.as_bytes());
                 if mac.verify_slice(hashed_attribute).is_err() {
-                    return Err(Error::HashedAttributeMac(attribute_key.to_string()));
+                    return Err(Error::HashedAttributeMac(attribute_key.to_owned()));
                 }
             } else {
-                return Err(Error::HashedAttributeMac(attribute_key.to_string()));
+                return Err(Error::HashedAttributeMac(attribute_key.to_owned()));
             }
         }
 
