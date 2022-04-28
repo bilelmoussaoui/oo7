@@ -12,6 +12,8 @@ pub(crate) type MacAlg = hmac::Hmac<sha2::Sha256>;
 pub(crate) fn encrypt(data: impl AsRef<[u8]>, key: &Key, iv: impl AsRef<[u8]>) -> Vec<u8> {
     let mut blob = vec![0; data.as_ref().len() + EncAlg::block_size()];
 
+    // Unwrapping since adding `CIPHER_BLOCK_SIZE` to array is enough space for
+    // PKCS7
     let encrypted_len = EncAlg::new(key.as_ref().into(), iv.as_ref().into())
         .encrypt_padded_b2b_mut::<Pkcs7>(data.as_ref(), &mut blob)
         .unwrap()
