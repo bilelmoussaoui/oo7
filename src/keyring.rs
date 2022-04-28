@@ -80,7 +80,7 @@ impl Keyring {
         Ok(())
     }
 
-    /// Remove an item that matches the attributes.
+    /// Remove items that matches the attributes.
     pub async fn delete(&self, attributes: HashMap<&str, &str>) -> Result<()> {
         match self {
             Self::DBus(backend) => {
@@ -280,5 +280,33 @@ impl Item {
             Self::DBus(item) => item.secret().await?,
         };
         Ok(secret)
+    }
+
+    /// Delete the item.
+    pub async fn delete(&self) -> Result<()> {
+        match self {
+            Self::File(item, backend) => {
+                let attributes = item
+                    .lock()
+                    .await
+                    .attributes()
+                    .iter()
+                    .map(|(k, v)| (k.to_owned(), v.to_string()))
+                    .collect::<HashMap<_, _>>();
+
+                backend
+                    .delete(
+                        attributes
+                            .iter()
+                            .map(|(k, v)| (k.as_str(), v.as_str()))
+                            .collect::<HashMap<_, _>>(),
+                    )
+                    .await?;
+            }
+            Self::DBus(item) => {
+                item.delete().await?;
+            }
+        };
+        Ok(())
     }
 }
