@@ -100,6 +100,15 @@ SOME_RUNTIME.block_on(async {
 });
 ```
 
+## Optional features
+
+| Feature | Description | Default |
+| ---     | ----------- | ------ |
+| `tracing` | Record various debug information using the `tracing` library | No |
+| `async-std` | Use `async-std` APIs for IO/filesystem operations | Yes |
+| `tokio` | Use `tokio` APIs for IO/Filesystem operations | No |
+| `unstable` | Unlock internal APIs | No |
+
 ## How does it compare to other libraries?
 
 - [libsecret-rs](https://gitlab.gnome.org/World/Rust/libsecret-rs) provides Rust bindings of the C library [libsecret](https://gitlab.gnome.org/GNOME/libsecret/). The current main pain point with it is that
