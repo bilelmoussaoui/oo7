@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 #[cfg(feature = "async-std")]
 use async_std::sync::Mutex;
@@ -23,7 +23,7 @@ use crate::{
 #[derive(Debug)]
 pub enum Keyring {
     #[doc(hidden)]
-    File(portal::Keyring),
+    File(Arc<portal::Keyring>),
     #[doc(hidden)]
     DBus(dbus::Collection<'static>),
 }
@@ -36,7 +36,7 @@ impl Keyring {
         if is_sandboxed {
             #[cfg(feature = "tracing")]
             tracing::debug!("Application is sandboxed, using the file backend");
-            Ok(Self::File(portal::Keyring::load_default().await?))
+            Ok(Self::File(Arc::new(portal::Keyring::load_default().await?)))
         } else {
             #[cfg(feature = "tracing")]
             tracing::debug!(
@@ -108,7 +108,10 @@ impl Keyring {
             }
             Self::File(backend) => {
                 let items = backend.items().await?;
-                items.into_iter().map(Item::for_file).collect::<Vec<_>>()
+                items
+                    .into_iter()
+                    .map(|i| Item::for_file(i, Arc::clone(backend)))
+                    .collect::<Vec<_>>()
             }
         };
         Ok(items)
@@ -146,7 +149,10 @@ impl Keyring {
             }
             Self::File(backend) => {
                 let items = backend.search_items(attributes).await?;
-                items.into_iter().map(Item::for_file).collect::<Vec<_>>()
+                items
+                    .into_iter()
+                    .map(|i| Item::for_file(i, Arc::clone(backend)))
+                    .collect::<Vec<_>>()
             }
         };
         Ok(items)
@@ -157,14 +163,14 @@ impl Keyring {
 #[derive(Debug)]
 pub enum Item {
     #[doc(hidden)]
-    File(Mutex<crate::portal::Item>),
+    File(Mutex<crate::portal::Item>, Arc<portal::Keyring>),
     #[doc(hidden)]
     DBus(dbus::Item<'static>),
 }
 
 impl Item {
-    fn for_file(item: portal::Item) -> Self {
-        Self::File(Mutex::new(item))
+    fn for_file(item: portal::Item, backend: Arc<portal::Keyring>) -> Self {
+        Self::File(Mutex::new(item), backend)
     }
 
     fn for_dbus(item: dbus::Item<'static>) -> Self {
@@ -174,7 +180,7 @@ impl Item {
     /// The item label.
     pub async fn label(&self) -> Result<String> {
         let label = match self {
-            Self::File(item) => item.lock().await.label().to_owned(),
+            Self::File(item, _) => item.lock().await.label().to_owned(),
             Self::DBus(item) => item.label().await?,
         };
         Ok(label)
@@ -183,7 +189,26 @@ impl Item {
     /// Sets the item label.
     pub async fn set_label(&self, label: &str) -> Result<()> {
         match self {
-            Self::File(item) => item.lock().await.set_label(label),
+            Self::File(item, backend) => {
+                let mut item_guard = item.lock().await;
+                item_guard.set_label(label);
+                let attributes = item_guard
+                    .attributes()
+                    .iter()
+                    .map(|(k, v)| (k.to_owned(), v.to_string()))
+                    .collect::<HashMap<_, _>>();
+                backend
+                    .create_item(
+                        item_guard.label(),
+                        attributes
+                            .iter()
+                            .map(|(k, v)| (k.as_str(), v.as_str()))
+                            .collect::<HashMap<_, _>>(),
+                        &*item_guard.secret(),
+                        true,
+                    )
+                    .await?;
+            }
             Self::DBus(item) => item.set_label(label).await?,
         };
         Ok(())
@@ -192,7 +217,7 @@ impl Item {
     /// Retrieve the item attributes.
     pub async fn attributes(&self) -> Result<HashMap<String, String>> {
         let attributes = match self {
-            Self::File(item) => item
+            Self::File(item, _) => item
                 .lock()
                 .await
                 .attributes()
@@ -207,7 +232,13 @@ impl Item {
     /// Sets the item attributes.
     pub async fn set_attributes(&self, attributes: HashMap<&str, &str>) -> Result<()> {
         match self {
-            Self::File(item) => item.lock().await.set_attributes(attributes),
+            Self::File(item, backend) => {
+                let mut item_guard = item.lock().await;
+                item_guard.set_attributes(attributes.clone());
+                backend
+                    .create_item(item_guard.label(), attributes, &*item_guard.secret(), true)
+                    .await?;
+            }
             Self::DBus(item) => item.set_attributes(attributes).await?,
         };
         Ok(())
@@ -216,8 +247,26 @@ impl Item {
     /// Sets a new secret.
     pub async fn set_secret<P: AsRef<[u8]>>(&self, secret: P) -> Result<()> {
         match self {
-            Self::File(item) => {
-                item.lock().await.set_secret(secret);
+            Self::File(item, backend) => {
+                let mut item_guard = item.lock().await;
+                item_guard.set_secret(secret);
+                let attributes = item_guard
+                    .attributes()
+                    .iter()
+                    .map(|(k, v)| (k.to_owned(), v.to_string()))
+                    .collect::<HashMap<_, _>>();
+
+                backend
+                    .create_item(
+                        item_guard.label(),
+                        attributes
+                            .iter()
+                            .map(|(k, v)| (k.as_str(), v.as_str()))
+                            .collect::<HashMap<_, _>>(),
+                        &*item_guard.secret(),
+                        true,
+                    )
+                    .await?;
             }
             Self::DBus(item) => item.set_secret(secret, "text/plain").await?,
         };
@@ -227,7 +276,7 @@ impl Item {
     /// Retrieves the stored secret.
     pub async fn secret(&self) -> Result<Zeroizing<Vec<u8>>> {
         let secret = match self {
-            Self::File(item) => item.lock().await.secret(),
+            Self::File(item, _) => item.lock().await.secret(),
             Self::DBus(item) => item.secret().await?,
         };
         Ok(secret)
