@@ -204,6 +204,15 @@ impl Item {
         Ok(attributes)
     }
 
+    /// Sets the item attributes.
+    pub async fn set_attributes(&self, attributes: HashMap<&str, &str>) -> Result<()> {
+        match self {
+            Self::File(item) => item.lock().await.set_attributes(attributes),
+            Self::DBus(item) => item.set_attributes(attributes).await?,
+        };
+        Ok(())
+    }
+
     /// Sets a new secret.
     pub async fn set_secret<P: AsRef<[u8]>>(&self, secret: P) -> Result<()> {
         match self {

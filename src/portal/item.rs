@@ -53,6 +53,14 @@ impl Item {
         &self.attributes
     }
 
+    /// Update the item attributes.
+    pub fn set_attributes(&mut self, attributes: HashMap<&str, &str>) {
+        self.attributes = attributes
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v.into()))
+            .collect();
+    }
+
     /// The item label.
     pub fn label(&self) -> &str {
         &self.label
