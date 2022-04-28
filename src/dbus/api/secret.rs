@@ -4,10 +4,7 @@ use serde::{ser::SerializeTuple, Deserialize, Serialize};
 use zbus::zvariant::{OwnedObjectPath, Type};
 
 use super::Session;
-use crate::{
-    dbus::{utils, Error},
-    Key,
-};
+use crate::{crypto, dbus::Error, Key};
 
 #[derive(Debug, Serialize, Deserialize, Type)]
 #[zvariant(signature = "(oayays)")]
@@ -42,11 +39,11 @@ impl<'a> Secret<'a> {
         content_type: &str,
         aes_key: &Key,
     ) -> Self {
-        let iv = utils::generate_iv();
-        let secret = utils::encrypt(secret.as_ref(), aes_key, &iv).unwrap();
+        let iv = crypto::generate_iv();
+        let secret = crypto::encrypt(secret.as_ref(), aes_key, &iv);
         Self {
             session,
-            parameters: iv,
+            parameters: iv.to_vec(),
             value: secret,
             content_type: content_type.to_owned(),
         }

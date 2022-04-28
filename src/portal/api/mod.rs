@@ -31,10 +31,6 @@ const FILE_HEADER_LEN: usize = FILE_HEADER.len();
 const MAJOR_VERSION: u8 = 1;
 const MINOR_VERSION: u8 = 0;
 
-pub(super) type MacAlg = hmac::Hmac<sha2::Sha256>;
-pub(super) type EncAlg = cbc::Encryptor<aes::Aes128>;
-type DecAlg = cbc::Decryptor<aes::Aes128>;
-
 pub(super) static GVARIANT_ENCODING: Lazy<zvariant::EncodingContext<byteorder::LE>> =
     Lazy::new(|| zvariant::EncodingContext::<byteorder::LE>::new_gvariant(0));
 
@@ -45,7 +41,7 @@ pub use attribute_value::AttributeValue;
 pub(super) use encrypted_item::EncryptedItem;
 
 use super::Item;
-use crate::{portal::Error, Key};
+use crate::{crypto::EncAlg, portal::Error, Key};
 
 /// Logical contents of a keyring file
 #[derive(Deserialize, Serialize, Type, Debug)]

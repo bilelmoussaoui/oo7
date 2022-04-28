@@ -1,18 +1,18 @@
 use std::collections::HashMap;
 
-use cipher::{
-    block_padding::Pkcs7, crypto_common::rand_core, BlockEncryptMut, BlockSizeUser, KeyIvInit,
-};
 use digest::Mac;
 use serde::{Deserialize, Serialize};
 use zbus::zvariant::{self, Type};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 use super::{
-    api::{AttributeValue, EncAlg, EncryptedItem, MacAlg, GVARIANT_ENCODING},
+    api::{AttributeValue, EncryptedItem, GVARIANT_ENCODING},
     Error,
 };
-use crate::Key;
+use crate::{
+    crypto::{self, MacAlg},
+    Key,
+};
 
 /// An item stored in the file backend.
 #[derive(Deserialize, Serialize, Type, Debug, Zeroize, ZeroizeOnDrop)]
@@ -84,18 +84,10 @@ impl Item {
     pub(crate) fn encrypt(&self, key: &Key) -> Result<EncryptedItem, Error> {
         let decrypted = Zeroizing::new(zvariant::to_bytes(*GVARIANT_ENCODING, &self)?);
 
-        let iv = EncAlg::generate_iv(rand_core::OsRng);
+        let iv = crypto::generate_iv();
 
-        let mut blob = vec![0; decrypted.len() + EncAlg::block_size()];
+        let mut blob = crypto::encrypt(&*decrypted, key, &iv);
 
-        // Unwrapping since adding `CIPHER_BLOCK_SIZE` to array is enough space for
-        // PKCS7
-        let encrypted_len = EncAlg::new(key.as_ref().into(), &iv)
-            .encrypt_padded_b2b_mut::<Pkcs7>(&decrypted, &mut blob)
-            .unwrap()
-            .len();
-
-        blob.truncate(encrypted_len);
         blob.append(&mut iv.as_slice().into());
 
         // Unwrapping since arbitrary keylength allowed

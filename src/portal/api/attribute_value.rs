@@ -3,8 +3,7 @@ use serde::{Deserialize, Serialize};
 use zbus::zvariant::Type;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-use super::MacAlg;
-use crate::Key;
+use crate::{crypto::MacAlg, Key};
 
 /// An encrypted attribute value.
 #[derive(Deserialize, Serialize, Type, Clone, Debug, Zeroize, ZeroizeOnDrop)]

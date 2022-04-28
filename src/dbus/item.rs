@@ -4,7 +4,7 @@ use futures::lock::Mutex;
 use zeroize::Zeroizing;
 
 use super::{api, Algorithm, Error};
-use crate::{dbus::utils, Key};
+use crate::{crypto, Key};
 
 /// A secret with a label and attributes to identify it.
 ///
@@ -141,7 +141,7 @@ impl<'a> Item<'a> {
                     let iv = secret.parameters;
                     // Safe unwrap as it is encrypted
                     let aes_key = self.aes_key.as_ref().unwrap();
-                    utils::decrypt(&secret.value, aes_key, &iv).unwrap()
+                    crypto::decrypt(&secret.value, aes_key, &iv).to_vec()
                 }
             };
             Ok(Zeroizing::new(value))

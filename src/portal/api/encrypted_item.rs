@@ -1,13 +1,15 @@
 use std::collections::HashMap;
 
-use cipher::{block_padding::Pkcs7, BlockDecryptMut, IvSizeUser, KeyIvInit};
+use cipher::IvSizeUser;
 use digest::{Mac, OutputSizeUser};
 use serde::{Deserialize, Serialize};
 use zbus::zvariant::Type;
-use zeroize::Zeroizing;
 
-use super::{DecAlg, Error, Item, MacAlg};
-use crate::Key;
+use super::{Error, Item};
+use crate::{
+    crypto::{self, DecAlg, MacAlg},
+    Key,
+};
 
 #[derive(Deserialize, Serialize, Type, Debug, Clone)]
 pub(crate) struct EncryptedItem {
@@ -25,14 +27,11 @@ impl EncryptedItem {
         mac.verify_slice(&mac_tag)?;
 
         let iv = self.blob.split_off(self.blob.len() - DecAlg::iv_size());
-        let mut data = Zeroizing::new(self.blob);
 
         // decrypt item
-        let decrypted = DecAlg::new(key.as_ref().into(), iv.as_slice().into())
-            .decrypt_padded_mut::<Pkcs7>(&mut data)
-            .unwrap();
+        let decrypted = crypto::decrypt(self.blob, key, &iv);
 
-        let item = Item::try_from(decrypted)?;
+        let item = Item::try_from(decrypted.as_slice())?;
 
         Self::validate(&self.hashed_attributes, &item, key)?;
 

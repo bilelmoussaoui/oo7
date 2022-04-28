@@ -11,6 +11,7 @@ pub use key::Key;
 #[cfg(not(feature = "unstable"))]
 pub(crate) use key::Key;
 
+mod crypto;
 pub mod dbus;
 pub mod portal;
 

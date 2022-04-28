@@ -60,7 +60,7 @@ impl Keyring {
 
     /// Unlock the used collection if using the Secret service.
     ///
-    /// The method does nothing if keyring is backed with a file backend.
+    /// The method does nothing if keyring is backed by a file backend.
     pub async fn unlock(&self) -> Result<()> {
         // No unlocking is needed for the file backend
         if let Self::DBus(backend) = self {
@@ -71,7 +71,7 @@ impl Keyring {
 
     /// Lock the used collection if using the Secret service.
     ///
-    /// The method does nothing if keyring is backed with a file backend.
+    /// The method does nothing if keyring is backed by a file backend.
     pub async fn lock(&self) -> Result<()> {
         // No locking is needed for the file backend
         if let Self::DBus(backend) = self {
