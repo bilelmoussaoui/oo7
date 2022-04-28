@@ -9,7 +9,7 @@ homepage = "https://github.com/bilelmoussaoui/oo7"
 keywords = ["keyring", "secret", "service", "portal", "keychain"]
 exclude = ["org.freedesktop.Secrets.xml"]
 categories = ["os::linux-apis", "os", "api-bindings"]
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license = "MIT"
 
 [dependencies]
 zbus = {version = "2.1", features = ["gvariant"]}

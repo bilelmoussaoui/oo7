@@ -111,9 +111,8 @@ that makes it not usable inside the Flatpak sandbox.
 
 # License
 
-To be figured out
-
+The project is released under the MIT license.
 
 # Credits
 
-- [secret-service-rs](https://github.com/hwchen/secret-service-rs/) for the encrypted Secret Service implementation. 
+- [secret-service-rs](https://github.com/hwchen/secret-service-rs/) for the encrypted Secret Service implementation.
