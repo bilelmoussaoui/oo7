@@ -38,7 +38,7 @@ keyring.create_item(
     HashMap::from([("attribute", "attribute_value")]),
     b"secret",
     true,
-)?;
+).await?;
 
 // Find a stored secret
 let items = keyring
