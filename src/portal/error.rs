@@ -3,20 +3,25 @@ use zbus::zvariant;
 /// File backend specific errors.
 #[derive(Debug)]
 pub enum Error {
-    /// File header does not match `FILE_HEADER`
+    /// File header does not match `FILE_HEADER`.
     FileHeaderMismatch(Option<String>),
-    /// Version bytes do not match `MAJOR_VERSION` or `MINOR_VERSION`
+    /// Version bytes do not match `MAJOR_VERSION` or `MINOR_VERSION`.
     VersionMismatch(Option<Vec<u8>>),
-    /// No data behind header and version bytes
+    /// No data behind header and version bytes.
     NoData,
+    /// No Parent directory.
     NoParentDir(String),
-    /// Bytes don't have the expected GVariant format
+    /// Bytes don't have the expected GVariant format.
     GVariantDeserialization(zvariant::Error),
+    /// Input/Output.
     Io(std::io::Error),
+    /// Unexpected MAC digest value.
     MacError,
+    /// Failure to validate the attributes.
     HashedAttributeMac(String),
-    /// XDG_DATA_HOME required for reading from default location
+    /// XDG_DATA_HOME required for reading from default location.
     NoDataDir,
+    /// Target file has changed.
     TargetFileChanged(String),
     /// Portal DBus communication error.
     PortalBus(zbus::Error),

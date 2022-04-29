@@ -107,6 +107,7 @@ impl Keyring {
         })
     }
 
+    /// Retrieve the list of available [`Item`].
     pub async fn items(&self) -> Result<Vec<Item>, Error> {
         self.keyring
             .lock()
@@ -117,6 +118,7 @@ impl Keyring {
             .collect()
     }
 
+    /// Search items matching the attributes.
     pub async fn search_items(&self, attributes: HashMap<&str, &str>) -> Result<Vec<Item>, Error> {
         self.keyring
             .lock()
@@ -124,6 +126,7 @@ impl Keyring {
             .search_items(attributes, &self.key)
     }
 
+    /// Find the first item matching the attributes.
     pub async fn lookup_item(
         &self,
         attributes: HashMap<&str, &str>,
@@ -131,12 +134,23 @@ impl Keyring {
         self.keyring.lock().await.lookup_item(attributes, &self.key)
     }
 
+    /// Delete an item.
     pub async fn delete(&self, attributes: HashMap<&str, &str>) -> Result<(), Error> {
         let mut keyring = self.keyring.lock().await;
         keyring.remove_items(attributes, &self.key)?;
         self.write().await
     }
 
+    /// Create a new item
+    ///
+    /// # Arguments
+    ///
+    /// * `label` - A user visible label of the item.
+    /// * `attributes` - A map of key/value attributes, used to find the item
+    ///   later.
+    /// * `secret` - The secret to store.
+    /// * `replace` - Whether to replace the value if the `attributes` matches
+    ///   an existing `secret`.
     pub async fn create_item(
         &self,
         label: &str,
@@ -173,6 +187,7 @@ impl Keyring {
         Ok(())
     }
 
+    /// Write the changes to the keyring file.
     pub async fn write(&self) -> Result<(), Error> {
         #[cfg(feature = "tracing")]
         tracing::debug!("Writing keyring back to the file {:?}", self.path);

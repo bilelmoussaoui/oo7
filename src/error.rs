@@ -6,7 +6,9 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// The error type for oo7.
 #[derive(Debug)]
 pub enum Error {
+    /// File backend error.
     Portal(crate::portal::Error),
+    /// Secret Service error.
     DBus(crate::dbus::Error),
 }
 
