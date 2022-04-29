@@ -22,7 +22,6 @@
 //! ```
 
 use std::{
-    cell::Cell,
     collections::HashMap,
     path::{Path, PathBuf},
 };
@@ -55,7 +54,7 @@ pub struct Keyring {
     path: PathBuf,
     /// Times are stored before reading the file to detect
     /// file changes before writing
-    mtime: Cell<Option<std::time::SystemTime>>,
+    mtime: Mutex<Option<std::time::SystemTime>>,
     key: crate::Key,
 }
 
@@ -103,7 +102,7 @@ impl Keyring {
         Ok(Self {
             keyring: Mutex::new(keyring),
             path: path.as_ref().to_path_buf(),
-            mtime: Cell::new(mtime),
+            mtime: Mutex::new(mtime),
             key,
         })
     }
@@ -169,22 +168,20 @@ impl Keyring {
 
         #[cfg(feature = "tracing")]
         tracing::debug!("Writing keyring back to the file");
-        keyring.dump(&self.path, self.mtime.get()).await?;
+        keyring.dump(&self.path, *self.mtime.lock().await).await?;
+
         Ok(())
     }
 
     pub async fn write(&self) -> Result<(), Error> {
         #[cfg(feature = "tracing")]
         tracing::debug!("Writing keyring back to the file {:?}", self.path);
-        self.keyring
-            .lock()
-            .await
-            .dump(&self.path, self.mtime.get())
-            .await?;
+        let mut mtime = self.mtime.lock().await;
+        self.keyring.lock().await.dump(&self.path, *mtime).await?;
 
-        self.mtime
-            .set(fs::metadata(&self.path).await?.modified().ok());
-
+        if let Ok(modified) = fs::metadata(&self.path).await?.modified() {
+            mtime.replace(modified);
+        }
         Ok(())
     }
 }

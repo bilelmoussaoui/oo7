@@ -46,7 +46,18 @@ unstable = []
 docs = []
 tokio_runtime = ["zbus/tokio", "tokio"]
 
+
 [[example]]
 name = "basic"
 path = "examples/basic.rs"
+required-features = ["async-std"]
+
+[[example]]
+name = "basic_2"
+path = "examples/basic_2.rs"
+required-features = ["async-std"]
+
+[[example]]
+name = "dbus_service"
+path = "examples/dbus_service.rs"
 required-features = ["async-std"]
