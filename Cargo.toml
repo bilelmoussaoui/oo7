@@ -44,6 +44,7 @@ local_tests = []
 unstable = []
 # Build nicer docs (requires nightly)
 docs = []
+tokio_runtime = ["zbus/tokio", "tokio"]
 
 [[example]]
 name = "basic"
