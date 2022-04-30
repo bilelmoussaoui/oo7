@@ -198,13 +198,18 @@ impl Keyring {
     pub async fn write(&self) -> Result<(), Error> {
         #[cfg(feature = "tracing")]
         tracing::debug!("Writing keyring back to the file {:?}", self.path);
+        let mtime = self.mtime.lock().await;
+        #[cfg(feature = "tracing")]
+        tracing::debug!("Current modified time {:?}", mtime);
         self.keyring
             .lock()
             .await
-            .dump(&self.path, *self.mtime.lock().await)
+            .dump(&self.path, *mtime)
             .await?;
 
         if let Ok(modified) = fs::metadata(&self.path).await?.modified() {
+            #[cfg(feature = "tracing")]
+            tracing::debug!("New modified time {:?}", modified);
             self.mtime.lock().await.replace(modified);
         }
         Ok(())
