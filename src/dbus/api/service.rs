@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fmt};
 
 use futures::StreamExt;
-use zbus::zvariant::{self, ObjectPath, OwnedObjectPath, OwnedValue, Type};
+use zbus::zvariant::{self, ObjectPath, OwnedObjectPath, OwnedValue, Type, Value};
 
 use super::{
     secret::SecretInner, Collection, Item, Prompt, Properties, Secret, Session, Unlockable,
@@ -70,9 +70,9 @@ impl<'a> Service<'a> {
         &self,
         client_public_key: Option<&Key>,
     ) -> Result<(Option<Key>, Session<'a>), Error> {
-        let (algorithm, key) = match client_public_key {
+        let (algorithm, key): (_, Value<'_>) = match client_public_key {
             None => (Algorithm::Plain, zvariant::Str::default().into()),
-            Some(key) => (Algorithm::Encrypted, key.to_value()),
+            Some(key) => (Algorithm::Encrypted, key.into()),
         };
         let (service_key, session_path) = self
             .inner()
@@ -83,7 +83,7 @@ impl<'a> Service<'a> {
 
         let key = match algorithm {
             Algorithm::Plain => None,
-            Algorithm::Encrypted => Some(Key::from(&service_key)),
+            Algorithm::Encrypted => Some(Key::from(service_key)),
         };
 
         Ok((key, session))

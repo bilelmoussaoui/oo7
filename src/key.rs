@@ -83,10 +83,12 @@ impl Key {
 
         okm
     }
+}
 
-    pub(crate) fn to_value(&self) -> zvariant::OwnedValue {
+impl From<&Key> for zvariant::Value<'_> {
+    fn from(key: &Key) -> Self {
         let mut array = zvariant::Array::new(u8::signature());
-        for byte in self.as_ref() {
+        for byte in key.as_ref() {
             array
                 .append(zvariant::Value::U8(*byte))
                 .expect("Element of valid type");
@@ -95,8 +97,8 @@ impl Key {
     }
 }
 
-impl From<&zvariant::OwnedValue> for Key {
-    fn from(value: &zvariant::OwnedValue) -> Self {
+impl From<zvariant::OwnedValue> for Key {
+    fn from(value: zvariant::OwnedValue) -> Self {
         let mut key = zeroize::Zeroizing::new(vec![]);
         for value in value.downcast_ref::<zvariant::Array>().unwrap().get() {
             key.push(*value.downcast_ref::<u8>().unwrap());
