@@ -1,6 +1,11 @@
 //! File backend implementation backed by the [Secret portal](https://flatpak.github.io/xdg-desktop-portal/#gdbus-org.freedesktop.portal.Secret).
 //!
-//! ```ignore
+//! ```no_run
+//! use std::collections::HashMap;
+//!
+//! use oo7::portal::Keyring;
+//!
+//! # async fn run() -> oo7::Result<()> {
 //! let keyring = Keyring::load_default().await?;
 //! keyring
 //!     .create_item(
@@ -14,11 +19,13 @@
 //! let items = keyring
 //!     .search_items(HashMap::from([("account", "alice")]))
 //!     .await?;
-//! assert_eq!(*items[0].password(), b"My Password");
+//! assert_eq!(*items[0].secret(), b"My Password");
 //!
 //! keyring
 //!     .delete(HashMap::from([("account", "alice")]))
 //!     .await?;
+//! #   Ok(())
+//! # }
 //! ```
 
 use std::{
@@ -191,11 +198,14 @@ impl Keyring {
     pub async fn write(&self) -> Result<(), Error> {
         #[cfg(feature = "tracing")]
         tracing::debug!("Writing keyring back to the file {:?}", self.path);
-        let mut mtime = self.mtime.lock().await;
-        self.keyring.lock().await.dump(&self.path, *mtime).await?;
+        self.keyring
+            .lock()
+            .await
+            .dump(&self.path, *self.mtime.lock().await)
+            .await?;
 
         if let Ok(modified) = fs::metadata(&self.path).await?.modified() {
-            mtime.replace(modified);
+            self.mtime.lock().await.replace(modified);
         }
         Ok(())
     }

@@ -27,47 +27,51 @@ The library provides helper methods to store and retrieve secrets and uses eithe
 
 ### Basic usage
 
-```rust,ignore
+```rust,no_run
 use std::collections::HashMap;
 
-let keyring = oo7::Keyring::new().await?;
+async fn run() -> oo7::Result<()> {
+    let keyring = oo7::Keyring::new().await?;
 
-// Store a secret
-keyring.create_item(
-    "Item Label",
-    HashMap::from([("attribute", "attribute_value")]),
-    b"secret",
-    true,
-).await?;
+    // Store a secret
+    keyring.create_item(
+        "Item Label",
+        HashMap::from([("attribute", "attribute_value")]),
+        b"secret",
+        true,
+    ).await?;
 
-// Find a stored secret
-let items = keyring
-    .search_items(HashMap::from([("attribute", "attribute_value")]))
-    .await?;
+    // Find a stored secret
+    let items = keyring
+        .search_items(HashMap::from([("attribute", "attribute_value")]))
+        .await?;
 
-// Delete a stored secret
-keyring
-    .delete(HashMap::from([("attribute", "attribute_value")]))
-    .await?;
+    // Delete a stored secret
+    keyring
+        .delete(HashMap::from([("attribute", "attribute_value")]))
+        .await?;
 
-// Unlock the collection if the Secret Service is used
-keyring.unlock().await?;
+    // Unlock the collection if the Secret Service is used
+    keyring.unlock().await?;
 
-// Lock the collection if the Secret Service is used
-keyring.lock().await?;
+    // Lock the collection if the Secret Service is used
+    keyring.lock().await?;
+    Ok(())
+}
 ```
 
 If your application makes heavy usage of the keyring like a password manager. You could store an instance of the `Keyring` in a `OnceCell`
 
 ```rust,ignore
 use once_cell::sync::OnceCell;
+use std::collections::HashMap;
 
 static KEYRING: OnceCell<oo7::Keyring> = OnceCell::new();
 
 fn main() {
     // SOME_RUNTIME could be a tokio/async-std/glib runtime
     SOME_RUNTIME.block_on(async {
-        let keyring = Keyring::new()
+        let keyring = oo7::Keyring::new()
             .await
             .expect("Failed to start Secret Service");
         KEYRING.set(keyring);
@@ -79,7 +83,7 @@ fn main() {
             .get()
             .unwrap()
             .search_items(HashMap::from([("attribute", "attribute_value")]))
-            .await?;
+            .await;
     });
 }
 ```
@@ -89,6 +93,8 @@ fn main() {
 The library also comes with API to migrate your secrets from the host Secret Service to the sandboxed file backend. Note that the items are removed from the host keyring if they are migrated successfully.
 
 ```rust,ignore
+use std::collections::HashMap;
+
 // SOME_RUNTIME could be a tokio/async-std/glib runtime
 SOME_RUNTIME.block_on(async {
     match oo7::migrate(vec![HashMap::from([("attribute", "attribute_value")])], true).await {

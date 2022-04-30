@@ -1,29 +1,35 @@
 //! A [Secret Service](https://specifications.freedesktop.org/secret-service/latest/index.html) implementation.
 //!
 //! That is usually done with
-//! ```ignore
+//! ```no_run
+//! use oo7::dbus::{Algorithm, Service};
+//!
+//! # async fn run() -> oo7::Result<()> {
 //! let service = Service::new(Algorithm::Plain).await?;
 //!
 //! let mut attributes = std::collections::HashMap::new();
 //! attributes.insert("type", "password");
 //! attributes.insert("user_id", "some_other_identifier");
 //!
-//! if let Some(collection) = service.default_collection().await? {
-//!     // Store a secret
-//!     collection
-//!         .create_item(
-//!             "My App's secret",
-//!             attributes.clone(),
-//!             b"password",
-//!             true,
-//!             "text/plain",
-//!         )
-//!         .await?;
+//! let collection = service.default_collection().await?;
+//! // Store a secret
+//! collection
+//!     .create_item(
+//!         "My App's secret",
+//!         attributes.clone(),
+//!         b"password",
+//!         true,
+//!         "text/plain",
+//!     )
+//!     .await?;
 //!
-//!     // Retrieve it later thanks to it attributes
-//!     let item = collection.search_items(attributes).await?.first().unwrap();
-//!     assert_eq!(item.secret().await?, b"password");
-//! }
+//! // Retrieve it later thanks to it attributes
+//! let items = collection.search_items(attributes).await?;
+//! let item = items.first().unwrap();
+//! assert_eq!(*item.secret().await?, b"password");
+//!
+//! #   Ok(())
+//! # }
 //! ```
 
 /// The default collection alias.

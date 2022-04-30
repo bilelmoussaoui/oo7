@@ -12,11 +12,16 @@ use crate::Key;
 /// user prompt to complete like creating a collection, locking or unlocking a
 /// collection. The library handles that automatically for you.
 ///
-/// ```ignore
+/// ```no_run
+/// use oo7::dbus::{Algorithm, Service};
+///
+/// # async fn run() -> oo7::Result<()> {
 /// let service = Service::new(Algorithm::Plain).await?;
 /// let collection = service.default_collection().await?;
-///
 /// // Do something with the collection
+///
+/// #   Ok(())
+/// }
 /// ```
 #[derive(Debug)]
 pub struct Service<'a> {
