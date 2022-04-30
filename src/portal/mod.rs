@@ -143,8 +143,10 @@ impl Keyring {
 
     /// Delete an item.
     pub async fn delete(&self, attributes: HashMap<&str, &str>) -> Result<(), Error> {
-        let mut keyring = self.keyring.lock().await;
-        keyring.remove_items(attributes, &self.key)?;
+        {
+            let mut keyring = self.keyring.lock().await;
+            keyring.remove_items(attributes, &self.key)?;
+        };
         self.write().await
     }
 
@@ -165,13 +167,15 @@ impl Keyring {
         secret: impl AsRef<[u8]>,
         replace: bool,
     ) -> Result<(), Error> {
-        let mut keyring = self.keyring.lock().await;
-        if replace {
-            keyring.remove_items(attributes.clone(), &self.key)?;
-        }
-        let item = Item::new(label, attributes, secret);
-        let encrypted_item = item.encrypt(&self.key)?;
-        keyring.items.push(encrypted_item);
+        {
+            let mut keyring = self.keyring.lock().await;
+            if replace {
+                keyring.remove_items(attributes.clone(), &self.key)?;
+            }
+            let item = Item::new(label, attributes, secret);
+            let encrypted_item = item.encrypt(&self.key)?;
+            keyring.items.push(encrypted_item);
+        };
         self.write().await
     }
 
@@ -198,15 +202,13 @@ impl Keyring {
     pub async fn write(&self) -> Result<(), Error> {
         #[cfg(feature = "tracing")]
         tracing::debug!("Writing keyring back to the file {:?}", self.path);
-        let mtime = self.mtime.lock().await;
-        #[cfg(feature = "tracing")]
-        tracing::debug!("Current modified time {:?}", mtime);
-        self.keyring
-            .lock()
-            .await
-            .dump(&self.path, *mtime)
-            .await?;
-
+        {
+            let mtime = self.mtime.lock().await;
+            let mut keyring = self.keyring.lock().await;
+            #[cfg(feature = "tracing")]
+            tracing::debug!("Current modified time {:?}", mtime);
+            keyring.dump(&self.path, *mtime).await?;
+        };
         if let Ok(modified) = fs::metadata(&self.path).await?.modified() {
             #[cfg(feature = "tracing")]
             tracing::debug!("New modified time {:?}", modified);
