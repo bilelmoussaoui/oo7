@@ -29,7 +29,7 @@ digest = "0.10"
 hmac = "0.12"
 pbkdf2 = "0.11"
 sha2 = "0.10"
-zeroize = {version = "1.5", features = ["zeroize_derive"]}
+zeroize = {version = "1", features = ["zeroize_derive"]}
 hkdf = "0.12"
 
 once_cell = "1.9"
