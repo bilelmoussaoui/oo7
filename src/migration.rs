@@ -9,7 +9,15 @@ use crate::{dbus::Service, portal::Keyring, Result};
 /// Secret Service.
 pub async fn migrate(attributes: Vec<HashMap<&str, &str>>, replace: bool) -> Result<()> {
     let service = Service::new(crate::dbus::Algorithm::Encrypted).await?;
-    let file_backend = Keyring::load_default().await?;
+    let file_backend = match Keyring::load_default().await {
+        Ok(portal) => Ok(portal),
+        Err(crate::portal::Error::PortalNotAvailable) => {
+            #[cfg(feature = "tracing")]
+            tracing::debug!("Portal not available, no migration to do");
+            return Ok(());
+        }
+        Err(err) => Err(err),
+    }?;
 
     let collection = service.default_collection().await?;
     let mut all_items = Vec::default();

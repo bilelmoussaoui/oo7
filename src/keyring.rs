@@ -32,30 +32,40 @@ impl Keyring {
     /// Create a new instance of the Keyring.
     pub async fn new() -> Result<Self> {
         let is_sandboxed = crate::is_sandboxed();
-
         if is_sandboxed {
             #[cfg(feature = "tracing")]
             tracing::debug!("Application is sandboxed, using the file backend");
-            Ok(Self::File(Arc::new(portal::Keyring::load_default().await?)))
+
+            match portal::Keyring::load_default().await {
+                Ok(portal) => return Ok(Self::File(Arc::new(portal))),
+                // Do nothing in this case, we are supposed to fallback to the host keyring
+                Err(portal::Error::PortalNotAvailable) => {
+                    #[cfg(feature = "tracing")]
+                    tracing::debug!(
+                        "org.freedesktop.portal.Secrets is not available, falling back to the Sercret Service backend"
+                    );
+                }
+                Err(e) => return Err(crate::Error::Portal(e)),
+            };
         } else {
             #[cfg(feature = "tracing")]
             tracing::debug!(
                 "Application is not sandboxed, falling back to the Sercret Service backend"
             );
-            let service = dbus::Service::new(Algorithm::Encrypted).await?;
-            let collection = match service.default_collection().await {
-                Ok(c) => Ok(c),
-                Err(crate::dbus::Error::NotFound(_)) => {
-                    #[cfg(feature = "tracing")]
-                    tracing::debug!("Default collection doesn't exists, trying to create it");
-                    service
-                        .create_collection("Login", Some(DEFAULT_COLLECTION))
-                        .await
-                }
-                Err(e) => Err(e),
-            }?;
-            Ok(Self::DBus(collection))
         }
+        let service = dbus::Service::new(Algorithm::Encrypted).await?;
+        let collection = match service.default_collection().await {
+            Ok(c) => Ok(c),
+            Err(crate::dbus::Error::NotFound(_)) => {
+                #[cfg(feature = "tracing")]
+                tracing::debug!("Default collection doesn't exists, trying to create it");
+                service
+                    .create_collection("Login", Some(DEFAULT_COLLECTION))
+                    .await
+            }
+            Err(e) => Err(e),
+        }?;
+        Ok(Self::DBus(collection))
     }
 
     /// Unlock the used collection if using the Secret service.

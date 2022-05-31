@@ -35,7 +35,7 @@ pub struct SecretProxy<'a>(zbus::Proxy<'a>);
 
 impl<'a> SecretProxy<'a> {
     /// Create a new instance of [`SecretProxy`].
-    pub async fn new(connection: &zbus::Connection) -> Result<SecretProxy<'a>, Error> {
+    pub async fn new(connection: &zbus::Connection) -> Result<SecretProxy<'a>, zbus::Error> {
         let proxy = zbus::ProxyBuilder::new_bare(connection)
             .interface("org.freedesktop.portal.Secret")?
             .path("/org/freedesktop/portal/desktop")?
@@ -102,7 +102,11 @@ pub async fn retrieve() -> Result<Vec<u8>, Error> {
     let connection = zbus::Connection::session().await?;
     #[cfg(feature = "tracing")]
     tracing::debug!("Retrieve service key using org.freedesktop.portal.Secrets");
-    let proxy = SecretProxy::new(&connection).await?;
+    let proxy = match SecretProxy::new(&connection).await {
+        Ok(proxy) => Ok(proxy),
+        Err(zbus::Error::MethodError(_, _, _)) => Err(Error::PortalNotAvailable),
+        Err(e) => Err(e.into()),
+    }?;
 
     let (mut x1, x2) = std::os::unix::net::UnixStream::pair()?;
     proxy.retrieve_secret(&x2).await?;

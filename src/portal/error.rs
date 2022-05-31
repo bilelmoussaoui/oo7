@@ -27,6 +27,9 @@ pub enum Error {
     PortalBus(zbus::Error),
     /// Portal request has been cancelled.
     CancelledPortalRequest,
+    /// If the portal is not available on the host.
+    /// Can happen if the host has an old xdg-desktop-portal
+    PortalNotAvailable,
 }
 
 impl From<zvariant::Error> for Error {
@@ -76,6 +79,7 @@ impl std::fmt::Display for Error {
             Error::TargetFileChanged(e) => write!(f, "The target file has changed {e}"),
             Error::PortalBus(e) => write!(f, "Portal communication failed {e}"),
             Error::CancelledPortalRequest => write!(f, "Portal request was cancelled"),
+            Error::PortalNotAvailable => write!(f, "xdg-desktop-portal is too old on the host"),
         }
     }
 }
