@@ -1,7 +1,8 @@
 use std::ops::{Mul, Rem, Shr};
 
 use hkdf::Hkdf;
-use num::{bigint::BigUint, FromPrimitive, Integer, One, Zero};
+use num::{FromPrimitive, Integer, One, Zero};
+use num_bigint_dig::BigUint;
 use once_cell::sync::Lazy;
 use rand::{rngs::OsRng, Rng};
 use sha2::Sha256;
@@ -49,19 +50,17 @@ impl Key {
         private_key
     }
 
-    // TODO zeroize
     pub(crate) fn generate_public_key(private_key: &Self) -> Self {
         let private_key_uint = BigUint::from_bytes_be(private_key.as_ref());
-        let public_key_uint = powm(&DH_GENERATOR, &private_key_uint, &DH_PRIME);
+        let public_key_uint = powm(&DH_GENERATOR, private_key_uint, &DH_PRIME);
 
         Key(public_key_uint.to_bytes_be())
     }
 
-    // TODO zeroize
     pub(crate) fn generate_aes_key(private_key: &Self, server_public_key: &Self) -> Self {
         let server_public_key_uint = BigUint::from_bytes_be(server_public_key.as_ref());
         let private_key_uint = BigUint::from_bytes_be(private_key.as_ref());
-        let common_secret = powm(&server_public_key_uint, &private_key_uint, &DH_PRIME);
+        let common_secret = powm(&server_public_key_uint, private_key_uint, &DH_PRIME);
 
         let mut common_secret_bytes = common_secret.to_bytes_be();
         let mut common_secret_padded = vec![0; 128 - common_secret_bytes.len()];
@@ -108,9 +107,8 @@ impl From<zvariant::OwnedValue> for Key {
 }
 
 /// from https://github.com/plietar/librespot/blob/master/core/src/util/mod.rs#L53
-fn powm(base: &BigUint, exp: &BigUint, modulus: &BigUint) -> BigUint {
+fn powm(base: &BigUint, mut exp: BigUint, modulus: &BigUint) -> BigUint {
     let mut base = base.clone();
-    let mut exp = exp.clone();
     let mut result: BigUint = One::one();
 
     while !exp.is_zero() {
@@ -120,6 +118,7 @@ fn powm(base: &BigUint, exp: &BigUint, modulus: &BigUint) -> BigUint {
         exp = exp.shr(1);
         base = (&base).mul(&base).rem(modulus);
     }
+    exp.zeroize();
 
     result
 }
