@@ -1,3 +1,8 @@
+#[cfg(feature = "async-std")]
+use async_std::{fs::File, prelude::*};
+#[cfg(all(feature = "tokio", not(feature = "async-std")))]
+use tokio::{fs::File, io::AsyncReadExt};
+
 pub(crate) async fn is_flatpak() -> bool {
     #[cfg(feature = "async-std")]
     {
@@ -12,11 +17,6 @@ pub(crate) async fn is_flatpak() -> bool {
 }
 
 pub(crate) async fn is_snap() -> bool {
-    #[cfg(feature = "async-std")]
-    use async_std::{fs::File, prelude::*};
-    #[cfg(all(feature = "tokio", not(feature = "async-std")))]
-    use tokio::{fs::File, io::AsyncReadExt};
-
     let pid = std::process::id();
     let path = format!("/proc/{}/cgroup", pid);
     let mut file = match File::open(path).await {
@@ -26,12 +26,12 @@ pub(crate) async fn is_snap() -> bool {
 
     let mut buffer = String::new();
     match file.read_to_string(&mut buffer).await {
-        Ok(_) => parse_cgroup_v2(&buffer),
+        Ok(_) => cgroup_v2_is_snap(&buffer),
         Err(_) => false,
     }
 }
 
-fn parse_cgroup_v2(cgroups: &str) -> bool {
+fn cgroup_v2_is_snap(cgroups: &str) -> bool {
     cgroups
         .lines()
         .map(|line| {
@@ -56,13 +56,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_cgroup_v2() {
+    fn test_cgroup_v2_is_snap() {
         let data =
             "0::/user.slice/user-1000.slice/user@1000.service/apps.slice/snap.something.scope\n";
-        assert_eq!(parse_cgroup_v2(data), true);
+        assert!(cgroup_v2_is_snap(data));
 
         let data = "0::/user.slice/user-1000.slice/user@1000.service/apps.slice\n";
-        assert_eq!(parse_cgroup_v2(data), false);
+        assert!(!cgroup_v2_is_snap(data));
 
         let data = "12:pids:/user.slice/user-1000.slice/user@1000.service
 11:perf_event:/
@@ -77,6 +77,6 @@ mod tests {
 2:cpu,cpuacct:/user.slice
 1:name=systemd:/user.slice/user-1000.slice/user@1000.service/apps.slice/apps-org.gnome.Terminal.slice/vte-spawn-228ae109-a869-4533-8988-65ea4c10b492.scope
 0::/user.slice/user-1000.slice/user@1000.service/apps.slice/apps-org.gnome.Terminal.slice/vte-spawn-228ae109-a869-4533-8988-65ea4c10b492.scope\n";
-        assert_eq!(parse_cgroup_v2(data), true);
+        assert!(cgroup_v2_is_snap(data));
     }
 }

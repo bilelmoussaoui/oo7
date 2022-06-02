@@ -15,8 +15,8 @@ mod crypto;
 pub mod dbus;
 pub mod portal;
 
+mod helpers;
 mod keyring;
-mod utils;
 
 pub use error::{Error, Result};
 pub use keyring::{Item, Keyring};
@@ -24,5 +24,5 @@ pub use migration::migrate;
 
 /// Checks whether the application is sandboxed or not.
 pub async fn is_sandboxed() -> bool {
-    crate::utils::is_flatpak().await || crate::utils::is_snap().await
+    crate::helpers::is_flatpak().await || crate::helpers::is_snap().await
 }
