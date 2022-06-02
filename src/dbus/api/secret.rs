@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use serde::{ser::SerializeTuple, Deserialize, Serialize};
 use zbus::zvariant::{OwnedObjectPath, Type};
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use super::Session;
 use crate::{crypto, dbus::Error, Key};
@@ -10,12 +11,14 @@ use crate::{crypto, dbus::Error, Key};
 #[zvariant(signature = "(oayays)")]
 pub(crate) struct SecretInner(pub OwnedObjectPath, pub Vec<u8>, pub Vec<u8>, pub String);
 
-#[derive(Debug, Type)]
+#[derive(Debug, Type, Zeroize, ZeroizeOnDrop)]
 #[zvariant(signature = "(oayays)")]
 pub struct Secret<'a> {
+    #[zeroize(skip)]
     pub(crate) session: Arc<Session<'a>>,
     pub(crate) parameters: Vec<u8>,
     pub(crate) value: Vec<u8>,
+    #[zeroize(skip)]
     pub(crate) content_type: String,
 }
 
