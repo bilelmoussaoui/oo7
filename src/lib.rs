@@ -16,12 +16,13 @@ pub mod dbus;
 pub mod portal;
 
 mod keyring;
+mod utils;
 
 pub use error::{Error, Result};
 pub use keyring::{Item, Keyring};
 pub use migration::migrate;
 
 /// Checks whether the application is sandboxed or not.
-pub fn is_sandboxed() -> bool {
-    std::path::PathBuf::from("/.flatpak-info").exists()
+pub async fn is_sandboxed() -> bool {
+    crate::utils::is_flatpak().await || crate::utils::is_snap().await
 }
