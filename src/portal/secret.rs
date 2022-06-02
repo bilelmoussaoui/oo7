@@ -1,10 +1,12 @@
 //! Secret portal implementation code.
 //!
 //! It is a modified copy from ASHPD.
-use std::{collections::HashMap, io::Read, os::unix::prelude::AsRawFd};
+use std::{collections::HashMap, os::unix::prelude::AsRawFd};
 
 use futures::StreamExt;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
+#[cfg(all(feature = "tokio", not(feature = "async-std")))]
+use tokio::{io::AsyncReadExt, net::UnixStream};
 use zbus::zvariant::{Fd, ObjectPath, OwnedValue, SerializeDict, Type};
 
 use super::Error;
@@ -99,6 +101,12 @@ impl<'a> SecretProxy<'a> {
 }
 
 pub async fn retrieve() -> Result<Vec<u8>, Error> {
+    #[cfg(not(feature = "async-std"))]
+    use std::{io::Read, os::unix::net::UnixStream};
+
+    #[cfg(feature = "async-std")]
+    use async_std::{os::unix::net::UnixStream, prelude::*};
+
     let connection = zbus::Connection::session().await?;
     #[cfg(feature = "tracing")]
     tracing::debug!("Retrieve service key using org.freedesktop.portal.Secrets");
@@ -108,11 +116,11 @@ pub async fn retrieve() -> Result<Vec<u8>, Error> {
         Err(e) => Err(e.into()),
     }?;
 
-    let (mut x1, x2) = std::os::unix::net::UnixStream::pair()?;
+    let (mut x1, x2) = UnixStream::pair()?;
     proxy.retrieve_secret(&x2).await?;
     drop(x2);
     let mut buf = Vec::new();
-    x1.read_to_end(&mut buf)?;
+    x1.read_to_end(&mut buf).await?;
 
     #[cfg(feature = "tracing")]
     tracing::debug!("Secret received from the portal successfully");
