@@ -1,6 +1,6 @@
 [package]
 name = "oo7"
-version = "0.1.0-alpha.4"
+version = "0.1.0-alpha.5"
 edition = "2021"
 authors = ["Bilal Elmoussaoui", "Sophie Herold", "Maximiliano Sandoval"]
 description = "Easy to use Secret Service implementation with sandboxed file backend support"
