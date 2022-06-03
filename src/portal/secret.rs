@@ -88,9 +88,15 @@ impl<'a> SecretProxy<'a> {
                 }
             },
             async {
-                self.0
+                match self
+                    .0
                     .call_method("RetrieveSecret", &(Fd::from(fd.as_raw_fd()), &options))
-                    .await?;
+                    .await
+                {
+                    Ok(_) => Ok(()),
+                    Err(zbus::Error::MethodError(_, _, _)) => Err(Error::PortalNotAvailable),
+                    Err(e) => Err(e.into()),
+                }?;
                 Ok(())
             },
         )?;
@@ -104,7 +110,7 @@ pub async fn retrieve() -> Result<Vec<u8>, Error> {
     tracing::debug!("Retrieve service key using org.freedesktop.portal.Secrets");
     let proxy = match SecretProxy::new(&connection).await {
         Ok(proxy) => Ok(proxy),
-        Err(zbus::Error::MethodError(_, _, _)) => Err(Error::PortalNotAvailable),
+        Err(zbus::Error::InterfaceNotFound) => Err(Error::PortalNotAvailable),
         Err(e) => Err(e.into()),
     }?;
 
