@@ -112,7 +112,7 @@ SOME_RUNTIME.block_on(async {
 | ---     | ----------- | ------ |
 | `tracing` | Record various debug information using the `tracing` library | No |
 | `async-std` | Use `async-std` APIs for IO/filesystem operations | Yes |
-| `tokio_runtime` | Use `tokio` APIs for IO/Filesystem operations | No |
+| `tokio` | Use `tokio` APIs for IO/Filesystem operations | No |
 | `unstable` | Unlock internal APIs | No |
 
 ## How does it compare to other libraries?
