@@ -1,6 +1,6 @@
 #[cfg(feature = "async-std")]
 use async_std::{fs::File, prelude::*};
-#[cfg(all(feature = "tokio", not(feature = "async-std")))]
+#[cfg(feature = "tokio")]
 use tokio::{fs::File, io::AsyncReadExt};
 
 pub(crate) async fn is_flatpak() -> bool {

@@ -1,6 +1,8 @@
 #![deny(rustdoc::broken_intra_doc_links)]
 #![doc = include_str!("../README.md")]
 #![cfg_attr(feature = "docs", feature(doc_auto_cfg))]
+#[cfg(all(all(feature = "tokio", feature = "async-std"), not(doc)))]
+compile_error!("You can't enable both async-std & tokio features at once");
 
 mod error;
 mod key;

@@ -2,14 +2,12 @@
 //!
 //! It is a modified copy from ASHPD.
 use std::{collections::HashMap, os::unix::prelude::AsRawFd};
-#[cfg(not(feature = "async-std"))]
-use std::{io::Read, os::unix::net::UnixStream};
 
 #[cfg(feature = "async-std")]
 use async_std::{os::unix::net::UnixStream, prelude::*};
 use futures::StreamExt;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
-#[cfg(all(feature = "tokio", not(feature = "async-std")))]
+#[cfg(feature = "tokio")]
 use tokio::{io::AsyncReadExt, net::UnixStream};
 use zbus::zvariant::{Fd, ObjectPath, OwnedValue, SerializeDict, Type};
 
