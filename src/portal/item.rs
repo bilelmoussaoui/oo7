@@ -19,8 +19,11 @@ use crate::{
 pub struct Item {
     #[zeroize(skip)]
     attributes: HashMap<String, AttributeValue>,
+    #[zeroize(skip)]
     label: String,
+    #[zeroize(skip)]
     created: u64,
+    #[zeroize(skip)]
     modified: u64,
     secret: Vec<u8>,
 }

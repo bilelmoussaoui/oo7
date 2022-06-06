@@ -24,13 +24,18 @@ pub(crate) fn encrypt(data: impl AsRef<[u8]>, key: &Key, iv: impl AsRef<[u8]>) -
     blob
 }
 
-pub(crate) fn decrypt(data: impl AsRef<[u8]>, key: &Key, iv: impl AsRef<[u8]>) -> Vec<u8> {
-    let mut data = zeroize::Zeroizing::new(data.as_ref().to_vec());
+pub(crate) fn decrypt(
+    data: impl AsRef<[u8]>,
+    key: &Key,
+    iv: impl AsRef<[u8]>,
+) -> zeroize::Zeroizing<Vec<u8>> {
+    let mut data = data.as_ref().to_vec();
 
     DecAlg::new(key.as_ref().into(), iv.as_ref().into())
         .decrypt_padded_mut::<Pkcs7>(&mut data)
         .unwrap()
         .to_vec()
+        .into()
 }
 
 pub(crate) fn generate_iv() -> Iv<EncAlg> {
@@ -58,6 +63,6 @@ mod test {
         assert_eq!(encrypted, expected_encrypted);
 
         let decrypted = decrypt(&encrypted, &aes_key, aes_iv);
-        assert_eq!(decrypted, data);
+        assert_eq!(decrypted.to_vec(), data);
     }
 }

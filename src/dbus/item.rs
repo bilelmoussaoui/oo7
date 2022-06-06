@@ -136,15 +136,16 @@ impl<'a> Item<'a> {
             let secret = self.inner.secret(&self.session).await?;
 
             let value = match self.algorithm {
-                Algorithm::Plain => secret.value,
+                Algorithm::Plain => Zeroizing::new(secret.value.to_owned()),
                 Algorithm::Encrypted => {
-                    let iv = secret.parameters;
+                    let iv = &secret.parameters;
                     // Safe unwrap as it is encrypted
                     let aes_key = self.aes_key.as_ref().unwrap();
-                    crypto::decrypt(&secret.value, aes_key, &iv).to_vec()
+
+                    crypto::decrypt(&secret.value, aes_key, iv)
                 }
             };
-            Ok(Zeroizing::new(value))
+            Ok(value)
         }
     }
 

@@ -5,9 +5,10 @@
 // - Keep proxis around
 // - Make more things async
 
+#[cfg(feature = "async-std")]
+use std::os::unix::fs::OpenOptionsExt;
 use std::{
     collections::HashMap,
-    os::unix::fs::OpenOptionsExt,
     path::{Path, PathBuf},
 };
 
@@ -18,7 +19,6 @@ use once_cell::sync::Lazy;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "tokio")]
-#[cfg(not(feature = "async-std"))]
 use tokio::{fs, io, io::AsyncWriteExt};
 use zbus::zvariant::{self, Type};
 
