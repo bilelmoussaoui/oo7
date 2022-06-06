@@ -18,7 +18,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: doc
-          args: --package oo7 --all-features --no-deps
+          args: --package oo7 --features "async-std" --no-deps
 
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
