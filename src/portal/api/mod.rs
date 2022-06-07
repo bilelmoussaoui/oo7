@@ -15,12 +15,15 @@ use std::{
 #[cfg(feature = "async-std")]
 use async_std::{fs, io, prelude::*};
 use cipher::BlockSizeUser;
+use futures::{future::OptionFuture, stream, StreamExt, TryStreamExt};
 use once_cell::sync::Lazy;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "tokio")]
 use tokio::{fs, io, io::AsyncWriteExt};
 use zbus::zvariant::{self, Type};
+
+use super::KeyExt;
 
 const SALT_SIZE: usize = 32;
 const ITERATION_COUNT: u32 = 100000;
@@ -141,47 +144,52 @@ impl Keyring {
         Ok(())
     }
 
-    pub fn search_items(
+    pub async fn search_items(
         &self,
         attributes: HashMap<impl AsRef<str>, impl AsRef<str>>,
-        key: &Key,
+        key_ext: impl KeyExt,
     ) -> Result<Vec<Item>, Error> {
+        let key = key_ext.key().await;
         let hashed_search = hash_attributes(attributes, key);
 
-        self.items
-            .iter()
-            .filter(|e| {
-                hashed_search.iter().all(|(search_key, search_hash)| {
-                    e.hashed_attributes.get(search_key.as_ref()) == Some(search_hash)
-                })
+        stream::iter(self.items.iter().filter(|e| {
+            hashed_search.iter().all(|(search_key, search_hash)| {
+                e.hashed_attributes.get(search_key.as_ref()) == Some(search_hash)
             })
-            .map(|e| (*e).clone().decrypt(key))
-            .collect()
+        }))
+        .then(|e| (*e).clone().decrypt(key))
+        .try_collect()
+        .await
     }
 
-    pub fn lookup_item(
+    pub async fn lookup_item(
         &self,
         attributes: HashMap<impl AsRef<str>, impl AsRef<str>>,
-        key: &Key,
+        key_ext: impl KeyExt,
     ) -> Result<Option<Item>, Error> {
+        let key = key_ext.key().await;
         let hashed_search = hash_attributes(attributes, key);
 
-        self.items
-            .iter()
-            .find(|e| {
-                hashed_search.iter().all(|(search_key, search_hash)| {
-                    e.hashed_attributes.get(search_key.as_ref()) == Some(search_hash)
+        OptionFuture::from(
+            self.items
+                .iter()
+                .find(|e| {
+                    hashed_search.iter().all(|(search_key, search_hash)| {
+                        e.hashed_attributes.get(search_key.as_ref()) == Some(search_hash)
+                    })
                 })
-            })
-            .map(|e| (*e).clone().decrypt(key))
-            .transpose()
+                .map(|x| (*x).clone().decrypt(key)),
+        )
+        .await
+        .transpose()
     }
 
-    pub fn remove_items(
+    pub async fn remove_items(
         &mut self,
         attributes: HashMap<impl AsRef<str>, impl AsRef<str>>,
-        key: &Key,
+        key_ext: impl KeyExt,
     ) -> Result<(), Error> {
+        let key = key_ext.key().await;
         let hashed_search = hash_attributes(attributes, key);
 
         let (remove, keep): (Vec<EncryptedItem>, _) =
@@ -193,7 +201,7 @@ impl Keyring {
 
         // check hashes for the ones to be removed
         for item in remove {
-            item.decrypt(key)?;
+            item.decrypt(key).await?;
         }
 
         self.items = keep;
@@ -297,15 +305,17 @@ mod tests {
         let mut keyring = Keyring::new();
         let key = keyring.derive_key(&SECRET);
 
-        keyring
-            .items
-            .push(Item::new(String::from("Label"), needle.clone(), b"MyPassword").encrypt(&key)?);
+        keyring.items.push(
+            Item::new(String::from("Label"), needle.clone(), b"MyPassword")
+                .encrypt(&key)
+                .await?,
+        );
 
-        assert_eq!(keyring.search_items(needle.clone(), &key)?.len(), 1);
+        assert_eq!(keyring.search_items(needle.clone(), &key).await?.len(), 1);
 
-        keyring.remove_items(needle.clone(), &key)?;
+        keyring.remove_items(needle.clone(), &key).await?;
 
-        assert_eq!(keyring.search_items(needle, &key)?.len(), 0);
+        assert_eq!(keyring.search_items(needle, &key).await?.len(), 0);
 
         Ok(())
     }
@@ -323,15 +333,17 @@ mod tests {
                 HashMap::from([(String::from("my-tag"), String::from("my tag value"))]),
                 "A Password".as_bytes(),
             )
-            .encrypt(&key)?,
+            .encrypt(&key)
+            .await?,
         );
         new_keyring.dump("/tmp/test.keyring", None).await?;
 
         let blob = async_std::fs::read("/tmp/test.keyring").await?;
 
         let loaded_keyring = Keyring::try_from(blob.as_slice())?;
-        let loaded_items =
-            loaded_keyring.search_items(HashMap::from([("my-tag", "my tag value")]), &key)?;
+        let loaded_items = loaded_keyring
+            .search_items(HashMap::from([("my-tag", "my tag value")]), &key)
+            .await?;
 
         assert_eq!(*loaded_items[0].secret(), "A Password".as_bytes());
 
