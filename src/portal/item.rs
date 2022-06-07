@@ -7,12 +7,9 @@ use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 use super::{
     api::{AttributeValue, EncryptedItem, GVARIANT_ENCODING},
-    Error,
+    Error, KeyExt,
 };
-use crate::{
-    crypto::{self, MacAlg},
-    Key,
-};
+use crate::crypto::{self, MacAlg};
 
 /// An item stored in the file backend.
 #[derive(Deserialize, Serialize, Type, Debug, Zeroize, ZeroizeOnDrop)]
@@ -92,7 +89,8 @@ impl Item {
         self.secret = secret.as_ref().to_vec();
     }
 
-    pub(crate) fn encrypt(&self, key: &Key) -> Result<EncryptedItem, Error> {
+    pub(crate) async fn encrypt(&self, key_ext: impl KeyExt) -> Result<EncryptedItem, Error> {
+        let key = key_ext.get().await;
         let decrypted = Zeroizing::new(zvariant::to_bytes(*GVARIANT_ENCODING, &self)?);
 
         let iv = crypto::generate_iv();

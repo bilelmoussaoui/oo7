@@ -5,7 +5,7 @@ use digest::{Mac, OutputSizeUser};
 use serde::{Deserialize, Serialize};
 use zbus::zvariant::Type;
 
-use super::{Error, Item};
+use super::{super::KeyExt, Error, Item};
 use crate::{
     crypto::{self, DecAlg, MacAlg},
     Key,
@@ -18,7 +18,8 @@ pub(crate) struct EncryptedItem {
 }
 
 impl EncryptedItem {
-    pub fn decrypt(mut self, key: &Key) -> Result<Item, Error> {
+    pub async fn decrypt(mut self, key_ext: impl KeyExt) -> Result<Item, Error> {
+        let key = key_ext.get().await;
         let mac_tag = self.blob.split_off(self.blob.len() - MacAlg::output_size());
 
         // verify item

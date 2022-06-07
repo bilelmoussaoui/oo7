@@ -28,9 +28,11 @@
 //! # }
 //! ```
 
+use once_cell::sync::OnceCell;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
+    pin::Pin,
 };
 
 #[cfg(feature = "async-std")]
@@ -62,7 +64,8 @@ pub struct Keyring {
     /// Times are stored before reading the file to detect
     /// file changes before writing
     mtime: Mutex<Option<std::time::SystemTime>>,
-    key: crate::Key,
+    secret: Zeroizing<Vec<u8>>,
+    key: OnceCell<crate::Key>,
 }
 
 impl Keyring {
@@ -104,25 +107,37 @@ impl Keyring {
             }
         };
 
-        let key = keyring.derive_key(secret);
+        //let key = Lazy::new(|| keyring.derive_key(secret));
 
         Ok(Self {
             keyring: Mutex::new(keyring),
             path: path.as_ref().to_path_buf(),
             mtime: Mutex::new(mtime),
-            key,
+            secret: Zeroizing::new(secret.to_vec()),
+            key: OnceCell::new(),
         })
+    }
+
+    /// Retrieve the number of items
+    ///
+    /// This function does not require for a key to be derived.
+    pub async fn num_items(&self) -> usize {
+        self.keyring.lock().await.items.len()
     }
 
     /// Retrieve the list of available [`Item`].
     pub async fn items(&self) -> Result<Vec<Item>, Error> {
-        self.keyring
-            .lock()
-            .await
-            .items
-            .iter()
-            .map(|e| (*e).clone().decrypt(&self.key))
-            .collect()
+        futures::future::join_all(
+            self.keyring
+                .lock()
+                .await
+                .items
+                .iter()
+                .map(|e| (*e).clone().decrypt(self)),
+        )
+        .await
+        .into_iter()
+        .collect()
     }
 
     /// Search items matching the attributes.
@@ -130,7 +145,8 @@ impl Keyring {
         self.keyring
             .lock()
             .await
-            .search_items(attributes, &self.key)
+            .search_items(attributes, self)
+            .await
     }
 
     /// Find the first item matching the attributes.
@@ -138,14 +154,18 @@ impl Keyring {
         &self,
         attributes: HashMap<&str, &str>,
     ) -> Result<Option<Item>, Error> {
-        self.keyring.lock().await.lookup_item(attributes, &self.key)
+        self.keyring
+            .lock()
+            .await
+            .lookup_item(attributes, self)
+            .await
     }
 
     /// Delete an item.
     pub async fn delete(&self, attributes: HashMap<&str, &str>) -> Result<(), Error> {
         {
             let mut keyring = self.keyring.lock().await;
-            keyring.remove_items(attributes, &self.key)?;
+            keyring.remove_items(attributes, self).await?;
         };
         self.write().await
     }
@@ -170,10 +190,10 @@ impl Keyring {
         {
             let mut keyring = self.keyring.lock().await;
             if replace {
-                keyring.remove_items(attributes.clone(), &self.key)?;
+                keyring.remove_items(attributes.clone(), self).await?;
             }
             let item = Item::new(label, attributes, secret);
-            let encrypted_item = item.encrypt(&self.key)?;
+            let encrypted_item = item.encrypt(self).await?;
             keyring.items.push(encrypted_item);
         };
         self.write().await
@@ -184,10 +204,10 @@ impl Keyring {
         let mut keyring = self.keyring.lock().await;
         for (label, attributes, secret, replace) in items {
             if replace {
-                keyring.remove_items(attributes.clone(), &self.key)?;
+                keyring.remove_items(attributes.clone(), self).await?;
             }
             let item = Item::new(label, attributes, &*secret);
-            let encrypted_item = item.encrypt(&self.key)?;
+            let encrypted_item = item.encrypt(self).await?;
             keyring.items.push(encrypted_item);
         }
 
@@ -215,6 +235,48 @@ impl Keyring {
             self.mtime.lock().await.replace(modified);
         }
         Ok(())
+    }
+}
+
+pub trait KeyExt {
+    fn get<'a>(&'a self) -> Pin<Box<dyn std::future::Future<Output = &crate::Key> + 'a>>;
+}
+
+impl KeyExt for Keyring {
+    fn get<'a>(&'a self) -> Pin<Box<dyn std::future::Future<Output = &crate::Key> + 'a>> {
+        Box::pin(async {
+            if let Some(key) = self.key.get() {
+                key
+            } else {
+                let keyring = self.keyring.lock().await;
+                self.key.get_or_init(|| keyring.derive_key(&self.secret))
+            }
+        })
+    }
+}
+
+impl KeyExt for &Keyring {
+    fn get<'a>(&'a self) -> Pin<Box<dyn std::future::Future<Output = &crate::Key> + 'a>> {
+        Box::pin(async {
+            if let Some(key) = self.key.get() {
+                key
+            } else {
+                let keyring = self.keyring.lock().await;
+                self.key.get_or_init(|| keyring.derive_key(&self.secret))
+            }
+        })
+    }
+}
+
+impl KeyExt for crate::Key {
+    fn get<'a>(&'a self) -> Pin<Box<dyn std::future::Future<Output = &crate::Key> + 'a>> {
+        Box::pin(async move { self })
+    }
+}
+
+impl KeyExt for &crate::Key {
+    fn get<'a>(&'a self) -> Pin<Box<dyn std::future::Future<Output = &crate::Key> + 'a>> {
+        Box::pin(async { *self })
     }
 }
 
