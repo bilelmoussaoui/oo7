@@ -19,7 +19,7 @@ pub(crate) struct EncryptedItem {
 
 impl EncryptedItem {
     pub async fn decrypt(mut self, key_ext: impl KeyExt) -> Result<Item, Error> {
-        let key = key_ext.get().await;
+        let key = key_ext.key().await;
         let mac_tag = self.blob.split_off(self.blob.len() - MacAlg::output_size());
 
         // verify item

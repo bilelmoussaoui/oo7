@@ -90,7 +90,7 @@ impl Item {
     }
 
     pub(crate) async fn encrypt(&self, key_ext: impl KeyExt) -> Result<EncryptedItem, Error> {
-        let key = key_ext.get().await;
+        let key = key_ext.key().await;
         let decrypted = Zeroizing::new(zvariant::to_bytes(*GVARIANT_ENCODING, &self)?);
 
         let iv = crypto::generate_iv();

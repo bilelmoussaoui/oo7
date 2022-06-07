@@ -28,7 +28,6 @@
 //! # }
 //! ```
 
-use once_cell::sync::OnceCell;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -37,10 +36,11 @@ use std::{
 
 #[cfg(feature = "async-std")]
 use async_std::{fs, io, prelude::*, sync::Mutex};
+use futures::{stream, StreamExt, TryStreamExt};
+use once_cell::sync::OnceCell;
 #[cfg(feature = "tokio")]
 #[cfg(not(feature = "async-std"))]
 use tokio::{fs, io, io::AsyncReadExt, sync::Mutex};
-
 #[cfg(feature = "unstable")]
 pub mod api;
 #[cfg(not(feature = "unstable"))]
@@ -107,8 +107,6 @@ impl Keyring {
             }
         };
 
-        //let key = Lazy::new(|| keyring.derive_key(secret));
-
         Ok(Self {
             keyring: Mutex::new(keyring),
             path: path.as_ref().to_path_buf(),
@@ -118,26 +116,28 @@ impl Keyring {
         })
     }
 
+    /// Force to derive key
+    ///
+    /// Usually the key is only derived when required. This usually happens
+    /// when optaining in element. With this function it will already be
+    /// derived and cached beforehand.
+    pub async fn force_dervice_key(&self) {
+        self.key();
+    }
+
     /// Retrieve the number of items
     ///
-    /// This function does not require for a key to be derived.
-    pub async fn num_items(&self) -> usize {
+    /// This function will not trigger a key derivation.
+    pub async fn n_items(&self) -> usize {
         self.keyring.lock().await.items.len()
     }
 
     /// Retrieve the list of available [`Item`].
     pub async fn items(&self) -> Result<Vec<Item>, Error> {
-        futures::future::join_all(
-            self.keyring
-                .lock()
-                .await
-                .items
-                .iter()
-                .map(|e| (*e).clone().decrypt(self)),
-        )
-        .await
-        .into_iter()
-        .collect()
+        stream::iter(self.keyring.lock().await.items.iter())
+            .then(|e| (*e).clone().decrypt(self))
+            .try_collect()
+            .await
     }
 
     /// Search items matching the attributes.
@@ -239,24 +239,11 @@ impl Keyring {
 }
 
 pub trait KeyExt {
-    fn get<'a>(&'a self) -> Pin<Box<dyn std::future::Future<Output = &crate::Key> + 'a>>;
-}
-
-impl KeyExt for Keyring {
-    fn get<'a>(&'a self) -> Pin<Box<dyn std::future::Future<Output = &crate::Key> + 'a>> {
-        Box::pin(async {
-            if let Some(key) = self.key.get() {
-                key
-            } else {
-                let keyring = self.keyring.lock().await;
-                self.key.get_or_init(|| keyring.derive_key(&self.secret))
-            }
-        })
-    }
+    fn key<'a>(&'a self) -> Pin<Box<dyn std::future::Future<Output = &crate::Key> + 'a>>;
 }
 
 impl KeyExt for &Keyring {
-    fn get<'a>(&'a self) -> Pin<Box<dyn std::future::Future<Output = &crate::Key> + 'a>> {
+    fn key<'a>(&'a self) -> Pin<Box<dyn std::future::Future<Output = &crate::Key> + 'a>> {
         Box::pin(async {
             if let Some(key) = self.key.get() {
                 key
@@ -265,17 +252,11 @@ impl KeyExt for &Keyring {
                 self.key.get_or_init(|| keyring.derive_key(&self.secret))
             }
         })
-    }
-}
-
-impl KeyExt for crate::Key {
-    fn get<'a>(&'a self) -> Pin<Box<dyn std::future::Future<Output = &crate::Key> + 'a>> {
-        Box::pin(async move { self })
     }
 }
 
 impl KeyExt for &crate::Key {
-    fn get<'a>(&'a self) -> Pin<Box<dyn std::future::Future<Output = &crate::Key> + 'a>> {
+    fn key<'a>(&'a self) -> Pin<Box<dyn std::future::Future<Output = &crate::Key> + 'a>> {
         Box::pin(async { *self })
     }
 }

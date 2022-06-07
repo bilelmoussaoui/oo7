@@ -12,17 +12,18 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use super::KeyExt;
-
 #[cfg(feature = "async-std")]
 use async_std::{fs, io, prelude::*};
 use cipher::BlockSizeUser;
+use futures::{future::OptionFuture, stream, StreamExt, TryStreamExt};
 use once_cell::sync::Lazy;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "tokio")]
 use tokio::{fs, io, io::AsyncWriteExt};
 use zbus::zvariant::{self, Type};
+
+use super::KeyExt;
 
 const SALT_SIZE: usize = 32;
 const ITERATION_COUNT: u32 = 100000;
@@ -148,22 +149,17 @@ impl Keyring {
         attributes: HashMap<impl AsRef<str>, impl AsRef<str>>,
         key_ext: impl KeyExt,
     ) -> Result<Vec<Item>, Error> {
-        let key = key_ext.get().await;
+        let key = key_ext.key().await;
         let hashed_search = hash_attributes(attributes, key);
 
-        futures::future::join_all(
-            self.items
-                .iter()
-                .filter(|e| {
-                    hashed_search.iter().all(|(search_key, search_hash)| {
-                        e.hashed_attributes.get(search_key.as_ref()) == Some(search_hash)
-                    })
-                })
-                .map(|e| (*e).clone().decrypt(key)),
-        )
+        stream::iter(self.items.iter().filter(|e| {
+            hashed_search.iter().all(|(search_key, search_hash)| {
+                e.hashed_attributes.get(search_key.as_ref()) == Some(search_hash)
+            })
+        }))
+        .then(|e| (*e).clone().decrypt(key))
+        .try_collect()
         .await
-        .into_iter()
-        .collect()
     }
 
     pub async fn lookup_item(
@@ -171,19 +167,21 @@ impl Keyring {
         attributes: HashMap<impl AsRef<str>, impl AsRef<str>>,
         key_ext: impl KeyExt,
     ) -> Result<Option<Item>, Error> {
-        let key = key_ext.get().await;
+        let key = key_ext.key().await;
         let hashed_search = hash_attributes(attributes, key);
-        let result = self.items.iter().find(|e| {
-            hashed_search.iter().all(|(search_key, search_hash)| {
-                e.hashed_attributes.get(search_key.as_ref()) == Some(search_hash)
-            })
-        });
 
-        if let Some(found) = result {
-            Ok(Some(found.clone().decrypt(key).await?))
-        } else {
-            Ok(None)
-        }
+        OptionFuture::from(
+            self.items
+                .iter()
+                .find(|e| {
+                    hashed_search.iter().all(|(search_key, search_hash)| {
+                        e.hashed_attributes.get(search_key.as_ref()) == Some(search_hash)
+                    })
+                })
+                .map(|x| (*x).clone().decrypt(key)),
+        )
+        .await
+        .transpose()
     }
 
     pub async fn remove_items(
@@ -191,7 +189,7 @@ impl Keyring {
         attributes: HashMap<impl AsRef<str>, impl AsRef<str>>,
         key_ext: impl KeyExt,
     ) -> Result<(), Error> {
-        let key = key_ext.get().await;
+        let key = key_ext.key().await;
         let hashed_search = hash_attributes(attributes, key);
 
         let (remove, keep): (Vec<EncryptedItem>, _) =
