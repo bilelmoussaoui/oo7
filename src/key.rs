@@ -46,7 +46,7 @@ impl AsMut<[u8]> for Key {
 impl Key {
     pub(crate) fn generate_private_key() -> Self {
         let mut generic_array = EncAlg::generate_key(cipher::rand_core::OsRng);
-        let key = Key(generic_array.to_vec());
+        let key = Self(generic_array.to_vec());
         generic_array.zeroize();
 
         key
@@ -56,7 +56,7 @@ impl Key {
         let private_key_uint = BigUint::from_bytes_be(private_key.as_ref());
         let public_key_uint = powm(&DH_GENERATOR, private_key_uint, &DH_PRIME);
 
-        Key(public_key_uint.to_bytes_be())
+        Self(public_key_uint.to_bytes_be())
     }
 
     pub(crate) fn generate_aes_key(private_key: &Self, server_public_key: &Self) -> Self {
