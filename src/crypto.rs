@@ -14,7 +14,8 @@ pub(crate) fn encrypt(data: impl AsRef<[u8]>, key: &Key, iv: impl AsRef<[u8]>) -
 
     // Unwrapping since adding `CIPHER_BLOCK_SIZE` to array is enough space for
     // PKCS7
-    let encrypted_len = EncAlg::new(key.as_ref().into(), iv.as_ref().into())
+    let encrypted_len = EncAlg::new_from_slices(key.as_ref(), iv.as_ref())
+        .expect("Invalid key length")
         .encrypt_padded_b2b_mut::<Pkcs7>(data.as_ref(), &mut blob)
         .unwrap()
         .len();
@@ -31,7 +32,8 @@ pub(crate) fn decrypt(
 ) -> zeroize::Zeroizing<Vec<u8>> {
     let mut data = data.as_ref().to_vec();
 
-    DecAlg::new(key.as_ref().into(), iv.as_ref().into())
+    DecAlg::new_from_slices(key.as_ref(), iv.as_ref())
+        .expect("Invalid key length")
         .decrypt_padded_mut::<Pkcs7>(&mut data)
         .unwrap()
         .to_vec()
