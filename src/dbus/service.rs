@@ -52,6 +52,7 @@ impl<'a> Service<'a> {
                 let (service_key, session) = service.open_session(Some(&public_key)).await?;
                 let aes_key = service_key
                     .map(|service_key| Arc::new(Key::generate_aes_key(&private_key, &service_key)));
+
                 (aes_key, session)
             }
         };
