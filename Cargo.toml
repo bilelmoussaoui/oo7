@@ -23,9 +23,9 @@ num = "0.4.0"
 num-bigint-dig = {version ="0.8", features = ["zeroize"]}
 tracing = {version = "0.1", optional = true}
 
-aes = "0.8"
-cbc = "0.1"
-cipher = {version = "0.4", features = ["rand_core"]}
+aes = {version = "0.8", features = ["zeroize"]}
+cbc = {version = "0.1", features = ["zeroize"]}
+cipher = {version = "0.4", features = ["rand_core", "zeroize"]}
 digest = "0.10"
 hmac = "0.12"
 pbkdf2 = "0.11"
