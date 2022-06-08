@@ -34,10 +34,9 @@ use std::{
 };
 
 #[cfg(feature = "async-std")]
-use async_std::{fs, io, prelude::*, sync::Mutex};
+use async_std::{fs, io, prelude::*, sync::RwLock};
 #[cfg(feature = "tokio")]
-#[cfg(not(feature = "async-std"))]
-use tokio::{fs, io, io::AsyncReadExt, sync::Mutex};
+use tokio::{fs, io, io::AsyncReadExt, sync::RwLock};
 
 #[cfg(feature = "unstable")]
 pub mod api;
@@ -57,11 +56,11 @@ type ItemDefinition = (String, HashMap<String, String>, Zeroizing<Vec<u8>>, bool
 /// File backed keyring.
 #[derive(Debug)]
 pub struct Keyring {
-    keyring: Mutex<api::Keyring>,
+    keyring: RwLock<api::Keyring>,
     path: PathBuf,
     /// Times are stored before reading the file to detect
     /// file changes before writing
-    mtime: Mutex<Option<std::time::SystemTime>>,
+    mtime: RwLock<Option<std::time::SystemTime>>,
     key: crate::Key,
 }
 
@@ -107,9 +106,9 @@ impl Keyring {
         let key = keyring.derive_key(secret);
 
         Ok(Self {
-            keyring: Mutex::new(keyring),
+            keyring: RwLock::new(keyring),
             path: path.as_ref().to_path_buf(),
-            mtime: Mutex::new(mtime),
+            mtime: RwLock::new(mtime),
             key,
         })
     }
@@ -117,7 +116,7 @@ impl Keyring {
     /// Retrieve the list of available [`Item`].
     pub async fn items(&self) -> Result<Vec<Item>, Error> {
         self.keyring
-            .lock()
+            .read()
             .await
             .items
             .iter()
@@ -128,7 +127,7 @@ impl Keyring {
     /// Search items matching the attributes.
     pub async fn search_items(&self, attributes: HashMap<&str, &str>) -> Result<Vec<Item>, Error> {
         self.keyring
-            .lock()
+            .read()
             .await
             .search_items(attributes, &self.key)
     }
@@ -138,13 +137,13 @@ impl Keyring {
         &self,
         attributes: HashMap<&str, &str>,
     ) -> Result<Option<Item>, Error> {
-        self.keyring.lock().await.lookup_item(attributes, &self.key)
+        self.keyring.read().await.lookup_item(attributes, &self.key)
     }
 
     /// Delete an item.
     pub async fn delete(&self, attributes: HashMap<&str, &str>) -> Result<(), Error> {
         {
-            let mut keyring = self.keyring.lock().await;
+            let mut keyring = self.keyring.write().await;
             keyring.remove_items(attributes, &self.key)?;
         };
         self.write().await
@@ -168,7 +167,7 @@ impl Keyring {
         replace: bool,
     ) -> Result<(), Error> {
         {
-            let mut keyring = self.keyring.lock().await;
+            let mut keyring = self.keyring.write().await;
             if replace {
                 keyring.remove_items(attributes.clone(), &self.key)?;
             }
@@ -181,7 +180,7 @@ impl Keyring {
 
     /// Helper used for migration to avoid re-writing the file multiple times
     pub(crate) async fn create_items(&self, items: Vec<ItemDefinition>) -> Result<(), Error> {
-        let mut keyring = self.keyring.lock().await;
+        let mut keyring = self.keyring.write().await;
         for (label, attributes, secret, replace) in items {
             if replace {
                 keyring.remove_items(attributes.clone(), &self.key)?;
@@ -193,7 +192,7 @@ impl Keyring {
 
         #[cfg(feature = "tracing")]
         tracing::debug!("Writing keyring back to the file");
-        keyring.dump(&self.path, *self.mtime.lock().await).await?;
+        keyring.dump(&self.path, *self.mtime.read().await).await?;
 
         Ok(())
     }
@@ -203,8 +202,8 @@ impl Keyring {
         #[cfg(feature = "tracing")]
         tracing::debug!("Writing keyring back to the file {:?}", self.path);
         {
-            let mtime = self.mtime.lock().await;
-            let mut keyring = self.keyring.lock().await;
+            let mtime = self.mtime.read().await;
+            let mut keyring = self.keyring.write().await;
             #[cfg(feature = "tracing")]
             tracing::debug!("Current modified time {:?}", mtime);
             keyring.dump(&self.path, *mtime).await?;
@@ -212,7 +211,7 @@ impl Keyring {
         if let Ok(modified) = fs::metadata(&self.path).await?.modified() {
             #[cfg(feature = "tracing")]
             tracing::debug!("New modified time {:?}", modified);
-            self.mtime.lock().await.replace(modified);
+            self.mtime.write().await.replace(modified);
         }
         Ok(())
     }

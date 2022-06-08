@@ -1,6 +1,9 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use futures::lock::Mutex;
+#[cfg(feature = "async-std")]
+use async_std::sync::RwLock;
+#[cfg(feature = "tokio")]
+use tokio::sync::RwLock;
 use zeroize::Zeroizing;
 
 use super::{api, Algorithm, Error};
@@ -28,7 +31,7 @@ pub struct Item<'a> {
     service: Arc<api::Service<'a>>,
     algorithm: Algorithm,
     /// Defines whether the Item has been deleted or not
-    available: Mutex<bool>,
+    available: RwLock<bool>,
     aes_key: Option<Arc<Key>>,
 }
 
@@ -45,13 +48,13 @@ impl<'a> Item<'a> {
             service,
             session,
             algorithm,
-            available: Mutex::new(true),
+            available: RwLock::new(true),
             aes_key,
         }
     }
 
     pub(crate) async fn is_available(&self) -> bool {
-        *self.available.lock().await
+        *self.available.read().await
     }
 
     /// Get whether the item is locked.
@@ -123,7 +126,7 @@ impl<'a> Item<'a> {
             Err(Error::Deleted)
         } else {
             self.inner.delete().await?;
-            *self.available.lock().await = false;
+            *self.available.write().await = false;
             Ok(())
         }
     }
