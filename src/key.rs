@@ -1,13 +1,15 @@
 use std::ops::{Mul, Rem, Shr};
 
+use cipher::KeyIvInit;
 use hkdf::Hkdf;
 use num::{FromPrimitive, Integer, One, Zero};
 use num_bigint_dig::BigUint;
 use once_cell::sync::Lazy;
-use rand::{rngs::OsRng, Rng};
 use sha2::Sha256;
 use zbus::zvariant::{self, Type};
 use zeroize::{Zeroize, ZeroizeOnDrop};
+
+use crate::crypto::EncAlg;
 
 // for key exchange
 static DH_GENERATOR: Lazy<BigUint> = Lazy::new(|| BigUint::from_u64(0x2).unwrap());
@@ -43,18 +45,18 @@ impl AsMut<[u8]> for Key {
 
 impl Key {
     pub(crate) fn generate_private_key() -> Self {
-        let mut rng = OsRng {};
-        let mut private_key = Key(vec![0_u8; 128]);
-        rng.fill(private_key.as_mut());
+        let mut generic_array = EncAlg::generate_key(cipher::rand_core::OsRng);
+        let key = Self(generic_array.to_vec());
+        generic_array.zeroize();
 
-        private_key
+        key
     }
 
     pub(crate) fn generate_public_key(private_key: &Self) -> Self {
         let private_key_uint = BigUint::from_bytes_be(private_key.as_ref());
         let public_key_uint = powm(&DH_GENERATOR, private_key_uint, &DH_PRIME);
 
-        Key(public_key_uint.to_bytes_be())
+        Self(public_key_uint.to_bytes_be())
     }
 
     pub(crate) fn generate_aes_key(private_key: &Self, server_public_key: &Self) -> Self {
