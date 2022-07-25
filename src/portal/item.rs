@@ -15,7 +15,7 @@ use crate::{
 };
 
 /// An item stored in the file backend.
-#[derive(Deserialize, Serialize, Type, Debug, Zeroize, ZeroizeOnDrop)]
+#[derive(Deserialize, Serialize, Type, Clone, Debug, Zeroize, ZeroizeOnDrop)]
 pub struct Item {
     #[zeroize(skip)]
     attributes: HashMap<String, AttributeValue>,

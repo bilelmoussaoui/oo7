@@ -10,8 +10,28 @@ use rand::{distributions::Alphanumeric, thread_rng, Rng};
 #[cfg(feature = "tokio")]
 use tokio::{io::AsyncReadExt, net::UnixStream};
 use zbus::zvariant::{Fd, ObjectPath, OwnedValue, SerializeDict, Type};
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use super::Error;
+
+#[derive(Debug, Zeroize, ZeroizeOnDrop)]
+pub struct Secret {
+    secret: Vec<u8>,
+}
+
+impl From<Vec<u8>> for Secret {
+    fn from(secret: Vec<u8>) -> Self {
+        Self { secret }
+    }
+}
+
+impl std::ops::Deref for Secret {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        &self.secret
+    }
+}
 
 #[derive(SerializeDict, Type, Debug)]
 /// Specified options for a [`SecretProxy::retrieve_secret`] request.
@@ -108,7 +128,7 @@ impl<'a> SecretProxy<'a> {
     }
 }
 
-pub async fn retrieve() -> Result<Vec<u8>, Error> {
+pub async fn retrieve() -> Result<Secret, Error> {
     let connection = zbus::Connection::session().await?;
     #[cfg(feature = "tracing")]
     tracing::debug!("Retrieve service key using org.freedesktop.portal.Secrets");
@@ -127,5 +147,5 @@ pub async fn retrieve() -> Result<Vec<u8>, Error> {
     #[cfg(feature = "tracing")]
     tracing::debug!("Secret received from the portal successfully");
 
-    Ok(buf)
+    Ok(Secret { secret: buf })
 }
