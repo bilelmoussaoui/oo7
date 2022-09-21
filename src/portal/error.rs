@@ -29,7 +29,10 @@ pub enum Error {
     CancelledPortalRequest,
     /// If the portal is not available on the host.
     /// Can happen if the host has an old xdg-desktop-portal
+    /// or no secret service is available to store the secret.
     PortalNotAvailable,
+    /// The addressed index does not exist.
+    InvalidItemIndex(usize),
 }
 
 impl From<zvariant::Error> for Error {
@@ -79,7 +82,8 @@ impl std::fmt::Display for Error {
             Error::TargetFileChanged(e) => write!(f, "The target file has changed {e}"),
             Error::PortalBus(e) => write!(f, "Portal communication failed {e}"),
             Error::CancelledPortalRequest => write!(f, "Portal request was cancelled"),
-            Error::PortalNotAvailable => write!(f, "xdg-desktop-portal is too old on the host"),
+            Error::PortalNotAvailable => write!(f, "xdg-desktop-portal is too old on the host or secret service not available to store the secret"),
+            Error::InvalidItemIndex(index) => write!(f, "The addressed item index {index} does not exist."),
         }
     }
 }

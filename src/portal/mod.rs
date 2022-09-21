@@ -195,6 +195,34 @@ impl Keyring {
         self.write().await
     }
 
+    pub async fn replace_item_index(&self, index: usize, item: &Item) -> Result<(), Error> {
+        {
+            let mut keyring = self.keyring.write().await;
+            let mut opt_key = self.key.write().await;
+            let key = derive_key(&mut opt_key, &keyring, &self.secret).await;
+
+            if let Some(item_store) = keyring.items.get_mut(index) {
+                *item_store = item.encrypt(key)?;
+            } else {
+                return Err(Error::InvalidItemIndex(index));
+            }
+        }
+        self.write().await
+    }
+
+    pub async fn delete_item_index(&self, index: usize) -> Result<(), Error> {
+        {
+            let mut keyring = self.keyring.write().await;
+
+            if index < keyring.items.len() {
+                keyring.items.remove(index);
+            } else {
+                return Err(Error::InvalidItemIndex(index));
+            }
+        }
+        self.write().await
+    }
+
     /// Helper used for migration to avoid re-writing the file multiple times
     pub(crate) async fn create_items(&self, items: Vec<ItemDefinition>) -> Result<(), Error> {
         let mut keyring = self.keyring.write().await;
@@ -259,6 +287,25 @@ mod tests {
 
         keyring.write().await?;
         keyring.write().await?;
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn delete() -> Result<(), Error> {
+        let path = std::path::PathBuf::from("../../tests/test-delete.keyring");
+
+        let secret = Secret::from(vec![1, 2]);
+        let keyring = Keyring::load(&path, secret).await?;
+        keyring
+            .create_item("Label", Default::default(), "secret", false)
+            .await?;
+
+        keyring.delete_item_index(0).await?;
+
+        let result = keyring.delete_item_index(100).await;
+
+        assert!(matches!(result, Err(Error::InvalidItemIndex(100))));
 
         Ok(())
     }
