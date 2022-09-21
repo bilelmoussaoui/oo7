@@ -48,7 +48,7 @@ mod error;
 mod item;
 mod secret;
 
-pub use error::Error;
+pub use error::{Error, InvalidItemError};
 pub use item::Item;
 pub use secret::Secret;
 use zeroize::Zeroizing;
@@ -117,20 +117,31 @@ impl Keyring {
 
     /// Retrieve the number of items
     ///
-    /// This function will not trigger a key derivation.
+    /// This function will not trigger a key derivation and can therefore be
+    /// faster than [`items().len()`](Self::items).
     pub async fn n_items(&self) -> usize {
         self.keyring.read().await.items.len()
     }
 
-    /// Retrieve the list of available [`Item`].
-    pub async fn items(&self) -> Result<Vec<Item>, Error> {
+    /// Retrieve the list of available [`Item`]s.
+    ///
+    /// If items cannot be decrypted, [`InvalidItemError`]s are returned for
+    /// them instead of [`Item`]s.
+    pub async fn items(&self) -> Vec<Result<Item, InvalidItemError>> {
         let keyring = self.keyring.read().await;
         let mut opt_key = self.key.write().await;
         let key = derive_key(&mut opt_key, &keyring, &self.secret).await;
         keyring
             .items
             .iter()
-            .map(|e| (*e).clone().decrypt(key))
+            .map(|e| {
+                (*e).clone().decrypt(key).map_err(|err| {
+                    InvalidItemError::new(
+                        err,
+                        e.hashed_attributes.keys().map(|x| x.to_string()).collect(),
+                    )
+                })
+            })
             .collect()
     }
 
@@ -192,6 +203,44 @@ impl Keyring {
             let encrypted_item = item.encrypt(key)?;
             keyring.items.push(encrypted_item);
         };
+        self.write().await
+    }
+
+    /// Replaces item at the given index.
+    ///
+    /// The `index` refers to the index of the [`Vec`] returned by
+    /// [`items()`](Self::items). If the index does not exist, the functions
+    /// returns an error.
+    pub async fn replace_item_index(&self, index: usize, item: &Item) -> Result<(), Error> {
+        {
+            let mut keyring = self.keyring.write().await;
+            let mut opt_key = self.key.write().await;
+            let key = derive_key(&mut opt_key, &keyring, &self.secret).await;
+
+            if let Some(item_store) = keyring.items.get_mut(index) {
+                *item_store = item.encrypt(key)?;
+            } else {
+                return Err(Error::InvalidItemIndex(index));
+            }
+        }
+        self.write().await
+    }
+
+    /// Deletes item at the given index.
+    ///
+    /// The `index` refers to the index of the [`Vec`](Vec) returned by
+    /// [`items()`](Self::items). If the index does not exist, the functions
+    /// returns an error.
+    pub async fn delete_item_index(&self, index: usize) -> Result<(), Error> {
+        {
+            let mut keyring = self.keyring.write().await;
+
+            if index < keyring.items.len() {
+                keyring.items.remove(index);
+            } else {
+                return Err(Error::InvalidItemIndex(index));
+            }
+        }
         self.write().await
     }
 
@@ -259,6 +308,25 @@ mod tests {
 
         keyring.write().await?;
         keyring.write().await?;
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn delete() -> Result<(), Error> {
+        let path = std::path::PathBuf::from("../../tests/test-delete.keyring");
+
+        let secret = Secret::from(vec![1, 2]);
+        let keyring = Keyring::load(&path, secret).await?;
+        keyring
+            .create_item("Label", Default::default(), "secret", false)
+            .await?;
+
+        keyring.delete_item_index(0).await?;
+
+        let result = keyring.delete_item_index(100).await;
+
+        assert!(matches!(result, Err(Error::InvalidItemIndex(100))));
 
         Ok(())
     }
