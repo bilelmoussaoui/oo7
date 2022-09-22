@@ -240,7 +240,7 @@ impl Keyring {
 async fn derive_key<'a>(
     key: &'a mut OnceCell<crate::Key>,
     keyring: &api::Keyring,
-    secret: &[u8],
+    secret: &Secret,
 ) -> &'a crate::Key {
     key.get_or_init(|| keyring.derive_key(secret))
 }
