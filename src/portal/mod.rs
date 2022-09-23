@@ -31,6 +31,7 @@
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 #[cfg(feature = "async-std")]
@@ -38,6 +39,7 @@ use async_std::{fs, io, prelude::*, sync::RwLock};
 use once_cell::sync::OnceCell;
 #[cfg(feature = "tokio")]
 use tokio::{fs, io, io::AsyncReadExt, sync::RwLock};
+use zeroize::Zeroizing;
 
 #[cfg(feature = "unstable")]
 pub mod api;
@@ -51,20 +53,19 @@ mod secret;
 pub use error::{Error, InvalidItemError};
 pub use item::Item;
 pub use secret::Secret;
-use zeroize::Zeroizing;
 
 type ItemDefinition = (String, HashMap<String, String>, Zeroizing<Vec<u8>>, bool);
 
 /// File backed keyring.
 #[derive(Debug)]
 pub struct Keyring {
-    keyring: RwLock<api::Keyring>,
+    keyring: Arc<RwLock<api::Keyring>>,
     path: PathBuf,
     /// Times are stored before reading the file to detect
     /// file changes before writing
     mtime: RwLock<Option<std::time::SystemTime>>,
     key: RwLock<OnceCell<crate::Key>>,
-    secret: Secret,
+    secret: Arc<Secret>,
 }
 
 impl Keyring {
@@ -107,11 +108,11 @@ impl Keyring {
         };
 
         Ok(Self {
-            keyring: RwLock::new(keyring),
+            keyring: Arc::new(RwLock::new(keyring)),
             path: path.as_ref().to_path_buf(),
             mtime: RwLock::new(mtime),
             key: Default::default(),
-            secret,
+            secret: Arc::new(secret),
         })
     }
 
@@ -128,9 +129,9 @@ impl Keyring {
     /// If items cannot be decrypted, [`InvalidItemError`]s are returned for
     /// them instead of [`Item`]s.
     pub async fn items(&self) -> Vec<Result<Item, InvalidItemError>> {
-        let keyring = self.keyring.read().await;
         let mut opt_key = self.key.write().await;
-        let key = derive_key(&mut opt_key, &keyring, &self.secret).await;
+        let key = self.derive_key(&mut opt_key).await;
+        let keyring = self.keyring.read().await;
         keyring
             .items
             .iter()
@@ -147,9 +148,9 @@ impl Keyring {
 
     /// Search items matching the attributes.
     pub async fn search_items(&self, attributes: HashMap<&str, &str>) -> Result<Vec<Item>, Error> {
-        let keyring = self.keyring.read().await;
         let mut opt_key = self.key.write().await;
-        let key = derive_key(&mut opt_key, &keyring, &self.secret).await;
+        let key = self.derive_key(&mut opt_key).await;
+        let keyring = self.keyring.read().await;
         keyring.search_items(attributes, key)
     }
 
@@ -158,18 +159,18 @@ impl Keyring {
         &self,
         attributes: HashMap<&str, &str>,
     ) -> Result<Option<Item>, Error> {
-        let keyring = self.keyring.read().await;
         let mut opt_key = self.key.write().await;
-        let key = derive_key(&mut opt_key, &keyring, &self.secret).await;
+        let key = self.derive_key(&mut opt_key).await;
+        let keyring = self.keyring.read().await;
         keyring.lookup_item(attributes, key)
     }
 
     /// Delete an item.
     pub async fn delete(&self, attributes: HashMap<&str, &str>) -> Result<(), Error> {
         {
-            let mut keyring = self.keyring.write().await;
             let mut opt_key = self.key.write().await;
-            let key = derive_key(&mut opt_key, &keyring, &self.secret).await;
+            let key = self.derive_key(&mut opt_key).await;
+            let mut keyring = self.keyring.write().await;
             keyring.remove_items(attributes, key)?;
         };
         self.write().await
@@ -193,9 +194,9 @@ impl Keyring {
         replace: bool,
     ) -> Result<(), Error> {
         {
-            let mut keyring = self.keyring.write().await;
             let mut opt_key = self.key.write().await;
-            let key = derive_key(&mut opt_key, &keyring, &self.secret).await;
+            let key = self.derive_key(&mut opt_key).await;
+            let mut keyring = self.keyring.write().await;
             if replace {
                 keyring.remove_items(attributes.clone(), key)?;
             }
@@ -213,9 +214,9 @@ impl Keyring {
     /// returns an error.
     pub async fn replace_item_index(&self, index: usize, item: &Item) -> Result<(), Error> {
         {
-            let mut keyring = self.keyring.write().await;
             let mut opt_key = self.key.write().await;
-            let key = derive_key(&mut opt_key, &keyring, &self.secret).await;
+            let key = self.derive_key(&mut opt_key).await;
+            let mut keyring = self.keyring.write().await;
 
             if let Some(item_store) = keyring.items.get_mut(index) {
                 *item_store = item.encrypt(key)?;
@@ -246,9 +247,9 @@ impl Keyring {
 
     /// Helper used for migration to avoid re-writing the file multiple times
     pub(crate) async fn create_items(&self, items: Vec<ItemDefinition>) -> Result<(), Error> {
-        let mut keyring = self.keyring.write().await;
         let mut opt_key = self.key.write().await;
-        let key = derive_key(&mut opt_key, &keyring, &self.secret).await;
+        let key = self.derive_key(&mut opt_key).await;
+        let mut keyring = self.keyring.write().await;
         for (label, attributes, secret, replace) in items {
             if replace {
                 keyring.remove_items(attributes.clone(), key)?;
@@ -283,24 +284,45 @@ impl Keyring {
         }
         Ok(())
     }
-}
 
-/// Return key, derive and store it first if not initialized
-async fn derive_key<'a>(
-    key: &'a mut OnceCell<crate::Key>,
-    keyring: &api::Keyring,
-    secret: &Secret,
-) -> &'a crate::Key {
-    key.get_or_init(|| keyring.derive_key(secret))
+    /// Return key, derive and store it first if not initialized
+    async fn derive_key<'a>(&'a self, key: &'a mut OnceCell<crate::Key>) -> &'a crate::Key {
+        let keyring = Arc::clone(&self.keyring);
+        let secret = Arc::clone(&self.secret);
+
+        #[cfg(feature = "async-std")]
+        let newkey = async_global_executor::spawn_blocking(move || {
+            async_std::task::block_on(async { keyring.read().await.derive_key(&secret) })
+        })
+        .await;
+
+        #[cfg(feature = "tokio")]
+        let newkey =
+            tokio::task::spawn_blocking(move || keyring.blocking_read().derive_key(&secret))
+                .await
+                .unwrap();
+
+        key.get_or_init(|| newkey)
+    }
 }
 
 #[cfg(test)]
-#[cfg(feature = "async-std")]
 mod tests {
     use super::*;
 
+    #[cfg(feature = "async-std")]
     #[async_std::test]
     async fn repeated_write() -> Result<(), Error> {
+        repeated_write_().await
+    }
+
+    #[cfg(feature = "tokio")]
+    #[tokio::test]
+    async fn repeated_write() -> Result<(), Error> {
+        repeated_write_().await
+    }
+
+    async fn repeated_write_() -> Result<(), Error> {
         let path = std::path::PathBuf::from("../../tests/test.keyring");
 
         let secret = Secret::from(vec![1, 2]);
@@ -312,6 +334,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "async-std")]
     #[async_std::test]
     async fn delete() -> Result<(), Error> {
         let path = std::path::PathBuf::from("../../tests/test-delete.keyring");
