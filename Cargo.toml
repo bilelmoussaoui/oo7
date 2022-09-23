@@ -17,6 +17,7 @@ serde = "1.0"
 futures-util = "0.3"
 rand = {version = "0.8", default-features = false}
 async-std = {version = "1.11", optional = true}
+async-global-executor = { version = "2.3", optional = true }
 tokio = {version = "1.17", features = ["sync", "fs", "io-util"], optional = true, default-features = false}
 byteorder = "1.0"
 num = "0.4.0"
@@ -38,6 +39,7 @@ dirs = "4.0"
 
 [dev-dependencies]
 async-std = {version = "1.11", features = ["attributes"]}
+tokio = {version = "1.11", features = ["macros", "rt"]}
 
 [features]
 default = ["local_tests", "async-std"]
@@ -48,6 +50,7 @@ local_tests = []
 unstable = []
 # Build nicer docs (requires nightly)
 docs = []
+async-std = ["dep:async-std", "dep:async-global-executor"]
 tokio = ["zbus/tokio", "dep:tokio"]
 
 
