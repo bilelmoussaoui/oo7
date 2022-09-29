@@ -93,6 +93,8 @@ impl Item {
     }
 
     pub(crate) fn encrypt(&self, key: &Key) -> Result<EncryptedItem, Error> {
+        key.strength()?;
+
         let decrypted = Zeroizing::new(zvariant::to_bytes(*GVARIANT_ENCODING, &self)?);
 
         let iv = crypto::generate_iv();

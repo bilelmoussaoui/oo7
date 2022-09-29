@@ -22,8 +22,14 @@ use serde::{Deserialize, Serialize};
 use tokio::{fs, io, io::AsyncWriteExt};
 use zbus::zvariant::{self, Type};
 
-const SALT_SIZE: usize = 32;
-const ITERATION_COUNT: u32 = 100000;
+/// Used for newly created [`Keyring`]s
+const DEFAULT_ITERATION_COUNT: u32 = 100000;
+/// Used for newly created [`Keyring`]s
+const DEFAULT_SALT_SIZE: usize = 32;
+
+const MIN_ITERATION_COUNT: u32 = 100000;
+const MIN_SALT_SIZE: usize = 32;
+const MIN_PASSWORD_LENGTH: usize = 64;
 
 const FILE_HEADER: &[u8] = b"GnomeKeyring\n\r\0\n";
 const FILE_HEADER_LEN: usize = FILE_HEADER.len();
@@ -41,7 +47,11 @@ pub use attribute_value::AttributeValue;
 pub(super) use encrypted_item::EncryptedItem;
 
 use super::{Item, Secret};
-use crate::{crypto::EncAlg, portal::Error, Key};
+use crate::{
+    crypto::EncAlg,
+    portal::{Error, WeakKeyError},
+    Key,
+};
 
 /// Logical contents of a keyring file
 #[derive(Deserialize, Serialize, Type, Debug)]
@@ -57,12 +67,12 @@ pub struct Keyring {
 impl Keyring {
     #[allow(clippy::new_without_default)]
     pub(crate) fn new() -> Self {
-        let salt = rand::thread_rng().gen::<[u8; SALT_SIZE]>().to_vec();
+        let salt = rand::thread_rng().gen::<[u8; DEFAULT_SALT_SIZE]>().to_vec();
 
         Self {
             salt_size: salt.len() as u32,
             salt,
-            iteration_count: ITERATION_COUNT,
+            iteration_count: DEFAULT_ITERATION_COUNT,
             // TODO: UTC?
             modified_time: std::time::SystemTime::UNIX_EPOCH
                 .elapsed()
@@ -70,6 +80,18 @@ impl Keyring {
                 .as_secs(),
             usage_count: 0,
             items: Vec::new(),
+        }
+    }
+
+    pub fn key_strength(&self, secret: &[u8]) -> Result<(), WeakKeyError> {
+        if self.iteration_count < MIN_ITERATION_COUNT {
+            Err(WeakKeyError::IterationCountTooLow(self.iteration_count))
+        } else if self.salt.len() < MIN_SALT_SIZE {
+            Err(WeakKeyError::SaltTooShort(self.salt.len()))
+        } else if secret.len() < MIN_PASSWORD_LENGTH {
+            Err(WeakKeyError::PasswordTooShort(secret.len()))
+        } else {
+            Ok(())
         }
     }
 
@@ -222,7 +244,8 @@ impl Keyring {
     }
 
     pub fn derive_key(&self, secret: &Secret) -> Key {
-        let mut key = Key(vec![0; EncAlg::block_size()]);
+        let mut key =
+            Key::new_with_strength(vec![0; EncAlg::block_size()], self.key_strength(secret));
 
         pbkdf2::pbkdf2::<hmac::Hmac<sha2::Sha256>>(
             secret,
@@ -252,7 +275,16 @@ impl TryFrom<&[u8]> for Keyring {
         }
 
         if let Some(data) = value.get((FILE_HEADER_LEN + 2)..) {
-            Ok(zvariant::from_slice(data, *GVARIANT_ENCODING)?)
+            let keyring: Self = zvariant::from_slice(data, *GVARIANT_ENCODING)?;
+
+            if keyring.salt.len() != keyring.salt_size as usize {
+                Err(Error::SaltSizeMismatch(
+                    keyring.salt.len(),
+                    keyring.salt_size,
+                ))
+            } else {
+                Ok(keyring)
+            }
         } else {
             Err(Error::NoData)
         }

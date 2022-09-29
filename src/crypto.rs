@@ -54,7 +54,7 @@ mod test {
         let expected_encrypted = &[
             241, 233, 175, 173, 142, 44, 63, 240, 77, 154, 211, 233, 217, 170, 49, 142,
         ];
-        let aes_key = Key(vec![
+        let aes_key = Key::new(vec![
             132, 3, 113, 222, 81, 209, 49, 43, 81, 232, 243, 46, 1, 103, 184, 42,
         ]);
         let aes_iv = &[
