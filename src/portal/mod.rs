@@ -52,7 +52,7 @@ mod error;
 mod item;
 mod secret;
 
-pub use error::{Error, InvalidItemError};
+pub use error::{Error, InvalidItemError, WeakKeyError};
 pub use item::Item;
 pub use secret::Secret;
 
@@ -341,8 +341,7 @@ mod tests {
     async fn delete() -> Result<(), Error> {
         let path = std::path::PathBuf::from("../../tests/test-delete.keyring");
 
-        let secret = Secret::from(vec![1, 2]);
-        let keyring = Keyring::load(&path, secret).await?;
+        let keyring = Keyring::load(&path, strong_key()).await?;
         keyring
             .create_item("Label", Default::default(), "secret", false)
             .await?;
@@ -354,5 +353,41 @@ mod tests {
         assert!(matches!(result, Err(Error::InvalidItemIndex(100))));
 
         Ok(())
+    }
+
+    #[async_std::test]
+    async fn write_with_weak_key() -> Result<(), Error> {
+        let path = std::path::PathBuf::from("../../tests/write_with_weak_key.keyring");
+
+        let secret = Secret::from(vec![1, 2]);
+        let keyring = Keyring::load(&path, secret).await?;
+
+        let result = keyring
+            .create_item("label", Default::default(), "my-password", false)
+            .await;
+
+        assert!(matches!(
+            result,
+            Err(Error::WeakKey(WeakKeyError::PasswordTooShort(2)))
+        ));
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn write_with_strong_key() -> Result<(), Error> {
+        let path = std::path::PathBuf::from("../../tests/write_with_strong_key.keyring");
+
+        let keyring = Keyring::load(&path, strong_key()).await?;
+
+        keyring
+            .create_item("label", Default::default(), "my-password", false)
+            .await?;
+
+        Ok(())
+    }
+
+    fn strong_key() -> Secret {
+        Secret::from([1, 2].into_iter().cycle().take(64).collect::<Vec<_>>())
     }
 }

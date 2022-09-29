@@ -9,7 +9,7 @@ use sha2::Sha256;
 use zbus::zvariant::{self, Type};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-use crate::crypto::EncAlg;
+use crate::{crypto::EncAlg, portal};
 
 // for key exchange
 static DH_GENERATOR: Lazy<BigUint> = Lazy::new(|| BigUint::from_u64(0x2).unwrap());
@@ -29,24 +29,43 @@ static DH_PRIME: Lazy<BigUint> = Lazy::new(|| {
 
 /// A key.
 #[derive(Debug, Zeroize, ZeroizeOnDrop)]
-pub struct Key(pub(crate) Vec<u8>);
+pub struct Key {
+    key: Vec<u8>,
+    #[zeroize(skip)]
+    strength: Result<(), portal::WeakKeyError>,
+}
 
 impl AsRef<[u8]> for Key {
     fn as_ref(&self) -> &[u8] {
-        self.0.as_slice()
+        self.key.as_slice()
     }
 }
 
 impl AsMut<[u8]> for Key {
     fn as_mut(&mut self) -> &mut [u8] {
-        &mut self.0
+        &mut self.key
     }
 }
 
 impl Key {
+    pub(crate) fn new(key: Vec<u8>) -> Self {
+        Self::new_with_strength(key, Err(portal::WeakKeyError::StrengthUnknown))
+    }
+
+    pub(crate) fn check_strength(&self) -> Result<(), portal::WeakKeyError> {
+        self.strength.clone()
+    }
+
+    pub(crate) fn new_with_strength(
+        key: Vec<u8>,
+        strength: Result<(), portal::WeakKeyError>,
+    ) -> Self {
+        Self { key, strength }
+    }
+
     pub(crate) fn generate_private_key() -> Self {
         let mut generic_array = EncAlg::generate_key(cipher::rand_core::OsRng);
-        let key = Self(generic_array.to_vec());
+        let key = Self::new(generic_array.to_vec());
         generic_array.zeroize();
 
         key
@@ -56,7 +75,7 @@ impl Key {
         let private_key_uint = BigUint::from_bytes_be(private_key.as_ref());
         let public_key_uint = powm(&DH_GENERATOR, private_key_uint, &DH_PRIME);
 
-        Self(public_key_uint.to_bytes_be())
+        Self::new(public_key_uint.to_bytes_be())
     }
 
     pub(crate) fn generate_aes_key(private_key: &Self, server_public_key: &Self) -> Self {
@@ -76,7 +95,7 @@ impl Key {
         let info = [];
 
         // output keying material
-        let mut okm = Key(vec![0; 16]);
+        let mut okm = Key::new(vec![0; 16]);
 
         let (_, hk) = Hkdf::<Sha256>::extract(salt, &ikm);
         hk.expand(&info, okm.as_mut())
@@ -104,7 +123,7 @@ impl From<zvariant::OwnedValue> for Key {
         for value in value.downcast_ref::<zvariant::Array>().unwrap().get() {
             key.push(*value.downcast_ref::<u8>().unwrap());
         }
-        Key(key.to_vec())
+        Key::new(key.to_vec())
     }
 }
 
@@ -131,7 +150,7 @@ mod tests {
 
     #[test]
     fn private_public_pair() {
-        let private_key = Key(vec![
+        let private_key = Key::new(vec![
             41, 20, 63, 236, 246, 132, 109, 70, 172, 121, 45, 66, 129, 21, 247, 91, 96, 217, 56,
             201, 205, 56, 17, 178, 202, 81, 71, 104, 233, 89, 87, 32, 88, 146, 107, 224, 56, 103,
             111, 74, 143, 80, 170, 40, 5, 52, 48, 90, 75, 71, 193, 224, 222, 57, 91, 81, 66, 1, 6,
@@ -140,7 +159,7 @@ mod tests {
             198, 45, 208, 132, 166, 0, 153, 243, 160, 255, 188, 59, 216, 99, 221, 85, 162, 116,
             210, 160, 117, 201, 39, 179, 123, 107, 8, 242, 139, 207, 250,
         ]);
-        let server_public_key = Key(vec![
+        let server_public_key = Key::new(vec![
             50, 233, 76, 88, 47, 206, 235, 107, 9, 232, 98, 14, 188, 214, 209, 77, 35, 66, 109,
             119, 24, 191, 120, 90, 242, 198, 240, 115, 200, 66, 51, 180, 8, 164, 89, 9, 229, 31,
             160, 31, 156, 101, 169, 60, 63, 247, 37, 255, 75, 198, 62, 235, 50, 29, 221, 245, 29,
