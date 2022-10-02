@@ -116,9 +116,11 @@ impl Keyring {
                 items.into_iter().map(Item::for_dbus).collect::<Vec<_>>()
             }
             Self::File(backend) => {
-                let items = backend.items().await?;
+                let items = backend.items().await;
                 items
                     .into_iter()
+                    // Ignore invalid items
+                    .flatten()
                     .map(|i| Item::for_file(i, Arc::clone(backend)))
                     .collect::<Vec<_>>()
             }
