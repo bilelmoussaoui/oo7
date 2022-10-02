@@ -40,7 +40,7 @@ mod encrypted_item;
 pub use attribute_value::AttributeValue;
 pub(super) use encrypted_item::EncryptedItem;
 
-use super::Item;
+use super::{Item, Secret};
 use crate::{crypto::EncAlg, portal::Error, Key};
 
 /// Logical contents of a keyring file
@@ -221,7 +221,7 @@ impl Keyring {
         }
     }
 
-    pub fn derive_key(&self, secret: &[u8]) -> Key {
+    pub fn derive_key(&self, secret: &Secret) -> Key {
         let mut key = Key(vec![0; EncAlg::block_size()]);
 
         pbkdf2::pbkdf2::<hmac::Hmac<sha2::Sha256>>(
@@ -295,7 +295,7 @@ mod tests {
         let needle = HashMap::from([(String::from("key"), String::from("value"))]);
 
         let mut keyring = Keyring::new();
-        let key = keyring.derive_key(&SECRET);
+        let key = keyring.derive_key(&SECRET.to_vec().into());
 
         keyring
             .items
@@ -315,7 +315,7 @@ mod tests {
         let _silent = std::fs::remove_file("/tmp/test.keyring");
 
         let mut new_keyring = Keyring::new();
-        let key = new_keyring.derive_key(&SECRET);
+        let key = new_keyring.derive_key(&SECRET.to_vec().into());
 
         new_keyring.items.push(
             Item::new(
