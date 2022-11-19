@@ -41,6 +41,8 @@ use once_cell::sync::OnceCell;
 use tokio::{fs, io, io::AsyncReadExt, sync::RwLock};
 use zeroize::Zeroizing;
 
+use crate::Key;
+
 #[cfg(feature = "unstable")]
 pub mod api;
 #[cfg(not(feature = "unstable"))]
@@ -64,7 +66,7 @@ pub struct Keyring {
     /// Times are stored before reading the file to detect
     /// file changes before writing
     mtime: RwLock<Option<std::time::SystemTime>>,
-    key: RwLock<OnceCell<crate::Key>>,
+    key: RwLock<OnceCell<Key>>,
     secret: Arc<Secret>,
 }
 
@@ -286,7 +288,7 @@ impl Keyring {
     }
 
     /// Return key, derive and store it first if not initialized
-    async fn derive_key<'a>(&'a self, key: &'a mut OnceCell<crate::Key>) -> &'a crate::Key {
+    async fn derive_key<'a>(&'a self, key: &'a mut OnceCell<Key>) -> &'a Key {
         let keyring = Arc::clone(&self.keyring);
         let secret = Arc::clone(&self.secret);
 

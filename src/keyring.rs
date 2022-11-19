@@ -55,7 +55,7 @@ impl Keyring {
         let service = dbus::Service::new(Algorithm::Encrypted).await?;
         let collection = match service.default_collection().await {
             Ok(c) => Ok(c),
-            Err(crate::dbus::Error::NotFound(_)) => {
+            Err(dbus::Error::NotFound(_)) => {
                 #[cfg(feature = "tracing")]
                 tracing::debug!("Default collection doesn't exists, trying to create it");
                 service
@@ -174,7 +174,7 @@ impl Keyring {
 #[derive(Debug)]
 pub enum Item {
     #[doc(hidden)]
-    File(RwLock<crate::portal::Item>, Arc<portal::Keyring>),
+    File(RwLock<portal::Item>, Arc<portal::Keyring>),
     #[doc(hidden)]
     DBus(dbus::Item<'static>),
 }

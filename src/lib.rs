@@ -26,5 +26,5 @@ pub use migration::migrate;
 
 /// Checks whether the application is sandboxed or not.
 pub async fn is_sandboxed() -> bool {
-    crate::helpers::is_flatpak().await || crate::helpers::is_snap().await
+    helpers::is_flatpak().await || helpers::is_snap().await
 }
