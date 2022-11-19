@@ -97,7 +97,7 @@ impl Item {
 
         let iv = crypto::generate_iv();
 
-        let mut blob = crypto::encrypt(&*decrypted, key, &iv);
+        let mut blob = crypto::encrypt(&*decrypted, key, iv);
 
         blob.append(&mut iv.as_slice().into());
 

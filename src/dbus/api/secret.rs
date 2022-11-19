@@ -43,7 +43,7 @@ impl<'a> Secret<'a> {
         aes_key: &Key,
     ) -> Self {
         let iv = crypto::generate_iv();
-        let secret = crypto::encrypt(secret.as_ref(), aes_key, &iv);
+        let secret = crypto::encrypt(secret.as_ref(), aes_key, iv);
         Self {
             session,
             parameters: iv.to_vec(),
