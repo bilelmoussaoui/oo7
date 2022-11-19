@@ -5,7 +5,7 @@ use std::{collections::HashMap, os::unix::prelude::AsRawFd};
 
 #[cfg(feature = "async-std")]
 use async_std::{os::unix::net::UnixStream, prelude::*};
-use futures::StreamExt;
+use futures_util::StreamExt;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 #[cfg(feature = "tokio")]
 use tokio::{io::AsyncReadExt, net::UnixStream};
@@ -109,7 +109,7 @@ impl<'a> SecretProxy<'a> {
 
         let mut signal_stream = request_proxy.receive_signal("Response").await?;
 
-        futures::try_join!(
+        futures_util::try_join!(
             async {
                 let message = signal_stream.next().await.unwrap();
                 let (response, _details) = message.body::<(u32, HashMap<String, OwnedValue>)>()?;

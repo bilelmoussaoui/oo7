@@ -1,6 +1,6 @@
 use std::fmt;
 
-use futures::StreamExt;
+use futures_util::StreamExt;
 use serde::Serialize;
 use zbus::zvariant::{ObjectPath, OwnedValue, Type};
 
@@ -54,7 +54,7 @@ impl<'a> Prompt<'a> {
         let mut stream = self.inner().receive_signal("Completed").await?;
         // TODO: figure out how to come with a window-id without depending on ashpd for
         // it WindowIdentifier thingy
-        let (value, _) = futures::try_join!(
+        let (value, _) = futures_util::try_join!(
             async {
                 let message = stream.next().await.unwrap();
                 let (dismissed, result) = message.body::<(bool, OwnedValue)>()?;

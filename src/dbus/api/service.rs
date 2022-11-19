@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt};
 
-use futures::StreamExt;
+use futures_util::StreamExt;
 use zbus::zvariant::{self, ObjectPath, OwnedObjectPath, OwnedValue, Type, Value};
 
 use super::{

@@ -14,7 +14,7 @@ license = "MIT"
 [dependencies]
 zbus = {version = "3.5.0", features = ["gvariant"]}
 serde = "1.0"
-futures = {version = "0.3", default-features = false, features = ["std", "async-await"]}
+futures-util = "0.3"
 rand = {version = "0.8", default-features = false}
 async-std = {version = "1.11", optional = true}
 tokio = {version = "1.17", features = ["sync", "fs", "io-util"], optional = true, default-features = false}
