@@ -74,9 +74,9 @@ impl Keyring {
     }
 
     /// Write to a keyring file
-    pub async fn dump<P: AsRef<Path>>(
+    pub async fn dump(
         &mut self,
-        path: P,
+        path: impl AsRef<Path>,
         mtime: Option<std::time::SystemTime>,
     ) -> Result<(), Error> {
         let tmp_path = if let Some(parent) = path.as_ref().parent() {

@@ -160,9 +160,9 @@ impl<'a> Item<'a> {
     /// * `content_type` - The content type of the secret, usually something
     ///   like `text/plain`.
     #[doc(alias = "SetSecret")]
-    pub async fn set_secret<P: AsRef<[u8]>>(
+    pub async fn set_secret(
         &self,
-        secret: P,
+        secret: impl AsRef<[u8]>,
         content_type: &str,
     ) -> Result<(), Error> {
         let secret = match self.algorithm {

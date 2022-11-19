@@ -257,7 +257,7 @@ impl Item {
     }
 
     /// Sets a new secret.
-    pub async fn set_secret<P: AsRef<[u8]>>(&self, secret: P) -> Result<()> {
+    pub async fn set_secret(&self, secret: impl AsRef<[u8]>) -> Result<()> {
         match self {
             Self::File(item, backend) => {
                 item.write().await.set_secret(secret);

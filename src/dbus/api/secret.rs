@@ -23,9 +23,9 @@ pub struct Secret<'a> {
 }
 
 impl<'a> Secret<'a> {
-    pub(crate) fn new<P: AsRef<[u8]>>(
+    pub(crate) fn new(
         session: Arc<Session<'a>>,
-        secret: P,
+        secret: impl AsRef<[u8]>,
         content_type: &str,
     ) -> Self {
         Self {
@@ -36,9 +36,9 @@ impl<'a> Secret<'a> {
         }
     }
 
-    pub(crate) fn new_encrypted<P: AsRef<[u8]>>(
+    pub(crate) fn new_encrypted(
         session: Arc<Session<'a>>,
-        secret: P,
+        secret: impl AsRef<[u8]>,
         content_type: &str,
         aes_key: &Key,
     ) -> Self {

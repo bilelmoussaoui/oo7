@@ -84,7 +84,7 @@ impl Item {
     }
 
     /// Store a new secret.
-    pub fn set_secret<P: AsRef<[u8]>>(&mut self, secret: P) {
+    pub fn set_secret(&mut self, secret: impl AsRef<[u8]>) {
         self.modified = std::time::SystemTime::UNIX_EPOCH
             .elapsed()
             .unwrap()
