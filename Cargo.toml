@@ -12,7 +12,7 @@ categories = ["os::linux-apis", "os", "api-bindings"]
 license = "MIT"
 
 [dependencies]
-zbus = {version = "3.1.0", features = ["gvariant"]}
+zbus = {version = "3.5.0", features = ["gvariant"]}
 serde = "1.0"
 futures = {version = "0.3", default-features = false, features = ["std", "async-await"]}
 rand = {version = "0.8", default-features = false}
