@@ -87,7 +87,7 @@ impl Keyring {
                 .collect();
 
             let mut tmp_path = parent.to_path_buf();
-            tmp_path.push(format!(".tmpkeyring{}", rnd));
+            tmp_path.push(format!(".tmpkeyring{rnd}"));
 
             if !parent.exists() {
                 #[cfg(feature = "tracing")]

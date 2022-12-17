@@ -65,12 +65,11 @@ impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Error::FileHeaderMismatch(e) => {
-                write!(f, "File header doesn't match FILE_HEADER {:#?}", e)
+                write!(f, "File header doesn't match FILE_HEADER {e:#?}")
             }
             Error::VersionMismatch(e) => write!(
                 f,
-                "Version doesn't match MAJOR_VERSION OR MICRO_VERSION {:#?}",
-                e
+                "Version doesn't match MAJOR_VERSION OR MICRO_VERSION {e:#?}",
             ),
             Error::NoData => write!(f, "No data behind header and version bytes"),
             Error::NoParentDir(e) => write!(f, "No Parent Directory {e}"),

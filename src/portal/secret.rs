@@ -57,7 +57,7 @@ impl Default for RetrieveOptions {
             .map(char::from)
             .collect();
         Self {
-            handle_token: format!("oo7_{}", token),
+            handle_token: format!("oo7_{token}"),
         }
     }
 }
@@ -90,8 +90,8 @@ impl<'a> SecretProxy<'a> {
         let unique_name = cnx.unique_name().unwrap();
         let unique_identifier = unique_name.trim_start_matches(':').replace('.', "_");
         let path = ObjectPath::try_from(format!(
-            "/org/freedesktop/portal/desktop/request/{}/{}",
-            unique_identifier, options.handle_token
+            "/org/freedesktop/portal/desktop/request/{unique_identifier}/{}",
+            options.handle_token
         ))
         .unwrap();
 
