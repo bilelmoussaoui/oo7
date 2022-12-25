@@ -1,7 +1,10 @@
 //! Implementation of the XDG secret portal.
 //!
 //! This is a modified copy from ASHPD.
-use std::{collections::HashMap, os::unix::prelude::AsRawFd};
+use std::{
+    collections::HashMap,
+    os::fd::{AsFd, AsRawFd, FromRawFd, IntoRawFd, OwnedFd},
+};
 
 #[cfg(feature = "async-std")]
 use async_std::{os::unix::net::UnixStream, prelude::*};
@@ -83,7 +86,7 @@ impl<'a> SecretProxy<'a> {
     ///
     /// * `fd` - Writable file descriptor for transporting the secret.
     #[doc(alias = "RetrieveSecret")]
-    pub async fn retrieve_secret(&self, fd: &impl AsRawFd) -> Result<(), Error> {
+    pub async fn retrieve_secret(&self, fd: &impl AsFd) -> Result<(), Error> {
         let options = RetrieveOptions::default();
         let cnx = self.0.connection();
 
@@ -122,7 +125,10 @@ impl<'a> SecretProxy<'a> {
             async {
                 match self
                     .0
-                    .call_method("RetrieveSecret", &(Fd::from(fd.as_raw_fd()), &options))
+                    .call_method(
+                        "RetrieveSecret",
+                        &(Fd::from(fd.as_fd().as_raw_fd()), &options),
+                    )
                     .await
                 {
                     Ok(_) => Ok(()),
@@ -147,8 +153,9 @@ pub async fn retrieve() -> Result<Secret, Error> {
     }?;
 
     let (mut x1, x2) = UnixStream::pair()?;
-    proxy.retrieve_secret(&x2).await?;
-    drop(x2);
+    let owned_x2 = unsafe { OwnedFd::from_raw_fd(x2.into_raw_fd()) };
+    proxy.retrieve_secret(&owned_x2).await?;
+    drop(owned_x2);
     let mut buf = Vec::new();
     x1.read_to_end(&mut buf).await?;
 
