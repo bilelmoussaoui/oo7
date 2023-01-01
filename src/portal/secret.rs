@@ -3,15 +3,15 @@
 //! This is a modified copy from ASHPD.
 use std::{
     collections::HashMap,
-    os::fd::{AsFd, AsRawFd, FromRawFd, IntoRawFd, OwnedFd},
+    io::Read,
+    os::{
+        fd::{AsFd, AsRawFd},
+        unix::net::UnixStream,
+    },
 };
 
-#[cfg(feature = "async-std")]
-use async_std::{os::unix::net::UnixStream, prelude::*};
 use futures_util::StreamExt;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
-#[cfg(feature = "tokio")]
-use tokio::{io::AsyncReadExt, net::UnixStream};
 use zbus::zvariant::{Fd, ObjectPath, OwnedValue, SerializeDict, Type};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
@@ -152,12 +152,13 @@ pub async fn retrieve() -> Result<Secret, Error> {
         Err(e) => Err(e.into()),
     }?;
 
+    // FIXME Use async-std's (tokio's) UnixStream once
+    // https://github.com/async-rs/async-std/pull/1036 is in.
     let (mut x1, x2) = UnixStream::pair()?;
-    let owned_x2 = unsafe { OwnedFd::from_raw_fd(x2.into_raw_fd()) };
-    proxy.retrieve_secret(&owned_x2).await?;
-    drop(owned_x2);
+    proxy.retrieve_secret(&x2).await?;
+    drop(x2);
     let mut buf = Vec::new();
-    x1.read_to_end(&mut buf).await?;
+    x1.read_to_end(&mut buf)?;
 
     #[cfg(feature = "tracing")]
     tracing::debug!("Secret received from the portal successfully");
