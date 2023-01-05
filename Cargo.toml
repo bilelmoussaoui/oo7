@@ -24,15 +24,18 @@ num = "0.4.0"
 num-bigint-dig = {version ="0.8", features = ["zeroize"]}
 tracing = {version = "0.1", optional = true}
 
-aes = {version = "0.8", features = ["zeroize"]}
-cbc = {version = "0.1", features = ["zeroize"]}
-cipher = {version = "0.4", features = ["rand_core", "zeroize"]}
-digest = "0.10"
-hmac = "0.12"
-pbkdf2 = "0.11"
-sha2 = "0.10"
 zeroize = {version = "1", features = ["zeroize_derive"]}
-hkdf = "0.12"
+
+aes = {version = "0.8", features = ["zeroize"], optional = true}
+cbc = {version = "0.1", features = ["zeroize"], optional = true}
+cipher = {version = "0.4", features = ["rand_core", "zeroize"], optional = true}
+digest = {version = "0.10", optional = true}
+hkdf = {version = "0.12", optional = true}
+hmac = {version = "0.12", optional = true}
+pbkdf2 = {version = "0.11", optional = true}
+sha2 = {version = "0.10", optional = true}
+
+openssl = {version = "0.10", optional = true}
 
 once_cell = "1.9"
 dirs = "4.0"
@@ -42,7 +45,7 @@ async-std = {version = "1.11", features = ["attributes"]}
 tokio = {version = "1.11", features = ["macros", "rt"]}
 
 [features]
-default = ["local_tests", "async-std"]
+default = ["local_tests", "async-std", "native_crypto"]
 # Some tests requires a prompt to be displayed, which can't be easily
 # handled in CI unless we write a mock service. The feature allows to disabling those tests in CI
 local_tests = []
@@ -52,6 +55,8 @@ unstable = []
 docs = []
 async-std = ["dep:async-std", "dep:async-global-executor"]
 tokio = ["zbus/tokio", "dep:tokio"]
+native_crypto = ["aes", "cbc", "cipher", "digest", "hkdf", "hmac", "pbkdf2", "sha2"]
+openssl_crypto = ["openssl"]
 
 
 [[example]]

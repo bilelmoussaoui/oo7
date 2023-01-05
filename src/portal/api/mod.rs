@@ -14,7 +14,6 @@ use std::{
 
 #[cfg(feature = "async-std")]
 use async_std::{fs, io, prelude::*};
-use cipher::BlockSizeUser;
 use once_cell::sync::Lazy;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -48,7 +47,7 @@ pub(super) use encrypted_item::EncryptedItem;
 
 use super::{Item, Secret};
 use crate::{
-    crypto::EncAlg,
+    crypto,
     portal::{Error, WeakKeyError},
     Key,
 };
@@ -244,17 +243,12 @@ impl Keyring {
     }
 
     pub fn derive_key(&self, secret: &Secret) -> Key {
-        let mut key =
-            Key::new_with_strength(vec![0; EncAlg::block_size()], self.key_strength(secret));
-
-        pbkdf2::pbkdf2::<hmac::Hmac<sha2::Sha256>>(
-            secret,
+        crypto::derive_key(
+            &**secret,
+            self.key_strength(secret),
             &self.salt,
-            self.iteration_count,
-            key.as_mut(),
-        );
-
-        key
+            self.iteration_count.try_into().unwrap(),
+        )
     }
 }
 
@@ -302,7 +296,6 @@ fn hash_attributes<K: AsRef<str>>(
                 k,
                 AttributeValue::from(v.as_ref())
                     .mac(key)
-                    .into_bytes()
                     .as_slice()
                     .to_vec(),
             )

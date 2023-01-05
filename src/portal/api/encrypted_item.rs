@@ -1,15 +1,10 @@
 use std::collections::HashMap;
 
-use cipher::IvSizeUser;
-use digest::{Mac, OutputSizeUser};
 use serde::{Deserialize, Serialize};
 use zbus::zvariant::Type;
 
 use super::{Error, Item};
-use crate::{
-    crypto::{self, DecAlg, MacAlg},
-    Key,
-};
+use crate::{crypto, Key};
 
 #[derive(Deserialize, Serialize, Type, Debug, Clone)]
 pub(crate) struct EncryptedItem {
@@ -19,14 +14,14 @@ pub(crate) struct EncryptedItem {
 
 impl EncryptedItem {
     pub fn decrypt(mut self, key: &Key) -> Result<Item, Error> {
-        let mac_tag = self.blob.split_off(self.blob.len() - MacAlg::output_size());
+        let mac_tag = self.blob.split_off(self.blob.len() - crypto::mac_len());
 
         // verify item
-        let mut mac = MacAlg::new_from_slice(key.as_ref()).unwrap();
-        mac.update(&self.blob);
-        mac.verify_slice(&mac_tag)?;
+        if !crypto::verify_mac(&self.blob, key, mac_tag) {
+            return Err(Error::MacError);
+        }
 
-        let iv = self.blob.split_off(self.blob.len() - DecAlg::iv_size());
+        let iv = self.blob.split_off(self.blob.len() - crypto::iv_len());
 
         // decrypt item
         let decrypted = crypto::decrypt(self.blob, key, iv);
@@ -45,9 +40,7 @@ impl EncryptedItem {
     ) -> Result<(), Error> {
         for (attribute_key, hashed_attribute) in hashed_attributes.iter() {
             if let Some(attribute_plaintext) = item.attributes().get(attribute_key) {
-                let mut mac = MacAlg::new_from_slice(key.as_ref()).unwrap();
-                mac.update(attribute_plaintext.as_bytes());
-                if mac.verify_slice(hashed_attribute).is_err() {
+                if !crypto::verify_mac(attribute_plaintext.as_bytes(), key, hashed_attribute) {
                     return Err(Error::HashedAttributeMac(attribute_key.to_owned()));
                 }
             } else {

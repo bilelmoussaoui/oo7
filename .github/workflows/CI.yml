@@ -36,7 +36,10 @@ jobs:
           override: true
       - name: Build and test
         run: |
-          dbus-run-session -- cargo test --no-default-features --features async-std
+          dbus-run-session -- cargo test --no-default-features --features async-std --features native_crypto
+      - name: Build and test (OpenSSL)
+        run: |
+          dbus-run-session -- cargo test --no-default-features --features async-std --features openssl_crypto
 
   fmt:
     name: Rustfmt

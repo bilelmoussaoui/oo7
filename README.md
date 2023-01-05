@@ -113,6 +113,8 @@ SOME_RUNTIME.block_on(async {
 | `tracing` | Record various debug information using the `tracing` library | No |
 | `async-std` | Use `async-std` APIs for IO/filesystem operations | Yes |
 | `tokio` | Use `tokio` APIs for IO/Filesystem operations | No |
+| `native_crypto` | Use Rust Crypto crates for cryptographic primitives | Yes |
+| `openssl_crypto` | Use `openssl` crate for cryptographic primitives | No |
 | `unstable` | Unlock internal APIs | No |
 
 ## How does it compare to other libraries?

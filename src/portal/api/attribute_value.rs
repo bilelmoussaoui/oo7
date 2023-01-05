@@ -1,19 +1,16 @@
-use digest::Mac;
 use serde::{Deserialize, Serialize};
 use zbus::zvariant::Type;
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
-use crate::{crypto::MacAlg, Key};
+use crate::{crypto, Key};
 
 /// An encrypted attribute value.
 #[derive(Deserialize, Serialize, Type, Clone, Debug, Zeroize, ZeroizeOnDrop)]
 pub struct AttributeValue(String);
 
 impl AttributeValue {
-    pub(crate) fn mac(&self, key: &Key) -> digest::CtOutput<MacAlg> {
-        let mut mac = MacAlg::new_from_slice(key.as_ref()).unwrap();
-        mac.update(self.0.as_bytes());
-        mac.finalize()
+    pub(crate) fn mac(&self, key: &Key) -> Zeroizing<Vec<u8>> {
+        Zeroizing::new(crypto::compute_mac(self.0.as_bytes(), key))
     }
 }
 
