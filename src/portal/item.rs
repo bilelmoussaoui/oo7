@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use digest::Mac;
 use serde::{Deserialize, Serialize};
 use zbus::zvariant::{self, Type};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
@@ -9,10 +8,7 @@ use super::{
     api::{AttributeValue, EncryptedItem, GVARIANT_ENCODING},
     Error,
 };
-use crate::{
-    crypto::{self, MacAlg},
-    Key,
-};
+use crate::{crypto, Key};
 
 /// An item stored in the file backend.
 #[derive(Deserialize, Serialize, Type, Clone, Debug, Zeroize, ZeroizeOnDrop)]
@@ -99,19 +95,15 @@ impl Item {
 
         let iv = crypto::generate_iv();
 
-        let mut blob = crypto::encrypt(&*decrypted, key, iv);
+        let mut blob = crypto::encrypt(&*decrypted, key, &iv);
 
         blob.append(&mut iv.as_slice().into());
-
-        // Unwrapping since arbitrary keylength allowed
-        let mut mac = MacAlg::new_from_slice(key.as_ref()).unwrap();
-        mac.update(&blob);
-        blob.append(&mut mac.finalize().into_bytes().as_slice().into());
+        blob.append(&mut crypto::compute_mac(&blob, key).as_slice().into());
 
         let hashed_attributes = self
             .attributes
             .iter()
-            .map(|(k, v)| (k.to_owned(), v.mac(key).into_bytes().as_slice().into()))
+            .map(|(k, v)| (k.to_owned(), v.mac(key).as_slice().into()))
             .collect();
 
         Ok(EncryptedItem {

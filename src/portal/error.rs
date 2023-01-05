@@ -57,12 +57,6 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl From<digest::MacError> for Error {
-    fn from(_value: digest::MacError) -> Self {
-        Self::MacError
-    }
-}
-
 impl From<zbus::Error> for Error {
     fn from(value: zbus::Error) -> Self {
         Self::PortalBus(value)
