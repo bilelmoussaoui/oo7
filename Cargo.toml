@@ -1,6 +1,6 @@
 [package]
 name = "oo7"
-version = "0.1.0-beta.2"
+version = "0.1.0-beta.3"
 edition = "2021"
 authors = ["Bilal Elmoussaoui", "Sophie Herold", "Maximiliano Sandoval"]
 description = "James Bond went on a new mission and this time as a Secret Service provider"
