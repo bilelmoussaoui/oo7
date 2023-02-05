@@ -82,7 +82,7 @@ impl std::fmt::Display for Error {
                 f,
                 "Salt size is not as expected. Array: {arr}, Explicit: {explicit}"
             ),
-            Error::WeakKey(err) => write!(f, "{}", err),
+            Error::WeakKey(err) => write!(f, "{err}"),
             Error::Io(e) => write!(f, "IO error {e}"),
             Error::MacError => write!(f, "Mac digest is not equal to the expected value"),
             Error::HashedAttributeMac(e) => write!(f, "Failed to validate hashed attribute {e}"),
