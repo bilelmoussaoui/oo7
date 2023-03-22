@@ -12,7 +12,7 @@ categories = ["os::linux-apis", "os", "api-bindings"]
 license = "MIT"
 
 [dependencies]
-zbus = {version = "3.5.0", features = ["gvariant"]}
+zbus = {version = "3.5.0", default-features = false, features = ["gvariant"]}
 serde = "1.0"
 futures-util = "0.3"
 rand = {version = "0.8", default-features = false}
@@ -53,7 +53,7 @@ local_tests = []
 unstable = []
 # Build nicer docs (requires nightly)
 docs = []
-async-std = ["dep:async-std", "dep:async-global-executor"]
+async-std = ["zbus/async-io", "dep:async-std", "dep:async-global-executor"]
 tokio = ["zbus/tokio", "dep:tokio"]
 native_crypto = ["aes", "cbc", "cipher", "digest", "hkdf", "hmac", "pbkdf2", "sha2"]
 openssl_crypto = ["openssl"]
