@@ -64,7 +64,7 @@ impl<'a> Prompt<'a> {
                     Ok(result)
                 }
             },
-            async { self.prompt("").await }
+            self.prompt("")
         )?;
         Ok(value)
     }
