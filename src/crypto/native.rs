@@ -126,7 +126,8 @@ pub(crate) fn derive_key(
         salt.as_ref(),
         iteration_count.try_into().unwrap(),
         key.as_mut(),
-    );
+    )
+    .expect("HMAC can be initialized with any key length");
 
     key
 }

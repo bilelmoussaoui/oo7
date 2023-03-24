@@ -32,13 +32,13 @@ cipher = {version = "0.4", features = ["rand_core", "zeroize"], optional = true}
 digest = {version = "0.10", optional = true}
 hkdf = {version = "0.12", optional = true}
 hmac = {version = "0.12", optional = true}
-pbkdf2 = {version = "0.11", optional = true}
+pbkdf2 = {version = "0.12", optional = true}
 sha2 = {version = "0.10", optional = true}
 
 openssl = {version = "0.10", optional = true}
 
 once_cell = "1.9"
-dirs = "4.0"
+dirs = "5.0"
 
 [dev-dependencies]
 async-std = {version = "1.11", features = ["attributes"]}
