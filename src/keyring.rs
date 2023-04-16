@@ -52,7 +52,13 @@ impl Keyring {
                 "Application is not sandboxed, falling back to the Sercret Service backend"
             );
         }
-        let service = dbus::Service::new(Algorithm::Encrypted).await?;
+        let service = match dbus::Service::new(Algorithm::Encrypted).await {
+            Ok(service) => Ok(service),
+            Err(dbus::Error::Zbus(zbus::Error::Unsupported)) => {
+                dbus::Service::new(Algorithm::Plain).await
+            }
+            Err(e) => Err(e),
+        }?;
         let collection = match service.default_collection().await {
             Ok(c) => Ok(c),
             Err(dbus::Error::NotFound(_)) => {
