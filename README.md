@@ -60,13 +60,13 @@ async fn run() -> oo7::Result<()> {
 }
 ```
 
-If your application makes heavy usage of the keyring like a password manager. You could store an instance of the `Keyring` in a `OnceCell`
+If your application makes heavy usage of the keyring like a password manager. You could store an instance of the `Keyring` in a `OnceLock`
 
 ```rust,ignore
-use once_cell::sync::OnceCell;
 use std::collections::HashMap;
+use std::sync::OnceLock;
 
-static KEYRING: OnceCell<oo7::Keyring> = OnceCell::new();
+static KEYRING: OnceLock<oo7::Keyring> = OnceLock::new();
 
 fn main() {
     // SOME_RUNTIME could be a tokio/async-std/glib runtime

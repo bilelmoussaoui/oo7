@@ -31,12 +31,11 @@
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, OnceLock},
 };
 
 #[cfg(feature = "async-std")]
 use async_std::{fs, io, prelude::*, sync::RwLock};
-use once_cell::sync::OnceCell;
 #[cfg(feature = "tokio")]
 use tokio::{fs, io, io::AsyncReadExt, sync::RwLock};
 use zeroize::Zeroizing;
@@ -66,7 +65,7 @@ pub struct Keyring {
     /// Times are stored before reading the file to detect
     /// file changes before writing
     mtime: RwLock<Option<std::time::SystemTime>>,
-    key: RwLock<OnceCell<Key>>,
+    key: RwLock<OnceLock<Key>>,
     secret: Arc<Secret>,
 }
 
@@ -288,7 +287,7 @@ impl Keyring {
     }
 
     /// Return key, derive and store it first if not initialized
-    async fn derive_key<'a>(&'a self, key: &'a mut OnceCell<Key>) -> &'a Key {
+    async fn derive_key<'a>(&'a self, key: &'a mut OnceLock<Key>) -> &'a Key {
         let keyring = Arc::clone(&self.keyring);
         let secret = Arc::clone(&self.secret);
 
