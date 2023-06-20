@@ -112,7 +112,7 @@ impl Keyring {
 
             if !parent.exists() {
                 #[cfg(feature = "tracing")]
-                tracing::debug!("Parent directory {:?} deosn't exists, creating it", parent);
+                tracing::debug!("Parent directory {:?} doesn't exists, creating it", parent);
                 fs::DirBuilder::new().recursive(true).create(parent).await?;
             }
 
