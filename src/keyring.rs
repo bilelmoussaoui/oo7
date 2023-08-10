@@ -300,6 +300,18 @@ impl Item {
         Ok(secret)
     }
 
+    /// Whether the item is locked or not
+    ///
+    /// The method always returns `false` if keyring is backed by a file
+    /// backend.
+    pub async fn is_locked(&self) -> Result<bool> {
+        if let Self::DBus(item) = self {
+            item.is_locked().await.map_err(From::from)
+        } else {
+            Ok(false)
+        }
+    }
+
     /// Lock the item
     ///
     /// The method does nothing if keyring is backed by a file backend.
