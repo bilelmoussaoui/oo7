@@ -1,7 +1,22 @@
+use std::path::PathBuf;
+
 #[cfg(feature = "async-std")]
 use async_std::{fs::File, prelude::*};
 #[cfg(feature = "tokio")]
 use tokio::{fs::File, io::AsyncReadExt};
+
+pub(crate) fn data_dir() -> Option<PathBuf> {
+    std::env::var_os("XDG_DATA_HOME")
+        .and_then(|h| if h.is_empty() { None } else { Some(h) })
+        .map(PathBuf::from)
+        .and_then(|p| if p.is_absolute() { Some(p) } else { None })
+        .or_else(|| {
+            std::env::var_os("HOME")
+                .and_then(|h| if h.is_empty() { None } else { Some(h) })
+                .map(PathBuf::from)
+                .map(|p| p.join(".local/share"))
+        })
+}
 
 pub(crate) async fn is_flatpak() -> bool {
     #[cfg(feature = "async-std")]

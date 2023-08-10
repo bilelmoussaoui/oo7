@@ -233,7 +233,7 @@ impl Keyring {
     }
 
     pub fn default_path() -> Result<PathBuf, Error> {
-        if let Some(mut path) = dirs::data_dir() {
+        if let Some(mut path) = crate::helpers::data_dir() {
             path.push("keyrings");
             path.push("default.keyring");
             Ok(path)
