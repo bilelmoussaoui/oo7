@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt, time::Duration};
 
-use futures_util::StreamExt;
+use futures_util::{Stream, StreamExt};
 use serde::Serialize;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath, Type};
 
@@ -51,27 +51,33 @@ impl<'a> Collection<'a> {
     }
 
     #[doc(alias = "ItemCreated")]
-    pub async fn receive_item_created(&self) -> Result<Item<'a>, Error> {
+    pub async fn receive_item_created(&self) -> Result<impl Stream<Item = Item<'_>>, Error> {
         let mut stream = self.inner().receive_signal("ItemCreated").await?;
-        let message = stream.next().await.unwrap();
-        let object_path = message.body::<OwnedObjectPath>()?;
-        Item::new(self.inner().connection(), object_path).await
+        let conn = self.inner().connection();
+        Ok(stream.filter_map(move |message| async move {
+            let path = message.body::<OwnedObjectPath>().ok()?;
+            Item::new(&conn.clone(), path).await.ok()
+        }))
     }
 
     #[doc(alias = "ItemDeleted")]
-    pub async fn receive_item_deleted(&self) -> Result<Item<'a>, Error> {
+    pub async fn receive_item_deleted(&self) -> Result<impl Stream<Item = Item<'_>>, Error> {
         let mut stream = self.inner().receive_signal("ItemDeleted").await?;
-        let message = stream.next().await.unwrap();
-        let object_path = message.body::<OwnedObjectPath>()?;
-        Item::new(self.inner().connection(), object_path).await
+        let conn = self.inner().connection();
+        Ok(stream.filter_map(move |message| async move {
+            let path = message.body::<OwnedObjectPath>().ok()?;
+            Item::new(&conn.clone(), path).await.ok()
+        }))
     }
 
     #[doc(alias = "ItemChanged")]
-    pub async fn receive_item_changed(&self) -> Result<Item<'a>, Error> {
+    pub async fn receive_item_changed(&self) -> Result<impl Stream<Item = Item<'_>>, Error> {
         let mut stream = self.inner().receive_signal("ItemChanged").await?;
-        let message = stream.next().await.unwrap();
-        let object_path = message.body::<OwnedObjectPath>()?;
-        Item::new(self.inner().connection(), object_path).await
+        let conn = self.inner().connection();
+        Ok(stream.filter_map(move |message| async move {
+            let path = message.body::<OwnedObjectPath>().ok()?;
+            Item::new(&conn.clone(), path).await.ok()
+        }))
     }
 
     pub async fn items(&self) -> Result<Vec<Item<'a>>, Error> {
