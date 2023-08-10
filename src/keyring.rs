@@ -300,6 +300,26 @@ impl Item {
         Ok(secret)
     }
 
+    /// Lock the item
+    ///
+    /// The method does nothing if keyring is backed by a file backend.
+    pub async fn lock(&self) -> Result<()> {
+        if let Self::DBus(item) = self {
+            item.lock().await?;
+        }
+        Ok(())
+    }
+
+    /// Unlock the item
+    ///
+    /// The method does nothing if keyring is backed by a file backend.
+    pub async fn unlock(&self) -> Result<()> {
+        if let Self::DBus(item) = self {
+            item.unlock().await?;
+        }
+        Ok(())
+    }
+
     /// Delete the item.
     pub async fn delete(&self) -> Result<()> {
         match self {
