@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt};
 
-use futures_util::StreamExt;
+use futures_util::{Stream, StreamExt};
 use zbus::zvariant::{self, ObjectPath, OwnedObjectPath, OwnedValue, Type, Value};
 
 use super::{
@@ -34,27 +34,39 @@ impl<'a> Service<'a> {
     }
 
     #[doc(alias = "CollectionCreated")]
-    pub async fn receive_collection_created(&self) -> Result<Collection<'a>, Error> {
+    pub async fn receive_collection_created(
+        &self,
+    ) -> Result<impl Stream<Item = Collection<'_>>, Error> {
         let mut stream = self.inner().receive_signal("CollectionCreated").await?;
-        let message = stream.next().await.unwrap();
-        let object_path = message.body::<OwnedObjectPath>()?;
-        Collection::new(self.inner().connection(), object_path).await
+        let conn = self.inner().connection();
+        Ok(stream.filter_map(move |message| async move {
+            let path = message.body::<OwnedObjectPath>().ok()?;
+            Collection::new(&conn.clone(), path).await.ok()
+        }))
     }
 
     #[doc(alias = "CollectionDeleted")]
-    pub async fn receive_collection_deleted(&self) -> Result<Collection<'a>, Error> {
+    pub async fn receive_collection_deleted(
+        &self,
+    ) -> Result<impl Stream<Item = Collection<'_>>, Error> {
         let mut stream = self.inner().receive_signal("CollectionDeleted").await?;
-        let message = stream.next().await.unwrap();
-        let object_path = message.body::<OwnedObjectPath>()?;
-        Collection::new(self.inner().connection(), object_path).await
+        let conn = self.inner().connection();
+        Ok(stream.filter_map(move |message| async move {
+            let path = message.body::<OwnedObjectPath>().ok()?;
+            Collection::new(&conn.clone(), path).await.ok()
+        }))
     }
 
     #[doc(alias = "CollectionChanged")]
-    pub async fn receive_collection_changed(&self) -> Result<Collection<'a>, Error> {
+    pub async fn receive_collection_changed(
+        &self,
+    ) -> Result<impl Stream<Item = Collection<'_>>, Error> {
         let mut stream = self.inner().receive_signal("CollectionChanged").await?;
-        let message = stream.next().await.unwrap();
-        let object_path = message.body::<OwnedObjectPath>()?;
-        Collection::new(self.inner().connection(), object_path).await
+        let conn = self.inner().connection();
+        Ok(stream.filter_map(move |message| async move {
+            let path = message.body::<OwnedObjectPath>().ok()?;
+            Collection::new(&conn.clone(), path).await.ok()
+        }))
     }
 
     pub async fn collections(&self) -> Result<Vec<Collection<'a>>, Error> {
