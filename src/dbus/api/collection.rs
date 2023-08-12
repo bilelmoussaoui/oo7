@@ -5,7 +5,7 @@ use serde::Serialize;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath, Type};
 
 use super::{Item, Prompt, Properties, Secret, Unlockable, DESTINATION};
-use crate::dbus::Error;
+use crate::dbus::{Error, ServiceError};
 
 #[derive(Type)]
 #[zvariant(signature = "o")]
@@ -122,7 +122,8 @@ impl<'a> Collection<'a> {
         let prompt_path = self
             .inner()
             .call_method("Delete", &())
-            .await?
+            .await
+            .map_err::<ServiceError, _>(From::from)?
             .body::<zbus::zvariant::OwnedObjectPath>()?;
         if let Some(prompt) = Prompt::new(self.inner().connection(), prompt_path).await? {
             let _ = prompt.receive_completed().await?;
@@ -138,7 +139,8 @@ impl<'a> Collection<'a> {
         let msg = self
             .inner()
             .call_method("SearchItems", &(attributes))
-            .await?;
+            .await
+            .map_err::<ServiceError, _>(From::from)?;
 
         let item_paths = msg.body::<Vec<OwnedObjectPath>>()?;
         Item::from_paths(self.inner().connection(), item_paths).await
@@ -156,7 +158,8 @@ impl<'a> Collection<'a> {
         let (item_path, prompt_path) = self
             .inner()
             .call_method("CreateItem", &(properties, secret, replace))
-            .await?
+            .await
+            .map_err::<ServiceError, _>(From::from)?
             .body::<(OwnedObjectPath, OwnedObjectPath)>()?;
         let cnx = self.inner().connection();
         let item_path = if let Some(prompt) = Prompt::new(cnx, prompt_path).await? {

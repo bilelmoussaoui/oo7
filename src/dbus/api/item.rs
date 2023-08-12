@@ -4,7 +4,7 @@ use serde::Serialize;
 use zbus::zvariant::{ObjectPath, Type};
 
 use super::{secret::SecretInner, Prompt, Secret, Session, Unlockable, DESTINATION};
-use crate::dbus::Error;
+use crate::dbus::{Error, ServiceError};
 
 #[derive(Type)]
 #[zvariant(signature = "o")]
@@ -94,7 +94,8 @@ impl<'a> Item<'a> {
         let prompt_path = self
             .inner()
             .call_method("Delete", &())
-            .await?
+            .await
+            .map_err::<ServiceError, _>(From::from)?
             .body::<zbus::zvariant::OwnedObjectPath>()?;
         if let Some(prompt) = Prompt::new(self.inner().connection(), prompt_path).await? {
             let _ = prompt.receive_completed().await?;
@@ -107,14 +108,18 @@ impl<'a> Item<'a> {
         let inner = self
             .inner()
             .call_method("GetSecret", &(session))
-            .await?
+            .await
+            .map_err::<ServiceError, _>(From::from)?
             .body::<SecretInner>()?;
         Secret::from_inner(self.inner().connection(), inner).await
     }
 
     #[doc(alias = "SetSecret")]
     pub async fn set_secret(&self, secret: &Secret<'_>) -> Result<(), Error> {
-        self.inner().call_method("SetSecret", &(secret)).await?;
+        self.inner()
+            .call_method("SetSecret", &(secret))
+            .await
+            .map_err::<ServiceError, _>(From::from)?;
         Ok(())
     }
 }

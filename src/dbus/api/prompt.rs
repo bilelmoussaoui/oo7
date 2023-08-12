@@ -5,7 +5,7 @@ use serde::Serialize;
 use zbus::zvariant::{ObjectPath, OwnedValue, Type};
 
 use super::DESTINATION;
-use crate::dbus::Error;
+use crate::dbus::{Error, ServiceError};
 
 #[derive(Type)]
 #[zvariant(signature = "o")]
@@ -40,13 +40,19 @@ impl<'a> Prompt<'a> {
     }
 
     pub async fn prompt(&self, window_id: &str) -> Result<(), Error> {
-        self.inner().call_method("Prompt", &(window_id)).await?;
+        self.inner()
+            .call_method("Prompt", &(window_id))
+            .await
+            .map_err::<ServiceError, _>(From::from)?;
         Ok(())
     }
 
     #[allow(unused)]
     pub async fn dismiss(&self) -> Result<(), Error> {
-        self.inner().call_method("Dismiss", &()).await?;
+        self.inner()
+            .call_method("Dismiss", &())
+            .await
+            .map_err::<ServiceError, _>(From::from)?;
         Ok(())
     }
 

@@ -8,7 +8,7 @@ use super::{
     DESTINATION, PATH,
 };
 use crate::{
-    dbus::{Algorithm, Error},
+    dbus::{Algorithm, Error, ServiceError},
     Key,
 };
 
@@ -89,7 +89,8 @@ impl<'a> Service<'a> {
         let (service_key, session_path) = self
             .inner()
             .call_method("OpenSession", &(&algorithm, key))
-            .await?
+            .await
+            .map_err::<ServiceError, _>(From::from)?
             .body::<(OwnedValue, OwnedObjectPath)>()?;
         let session = Session::new(self.inner().connection(), session_path).await?;
 
@@ -111,7 +112,8 @@ impl<'a> Service<'a> {
         let (collection_path, prompt_path) = self
             .inner()
             .call_method("CreateCollection", &(properties, alias.unwrap_or_default()))
-            .await?
+            .await
+            .map_err::<ServiceError, _>(From::from)?
             .body::<(OwnedObjectPath, OwnedObjectPath)>()?;
 
         let collection_path = if let Some(prompt) =
@@ -133,7 +135,8 @@ impl<'a> Service<'a> {
         let (unlocked_item_paths, locked_item_paths) = self
             .inner()
             .call_method("SearchItems", &(attributes))
-            .await?
+            .await
+            .map_err::<ServiceError, _>(From::from)?
             .body::<(Vec<OwnedObjectPath>, Vec<OwnedObjectPath>)>()?;
         let cnx = self.inner().connection();
 
@@ -147,7 +150,8 @@ impl<'a> Service<'a> {
         let (mut unlocked_item_paths, prompt_path) = self
             .inner()
             .call_method("Unlock", &(items))
-            .await?
+            .await
+            .map_err::<ServiceError, _>(From::from)?
             .body::<(Vec<OwnedObjectPath>, OwnedObjectPath)>()?;
         let cnx = self.inner().connection();
 
@@ -164,7 +168,8 @@ impl<'a> Service<'a> {
         let (mut locked_item_paths, prompt_path) = self
             .inner()
             .call_method("Lock", &(items))
-            .await?
+            .await
+            .map_err::<ServiceError, _>(From::from)?
             .body::<(Vec<OwnedObjectPath>, OwnedObjectPath)>()?;
         let cnx = self.inner().connection();
 
@@ -187,7 +192,8 @@ impl<'a> Service<'a> {
         let secrets = self
             .inner()
             .call_method("GetSecrets", &(items, session))
-            .await?
+            .await
+            .map_err::<ServiceError, _>(From::from)?
             .body::<HashMap<OwnedObjectPath, SecretInner>>()?;
 
         let cnx = self.inner().connection();
@@ -207,7 +213,8 @@ impl<'a> Service<'a> {
         let collection_path = self
             .inner()
             .call_method("ReadAlias", &(name))
-            .await?
+            .await
+            .map_err::<ServiceError, _>(From::from)?
             .body::<zbus::zvariant::OwnedObjectPath>()?;
 
         if collection_path.as_str() != "/" {
@@ -222,7 +229,8 @@ impl<'a> Service<'a> {
     pub async fn set_alias(&self, name: &str, collection: &Collection<'_>) -> Result<(), Error> {
         self.inner()
             .call_method("SetAlias", &(name, collection))
-            .await?;
+            .await
+            .map_err::<ServiceError, _>(From::from)?;
         Ok(())
     }
 }

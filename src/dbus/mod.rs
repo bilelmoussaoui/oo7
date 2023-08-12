@@ -59,7 +59,7 @@ mod item;
 pub use item::Item;
 mod error;
 mod service;
-pub use error::Error;
+pub use error::{Error, ServiceError};
 pub use service::Service;
 mod collection;
 pub use collection::Collection;
