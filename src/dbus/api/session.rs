@@ -4,7 +4,7 @@ use serde::Serialize;
 use zbus::zvariant::{ObjectPath, Type};
 
 use super::DESTINATION;
-use crate::dbus::Error;
+use crate::dbus::{Error, ServiceError};
 
 #[derive(Type)]
 #[zvariant(signature = "o")]
@@ -31,7 +31,10 @@ impl<'a> Session<'a> {
     }
 
     pub async fn close(&self) -> Result<(), Error> {
-        self.inner().call_method("Close", &()).await?;
+        self.inner()
+            .call_method("Close", &())
+            .await
+            .map_err::<ServiceError, _>(From::from)?;
         Ok(())
     }
 }
