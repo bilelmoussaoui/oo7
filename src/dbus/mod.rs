@@ -47,6 +47,7 @@ pub static SESSION_COLLECTION: &str = "session";
 /// The API is not supposed to be used by the applications in general unless
 /// the wrapper API doesn't provide functionality you need.
 #[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 pub mod api;
 
 #[cfg(not(feature = "unstable"))]

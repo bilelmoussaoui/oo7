@@ -16,9 +16,12 @@ jobs:
           toolchain: nightly
           override: true
       - uses: actions-rs/cargo@v1
+        env:
+          RUSTFLAGS: --cfg docsrs
+          RUSTDOCFLAGS: --cfg docsrs
         with:
           command: doc
-          args: --package oo7 --features "async-std" --no-deps
+          args: --package oo7 --features "async-std, unstable" --no-deps
 
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3

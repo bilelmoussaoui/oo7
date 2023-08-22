@@ -44,6 +44,7 @@ use zeroize::Zeroizing;
 use crate::Key;
 
 #[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 pub mod api;
 #[cfg(not(feature = "unstable"))]
 mod api;

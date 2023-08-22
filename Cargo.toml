@@ -12,36 +12,39 @@ categories = ["os::linux-apis", "os", "api-bindings"]
 license = "MIT"
 
 [dependencies]
-zbus = {version = "3.5.0", default-features = false, features = ["gvariant"]}
+zbus = { version = "3.5.0", default-features = false, features = ["gvariant"] }
 serde = "1.0"
 futures-util = "0.3"
-rand = {version = "0.8", default-features = false}
-async-std = {version = "1.11", optional = true}
+rand = { version = "0.8", default-features = false }
+async-std = { version = "1.11", optional = true }
 async-global-executor = { version = "2.3", optional = true }
-tokio = {version = "1.17", features = ["sync", "fs", "io-util"], optional = true, default-features = false}
+tokio = { version = "1.17", features = [
+    "sync",
+    "fs",
+    "io-util",
+], optional = true, default-features = false }
 byteorder = "1.0"
 num = "0.4.0"
-num-bigint-dig = {version ="0.8", features = ["zeroize"]}
-tracing = {version = "0.1", optional = true}
-
-zeroize = {version = "1", features = ["zeroize_derive"]}
-
-aes = {version = "0.8", features = ["zeroize"], optional = true}
-cbc = {version = "0.1", features = ["zeroize"], optional = true}
-cipher = {version = "0.4", features = ["rand_core", "zeroize"], optional = true}
-digest = {version = "0.10", optional = true}
-hkdf = {version = "0.12", optional = true}
-hmac = {version = "0.12", optional = true}
-pbkdf2 = {version = "0.12", optional = true}
-sha2 = {version = "0.10", optional = true}
-
-openssl = {version = "0.10", optional = true}
-
+num-bigint-dig = { version = "0.8", features = ["zeroize"] }
+tracing = { version = "0.1", optional = true }
+zeroize = { version = "1", features = ["zeroize_derive"] }
+aes = { version = "0.8", features = ["zeroize"], optional = true }
+cbc = { version = "0.1", features = ["zeroize"], optional = true }
+cipher = { version = "0.4", features = [
+    "rand_core",
+    "zeroize",
+], optional = true }
+digest = { version = "0.10", optional = true }
+hkdf = { version = "0.12", optional = true }
+hmac = { version = "0.12", optional = true }
+pbkdf2 = { version = "0.12", optional = true }
+sha2 = { version = "0.10", optional = true }
+openssl = { version = "0.10", optional = true }
 once_cell = "1.9"
 
 [dev-dependencies]
-async-std = {version = "1.11", features = ["attributes"]}
-tokio = {version = "1.11", features = ["macros", "rt"]}
+async-std = { version = "1.11", features = ["attributes"] }
+tokio = { version = "1.11", features = ["macros", "rt"] }
 
 [features]
 default = ["local_tests", "async-std", "native_crypto"]
@@ -54,9 +57,22 @@ unstable = []
 docs = []
 async-std = ["zbus/async-io", "dep:async-std", "dep:async-global-executor"]
 tokio = ["zbus/tokio", "dep:tokio"]
-native_crypto = ["aes", "cbc", "cipher", "digest", "hkdf", "hmac", "pbkdf2", "sha2"]
+native_crypto = [
+    "aes",
+    "cbc",
+    "cipher",
+    "digest",
+    "hkdf",
+    "hmac",
+    "pbkdf2",
+    "sha2",
+]
 openssl_crypto = ["openssl"]
 
+[package.metadata.docs.rs]
+features = ["unstable"]
+rustc-args = ["--cfg", "docsrs"]
+rustdoc-args = ["--cfg", "docsrs", "--generate-link-to-definition"]
 
 [[example]]
 name = "basic"
