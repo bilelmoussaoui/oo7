@@ -82,7 +82,7 @@ pub struct Keyring {
     /// Times are stored before reading the file to detect
     /// file changes before writing
     mtime: Mutex<Option<std::time::SystemTime>>,
-    key: RwLock<OnceCell<Key>>,
+    key: OnceCell<Key>,
     secret: Arc<Secret>,
 }
 
@@ -147,8 +147,7 @@ impl Keyring {
     /// If items cannot be decrypted, [`InvalidItemError`]s are returned for
     /// them instead of [`Item`]s.
     pub async fn items(&self) -> Vec<Result<Item, InvalidItemError>> {
-        let mut opt_key = self.key.write().await;
-        let key = self.derive_key(&mut opt_key).await;
+        let key = self.derive_key().await;
         let keyring = self.keyring.read().await;
         keyring
             .items
@@ -166,16 +165,14 @@ impl Keyring {
 
     /// Search items matching the attributes.
     pub async fn search_items(&self, attributes: &impl AsAttributes) -> Result<Vec<Item>, Error> {
-        let mut opt_key = self.key.write().await;
-        let key = self.derive_key(&mut opt_key).await;
+        let key = self.derive_key().await;
         let keyring = self.keyring.read().await;
         keyring.search_items(attributes, key)
     }
 
     /// Find the first item matching the attributes.
     pub async fn lookup_item(&self, attributes: &impl AsAttributes) -> Result<Option<Item>, Error> {
-        let mut opt_key = self.key.write().await;
-        let key = self.derive_key(&mut opt_key).await;
+        let key = self.derive_key().await;
         let keyring = self.keyring.read().await;
         keyring.lookup_item(attributes, key)
     }
@@ -183,8 +180,7 @@ impl Keyring {
     /// Delete an item.
     pub async fn delete(&self, attributes: &impl AsAttributes) -> Result<(), Error> {
         {
-            let mut opt_key = self.key.write().await;
-            let key = self.derive_key(&mut opt_key).await;
+            let key = self.derive_key().await;
             let mut keyring = self.keyring.write().await;
             keyring.remove_items(attributes, key)?;
         };
@@ -209,8 +205,7 @@ impl Keyring {
         replace: bool,
     ) -> Result<Item, Error> {
         let item = {
-            let mut opt_key = self.key.write().await;
-            let key = self.derive_key(&mut opt_key).await;
+            let key = self.derive_key().await;
             let mut keyring = self.keyring.write().await;
             if replace {
                 keyring.remove_items(attributes, key)?;
@@ -233,8 +228,7 @@ impl Keyring {
     /// returns an error.
     pub async fn replace_item_index(&self, index: usize, item: &Item) -> Result<(), Error> {
         {
-            let mut opt_key = self.key.write().await;
-            let key = self.derive_key(&mut opt_key).await;
+            let key = self.derive_key().await;
             let mut keyring = self.keyring.write().await;
 
             if let Some(item_store) = keyring.items.get_mut(index) {
@@ -266,8 +260,7 @@ impl Keyring {
 
     /// Helper used for migration to avoid re-writing the file multiple times
     pub(crate) async fn create_items(&self, items: Vec<ItemDefinition>) -> Result<(), Error> {
-        let mut opt_key = self.key.write().await;
-        let key = self.derive_key(&mut opt_key).await;
+        let key = self.derive_key().await;
         let mut keyring = self.keyring.write().await;
         for (label, attributes, secret, replace) in items {
             if replace {
@@ -305,7 +298,7 @@ impl Keyring {
     }
 
     /// Return key, derive and store it first if not initialized
-    async fn derive_key<'a>(&'a self, key: &'a mut OnceCell<Key>) -> &'a Key {
+    async fn derive_key(&self) -> &Key {
         let keyring = Arc::clone(&self.keyring);
         let secret = Arc::clone(&self.secret);
 
@@ -321,7 +314,7 @@ impl Keyring {
                 .await
                 .unwrap();
 
-        key.get_or_init(|| newkey)
+        self.key.get_or_init(|| newkey)
     }
 }
 
