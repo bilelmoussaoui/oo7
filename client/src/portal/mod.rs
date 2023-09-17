@@ -299,22 +299,11 @@ impl Keyring {
 
     /// Return key, derive and store it first if not initialized
     async fn derive_key(&self) -> &Key {
-        let keyring = Arc::clone(&self.keyring);
-        let secret = Arc::clone(&self.secret);
-
-        #[cfg(feature = "async-std")]
-        let newkey = blocking::unblock(move || {
-            async_io::block_on(async { keyring.read().await.derive_key(&secret) })
-        })
-        .await;
-
-        #[cfg(feature = "tokio")]
-        let newkey =
-            tokio::task::spawn_blocking(move || keyring.blocking_read().derive_key(&secret))
-                .await
-                .unwrap();
-
-        self.key.get_or_init(|| newkey)
+        if self.key.get().is_none() {
+            let key = self.keyring.read().await.derive_key(&self.secret);
+            self.key.set(key).unwrap();
+        }
+        self.key.get().unwrap()
     }
 }
 
