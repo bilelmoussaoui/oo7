@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 #[cfg(feature = "async-std")]
 use async_std::sync::RwLock;
@@ -358,5 +358,21 @@ impl Item {
             }
         };
         Ok(())
+    }
+
+    /// The UNIX time when the item was created.
+    pub async fn created(&self) -> Result<Duration> {
+        match self {
+            Self::DBus(item) => Ok(item.created().await?),
+            Self::File(item, _) => Ok(item.read().await.created()),
+        }
+    }
+
+    /// The UNIX time when the item was modified.
+    pub async fn modified(&self) -> Result<Duration> {
+        match self {
+            Self::DBus(item) => Ok(item.modified().await?),
+            Self::File(item, _) => Ok(item.read().await.modified()),
+        }
     }
 }

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use serde::{Deserialize, Serialize};
 use zbus::zvariant::{self, Type};
@@ -86,6 +86,18 @@ impl Item {
             .unwrap()
             .as_secs();
         self.secret = secret.as_ref().to_vec();
+    }
+
+    /// The UNIX time when the item was created.
+    pub fn created(&self) -> Duration {
+        let secs = self.created;
+        Duration::from_secs(secs)
+    }
+
+    /// The UNIX time when the item was modified.
+    pub fn modified(&self) -> Duration {
+        let secs = self.modified;
+        Duration::from_secs(secs)
     }
 
     pub(crate) fn encrypt(&self, key: &Key) -> Result<EncryptedItem, Error> {
