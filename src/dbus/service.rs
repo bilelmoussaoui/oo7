@@ -40,7 +40,7 @@ impl<'a> Service<'a> {
         let (aes_key, session) = match algorithm {
             Algorithm::Plain => {
                 #[cfg(feature = "tracing")]
-                tracing::debug!("Starting an unecrypted Secret Service session");
+                tracing::debug!("Starting an unencrypted Secret Service session");
                 let (_service_key, session) = service.open_session(None).await?;
                 (None, session)
             }
