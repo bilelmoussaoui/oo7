@@ -24,6 +24,7 @@ mod keyring;
 pub use error::{Error, Result};
 pub use keyring::{Item, Keyring};
 pub use migration::migrate;
+pub use zbus;
 
 /// Checks whether the application is sandboxed or not.
 pub async fn is_sandboxed() -> bool {
