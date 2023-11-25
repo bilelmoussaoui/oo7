@@ -90,10 +90,10 @@ impl Keyring {
     }
 
     /// Remove items that matches the attributes.
-    pub async fn delete(&self, attributes: HashMap<&str, &str>) -> Result<()> {
+    pub async fn delete(&self, attributes: &HashMap<&str, &str>) -> Result<()> {
         match self {
             Self::DBus(backend) => {
-                let items = backend.search_items(&attributes).await?;
+                let items = backend.search_items(attributes).await?;
                 for item in items {
                     item.delete().await?;
                 }
@@ -152,10 +152,10 @@ impl Keyring {
     }
 
     /// Find items based on their attributes.
-    pub async fn search_items(&self, attributes: HashMap<&str, &str>) -> Result<Vec<Item>> {
+    pub async fn search_items(&self, attributes: &HashMap<&str, &str>) -> Result<Vec<Item>> {
         let items = match self {
             Self::DBus(backend) => {
-                let items = backend.search_items(&attributes).await?;
+                let items = backend.search_items(attributes).await?;
                 items.into_iter().map(Item::for_dbus).collect::<Vec<_>>()
             }
             Self::File(backend) => {
@@ -340,7 +340,7 @@ impl Item {
 
                 backend
                     .delete(
-                        attributes
+                        &attributes
                             .iter()
                             .map(|(k, v)| (k.as_str(), v.as_str()))
                             .collect::<HashMap<_, _>>(),
