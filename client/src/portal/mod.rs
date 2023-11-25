@@ -160,7 +160,7 @@ impl Keyring {
     }
 
     /// Search items matching the attributes.
-    pub async fn search_items(&self, attributes: HashMap<&str, &str>) -> Result<Vec<Item>, Error> {
+    pub async fn search_items(&self, attributes: &HashMap<&str, &str>) -> Result<Vec<Item>, Error> {
         let mut opt_key = self.key.write().await;
         let key = self.derive_key(&mut opt_key).await;
         let keyring = self.keyring.read().await;
@@ -170,7 +170,7 @@ impl Keyring {
     /// Find the first item matching the attributes.
     pub async fn lookup_item(
         &self,
-        attributes: HashMap<&str, &str>,
+        attributes: &HashMap<&str, &str>,
     ) -> Result<Option<Item>, Error> {
         let mut opt_key = self.key.write().await;
         let key = self.derive_key(&mut opt_key).await;
@@ -179,7 +179,7 @@ impl Keyring {
     }
 
     /// Delete an item.
-    pub async fn delete(&self, attributes: HashMap<&str, &str>) -> Result<(), Error> {
+    pub async fn delete(&self, attributes: &HashMap<&str, &str>) -> Result<(), Error> {
         {
             let mut opt_key = self.key.write().await;
             let key = self.derive_key(&mut opt_key).await;
@@ -211,7 +211,7 @@ impl Keyring {
             let key = self.derive_key(&mut opt_key).await;
             let mut keyring = self.keyring.write().await;
             if replace {
-                keyring.remove_items(attributes.clone(), key)?;
+                keyring.remove_items(&attributes, key)?;
             }
             let item = Item::new(label, attributes, secret);
             let encrypted_item = item.encrypt(key)?;
@@ -265,7 +265,7 @@ impl Keyring {
         let mut keyring = self.keyring.write().await;
         for (label, attributes, secret, replace) in items {
             if replace {
-                keyring.remove_items(attributes.clone(), key)?;
+                keyring.remove_items(&attributes, key)?;
             }
             let item = Item::new(label, attributes, &*secret);
             let encrypted_item = item.encrypt(key)?;

@@ -168,7 +168,7 @@ impl Keyring {
 
     pub fn search_items(
         &self,
-        attributes: HashMap<impl AsRef<str>, impl AsRef<str>>,
+        attributes: &HashMap<impl AsRef<str>, impl AsRef<str>>,
         key: &Key,
     ) -> Result<Vec<Item>, Error> {
         let hashed_search = hash_attributes(attributes, key);
@@ -186,7 +186,7 @@ impl Keyring {
 
     pub fn lookup_item(
         &self,
-        attributes: HashMap<impl AsRef<str>, impl AsRef<str>>,
+        attributes: &HashMap<impl AsRef<str>, impl AsRef<str>>,
         key: &Key,
     ) -> Result<Option<Item>, Error> {
         let hashed_search = hash_attributes(attributes, key);
@@ -204,7 +204,7 @@ impl Keyring {
 
     pub fn remove_items(
         &mut self,
-        attributes: HashMap<impl AsRef<str>, impl AsRef<str>>,
+        attributes: &HashMap<impl AsRef<str>, impl AsRef<str>>,
         key: &Key,
     ) -> Result<(), Error> {
         let hashed_search = hash_attributes(attributes, key);
@@ -289,12 +289,12 @@ impl TryFrom<&[u8]> for Keyring {
     }
 }
 
-fn hash_attributes<K: AsRef<str>>(
-    attributes: HashMap<K, impl AsRef<str>>,
+fn hash_attributes<'a, K: AsRef<str>>(
+    attributes: &'a HashMap<K, impl AsRef<str>>,
     key: &Key,
-) -> Vec<(K, Vec<u8>)> {
+) -> Vec<(&'a K, Vec<u8>)> {
     attributes
-        .into_iter()
+        .iter()
         .map(|(k, v)| {
             (
                 k,
