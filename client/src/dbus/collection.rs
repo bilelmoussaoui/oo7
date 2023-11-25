@@ -119,7 +119,7 @@ impl<'a> Collection<'a> {
     /// Search for items based on their attributes.
     pub async fn search_items(
         &self,
-        attributes: HashMap<&str, &str>,
+        attributes: &HashMap<&str, &str>,
     ) -> Result<Vec<Item<'a>>, Error> {
         if !self.is_available().await {
             Err(Error::Deleted)

@@ -93,7 +93,7 @@ impl Keyring {
     pub async fn delete(&self, attributes: HashMap<&str, &str>) -> Result<()> {
         match self {
             Self::DBus(backend) => {
-                let items = backend.search_items(attributes).await?;
+                let items = backend.search_items(&attributes).await?;
                 for item in items {
                     item.delete().await?;
                 }
@@ -155,7 +155,7 @@ impl Keyring {
     pub async fn search_items(&self, attributes: HashMap<&str, &str>) -> Result<Vec<Item>> {
         let items = match self {
             Self::DBus(backend) => {
-                let items = backend.search_items(attributes).await?;
+                let items = backend.search_items(&attributes).await?;
                 items.into_iter().map(Item::for_dbus).collect::<Vec<_>>()
             }
             Self::File(backend) => {
