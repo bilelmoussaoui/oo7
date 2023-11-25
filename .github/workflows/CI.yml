@@ -43,9 +43,14 @@ jobs:
       - name: Build client (tokio / OpenSSL)
         run: |
           cargo build --manifest-path ./client/Cargo.toml --no-default-features --features tokio --features openssl_crypto
+
       - name: Build CLI
         run: |
           cargo build --manifest-path ./cli/Cargo.toml
+
+      - name: Build Portal
+        run: |
+          cargo build --manifest-path ./portal/Cargo.toml
 
       - name: Test (native)
         run: |

@@ -1,3 +1,4 @@
 /target
+/portal/target
 Cargo.lock
 cli/target
