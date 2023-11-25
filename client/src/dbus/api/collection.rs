@@ -130,7 +130,7 @@ impl<'a> Collection<'a> {
     #[doc(alias = "SearchItems")]
     pub async fn search_items(
         &self,
-        attributes: HashMap<&str, &str>,
+        attributes: &HashMap<&str, &str>,
     ) -> Result<Vec<Item<'a>>, Error> {
         let msg = self
             .inner()

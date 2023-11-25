@@ -23,7 +23,7 @@ pub async fn migrate(attributes: Vec<HashMap<&str, &str>>, replace: bool) -> Res
     let mut all_items = Vec::default();
 
     for attrs in attributes {
-        let items = collection.search_items(attrs).await?;
+        let items = collection.search_items(&attrs).await?;
         all_items.extend(items);
     }
     let mut new_items = Vec::with_capacity(all_items.capacity());
