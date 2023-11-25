@@ -16,7 +16,7 @@
 //! collection
 //!     .create_item(
 //!         "My App's secret",
-//!         attributes.clone(),
+//!         &attributes,
 //!         b"password",
 //!         true,
 //!         "text/plain",
