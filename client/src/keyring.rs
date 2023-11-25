@@ -139,7 +139,7 @@ impl Keyring {
         match self {
             Self::DBus(backend) => {
                 backend
-                    .create_item(label, attributes, secret, replace, "text/plain")
+                    .create_item(label, &attributes, secret, replace, "text/plain")
                     .await?;
             }
             Self::File(backend) => {

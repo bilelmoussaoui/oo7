@@ -155,7 +155,7 @@ impl<'a> Collection<'a> {
     pub async fn create_item(
         &self,
         label: &str,
-        attributes: HashMap<&str, &str>,
+        attributes: &HashMap<&str, &str>,
         secret: impl AsRef<[u8]>,
         replace: bool,
         content_type: &str,
@@ -270,14 +270,10 @@ mod tests {
 
         let collection = service.default_collection().await.unwrap();
         let n_items = collection.items().await.unwrap().len();
-        let n_search_items = collection
-            .search_items(attributes.clone())
-            .await
-            .unwrap()
-            .len();
+        let n_search_items = collection.search_items(&attributes).await.unwrap().len();
 
         let item = collection
-            .create_item("A secret", attributes.clone(), secret, true, "text/plain")
+            .create_item("A secret", &attributes, secret, true, "text/plain")
             .await
             .unwrap();
 
@@ -286,11 +282,7 @@ mod tests {
 
         assert_eq!(collection.items().await.unwrap().len(), n_items + 1);
         assert_eq!(
-            collection
-                .search_items(attributes.clone())
-                .await
-                .unwrap()
-                .len(),
+            collection.search_items(&attributes).await.unwrap().len(),
             n_search_items + 1
         );
 
@@ -298,11 +290,7 @@ mod tests {
 
         assert_eq!(collection.items().await.unwrap().len(), n_items);
         assert_eq!(
-            collection
-                .search_items(attributes.clone())
-                .await
-                .unwrap()
-                .len(),
+            collection.search_items(&attributes).await.unwrap().len(),
             n_search_items
         );
     }

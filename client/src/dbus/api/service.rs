@@ -130,7 +130,7 @@ impl<'a> Service<'a> {
     #[doc(alias = "SearchItems")]
     pub async fn search_items(
         &self,
-        attributes: HashMap<&str, &str>,
+        attributes: &HashMap<&str, &str>,
     ) -> Result<(Vec<Item<'a>>, Vec<Item<'a>>), Error> {
         let (unlocked_item_paths, locked_item_paths) = self
             .inner()

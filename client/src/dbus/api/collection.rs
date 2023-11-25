@@ -146,7 +146,7 @@ impl<'a> Collection<'a> {
     pub async fn create_item(
         &self,
         label: &str,
-        attributes: HashMap<&str, &str>,
+        attributes: &HashMap<&str, &str>,
         secret: &Secret<'_>,
         replace: bool,
     ) -> Result<Item<'a>, Error> {
