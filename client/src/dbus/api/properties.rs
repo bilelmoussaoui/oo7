@@ -12,15 +12,15 @@ const COLLECTION_PROPERTY_LABEL: &str = "org.freedesktop.Secret.Collection.Label
 #[zvariant(signature = "a{sv}")]
 pub struct Properties<'a> {
     label: &'a str,
-    attributes: HashMap<&'a str, &'a str>,
+    attributes: Option<&'a HashMap<&'a str, &'a str>>,
     is_collection: bool,
 }
 
 impl<'a> Properties<'a> {
-    pub fn for_item(label: &'a str, attributes: HashMap<&'a str, &'a str>) -> Self {
+    pub fn for_item(label: &'a str, attributes: &'a HashMap<&'a str, &'a str>) -> Self {
         Self {
             label,
-            attributes,
+            attributes: Some(attributes),
             is_collection: false,
         }
     }
@@ -28,7 +28,7 @@ impl<'a> Properties<'a> {
     pub fn for_collection(label: &'a str) -> Self {
         Self {
             label,
-            attributes: Default::default(),
+            attributes: None,
             is_collection: true,
         }
     }
@@ -47,8 +47,11 @@ impl<'a> Serialize for Properties<'a> {
             let mut map = serializer.serialize_map(Some(2))?;
             map.serialize_entry(ITEM_PROPERTY_LABEL, &Value::from(self.label))?;
             let mut dict = zbus::zvariant::Dict::new(String::signature(), String::signature());
-            for (key, value) in &self.attributes {
-                dict.add(key, value).expect("Key/Value of correct types");
+
+            if let Some(attributes) = self.attributes {
+                for (key, value) in attributes {
+                    dict.add(key, value).expect("Key/Value of correct types");
+                }
             }
 
             map.serialize_entry(ITEM_PROPERTY_ATTRIBUTES, &Value::from(dict))?;
@@ -84,7 +87,7 @@ mod tests {
     fn serialize_label_with_attributes() {
         let mut attributes = HashMap::new();
         attributes.insert("some", "attribute");
-        let properties = Properties::for_item("some_label", attributes.clone());
+        let properties = Properties::for_item("some_label", &attributes);
 
         let ctxt = Context::<LE>::new_dbus(0);
         let encoded = to_bytes(ctxt, &properties).unwrap();
