@@ -35,10 +35,18 @@ use std::{
 };
 
 #[cfg(feature = "async-std")]
-use async_std::{fs, io, prelude::*, sync::RwLock};
+use async_std::{
+    fs, io,
+    prelude::*,
+    sync::{Mutex, RwLock},
+};
 use once_cell::sync::OnceCell;
 #[cfg(feature = "tokio")]
-use tokio::{fs, io, io::AsyncReadExt, sync::RwLock};
+use tokio::{
+    fs, io,
+    io::AsyncReadExt,
+    sync::{Mutex, RwLock},
+};
 use zeroize::Zeroizing;
 
 use crate::Key;
@@ -66,7 +74,7 @@ pub struct Keyring {
     path: PathBuf,
     /// Times are stored before reading the file to detect
     /// file changes before writing
-    mtime: RwLock<Option<std::time::SystemTime>>,
+    mtime: Mutex<Option<std::time::SystemTime>>,
     key: RwLock<OnceCell<Key>>,
     secret: Arc<Secret>,
 }
@@ -113,7 +121,7 @@ impl Keyring {
         Ok(Self {
             keyring: Arc::new(RwLock::new(keyring)),
             path: path.as_ref().to_path_buf(),
-            mtime: RwLock::new(mtime),
+            mtime: Mutex::new(mtime),
             key: Default::default(),
             secret: Arc::new(secret),
         })
@@ -264,7 +272,7 @@ impl Keyring {
 
         #[cfg(feature = "tracing")]
         tracing::debug!("Writing keyring back to the file");
-        keyring.dump(&self.path, *self.mtime.read().await).await?;
+        keyring.dump(&self.path, *self.mtime.lock().await).await?;
 
         Ok(())
     }
@@ -273,8 +281,8 @@ impl Keyring {
     pub async fn write(&self) -> Result<(), Error> {
         #[cfg(feature = "tracing")]
         tracing::debug!("Writing keyring back to the file {:?}", self.path);
+        let mut mtime = self.mtime.lock().await;
         {
-            let mtime = self.mtime.read().await;
             let mut keyring = self.keyring.write().await;
             #[cfg(feature = "tracing")]
             tracing::debug!("Current modified time {:?}", mtime);
@@ -283,7 +291,7 @@ impl Keyring {
         if let Ok(modified) = fs::metadata(&self.path).await?.modified() {
             #[cfg(feature = "tracing")]
             tracing::debug!("New modified time {:?}", modified);
-            self.mtime.write().await.replace(modified);
+            *mtime = Some(modified);
         }
         Ok(())
     }
@@ -390,5 +398,23 @@ mod tests {
 
     fn strong_key() -> Secret {
         Secret::from([1, 2].into_iter().cycle().take(64).collect::<Vec<_>>())
+    }
+
+    #[cfg(feature = "async-std")]
+    #[async_std::test]
+    async fn concurrent_writes() -> Result<(), Error> {
+        let path = std::path::PathBuf::from("../../tests/concurrent_writes.keyring");
+
+        let keyring = Arc::new(Keyring::load(&path, strong_key()).await?);
+
+        let keyring_clone = keyring.clone();
+        let handle_1 = async_std::task::spawn(async move { keyring_clone.write().await });
+        let handle_2 = async_std::task::spawn(async move { keyring.write().await });
+
+        let (res_1, res_2) = futures_util::future::join(handle_1, handle_2).await;
+        res_1?;
+        res_2?;
+
+        Ok(())
     }
 }
