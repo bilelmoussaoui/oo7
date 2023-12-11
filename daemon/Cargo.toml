@@ -1,0 +1,15 @@
+[package]
+name = "oo7-daemon"
+edition.workspace = true
+exclude.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+oo7 = { path = "../client", features = ["unstable"] }
+serde = "1.0"
+tokio = { version = "1", features = ["full"] } # look for specific features
+zbus = "3.14.1"
+zeroize = { version = "1", features = ["zeroize_derive"] }
