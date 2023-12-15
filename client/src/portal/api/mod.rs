@@ -330,11 +330,11 @@ mod tests {
             .items
             .push(Item::new(String::from("Label"), needle.clone(), b"MyPassword").encrypt(&key)?);
 
-        assert_eq!(keyring.search_items(needle.clone(), &key)?.len(), 1);
+        assert_eq!(keyring.search_items(&needle, &key)?.len(), 1);
 
-        keyring.remove_items(needle.clone(), &key)?;
+        keyring.remove_items(&needle, &key)?;
 
-        assert_eq!(keyring.search_items(needle, &key)?.len(), 0);
+        assert_eq!(keyring.search_items(&needle, &key)?.len(), 0);
 
         Ok(())
     }
@@ -360,7 +360,7 @@ mod tests {
 
         let loaded_keyring = Keyring::try_from(blob.as_slice())?;
         let loaded_items =
-            loaded_keyring.search_items(HashMap::from([("my-tag", "my tag value")]), &key)?;
+            loaded_keyring.search_items(&HashMap::from([("my-tag", "my tag value")]), &key)?;
 
         assert_eq!(*loaded_items[0].secret(), "A Password".as_bytes());
 

@@ -17,12 +17,12 @@
 //!     .await?;
 //!
 //! let items = keyring
-//!     .search_items(HashMap::from([("account", "alice")]))
+//!     .search_items(&HashMap::from([("account", "alice")]))
 //!     .await?;
 //! assert_eq!(*items[0].secret(), b"My Password");
 //!
 //! keyring
-//!     .delete(HashMap::from([("account", "alice")]))
+//!     .delete(&HashMap::from([("account", "alice")]))
 //!     .await?;
 //! #   Ok(())
 //! # }

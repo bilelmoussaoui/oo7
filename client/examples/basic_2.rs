@@ -24,7 +24,7 @@ async fn main() -> oo7::Result<()> {
     let items = KEYRING
         .get()
         .unwrap()
-        .search_items(HashMap::from([("attr", "value")]))
+        .search_items(&HashMap::from([("attr", "value")]))
         .await?;
 
     for item in items {
