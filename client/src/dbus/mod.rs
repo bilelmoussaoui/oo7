@@ -24,7 +24,7 @@
 //!     .await?;
 //!
 //! // Retrieve it later thanks to it attributes
-//! let items = collection.search_items(attributes).await?;
+//! let items = collection.search_items(&attributes).await?;
 //! let item = items.first().unwrap();
 //! assert_eq!(*item.secret().await?, b"password");
 //!

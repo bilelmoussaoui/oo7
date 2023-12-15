@@ -43,12 +43,12 @@ async fn run() -> oo7::Result<()> {
 
     // Find a stored secret
     let items = keyring
-        .search_items(HashMap::from([("attribute", "attribute_value")]))
+        .search_items(&HashMap::from([("attribute", "attribute_value")]))
         .await?;
 
     // Delete a stored secret
     keyring
-        .delete(HashMap::from([("attribute", "attribute_value")]))
+        .delete(&HashMap::from([("attribute", "attribute_value")]))
         .await?;
 
     // Unlock the collection if the Secret Service is used
@@ -82,7 +82,7 @@ fn main() {
         let items = KEYRING
             .get()
             .unwrap()
-            .search_items(HashMap::from([("attribute", "attribute_value")]))
+            .search_items(&HashMap::from([("attribute", "attribute_value")]))
             .await;
     });
 }
