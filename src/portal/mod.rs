@@ -35,12 +35,14 @@ use std::{
 };
 
 #[cfg(feature = "async-std")]
-use async_std::{
-    fs, io,
-    prelude::*,
-    sync::{Mutex, RwLock},
-};
+use async_fs as fs;
+#[cfg(feature = "async-std")]
+use async_lock::{Mutex, RwLock};
+#[cfg(feature = "async-std")]
+use futures_lite::AsyncReadExt;
 use once_cell::sync::OnceCell;
+#[cfg(feature = "async-std")]
+use std::io;
 #[cfg(feature = "tokio")]
 use tokio::{
     fs, io,
@@ -302,8 +304,8 @@ impl Keyring {
         let secret = Arc::clone(&self.secret);
 
         #[cfg(feature = "async-std")]
-        let newkey = async_global_executor::spawn_blocking(move || {
-            async_std::task::block_on(async { keyring.read().await.derive_key(&secret) })
+        let newkey = blocking::unblock(move || {
+            async_io::block_on(async { keyring.read().await.derive_key(&secret) })
         })
         .await;
 
