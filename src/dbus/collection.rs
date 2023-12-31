@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 #[cfg(feature = "async-std")]
-use async_std::sync::RwLock;
+use async_lock::RwLock;
 #[cfg(feature = "tokio")]
 use tokio::sync::RwLock;
 
