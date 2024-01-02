@@ -8,7 +8,7 @@ name: CI
 jobs:
   check:
     name: Check
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
@@ -23,28 +23,40 @@ jobs:
 
   test:
     name: Test Suite
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install dependencies
-        run: |
-          sudo apt-get install gnome-keyring dbus dbus-x11 -y
-          gnome-keyring-daemon -d
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
-      - name: Build and test
+      - name: Build client (async-std / native)
         run: |
-          dbus-run-session -- cargo test --no-default-features --features async-std --features native_crypto
-      - name: Build and test (OpenSSL)
+          cargo build --manifest-path ./client/Cargo.toml --no-default-features --features async-std --features native_crypto
+      - name: Build client (async-std / OpenSSL)
         run: |
-          dbus-run-session -- cargo test --no-default-features --features async-std --features openssl_crypto
+          cargo build --manifest-path ./client/Cargo.toml --no-default-features --features async-std --features openssl_crypto
+      - name: Build client (tokio / native)
+        run: |
+          cargo build --manifest-path ./client/Cargo.toml --no-default-features --features tokio --features native_crypto
+      - name: Build client (tokio / OpenSSL)
+        run: |
+          cargo build --manifest-path ./client/Cargo.toml --no-default-features --features tokio --features openssl_crypto
+      - name: Build CLI
+        run: |
+          cargo build --manifest-path ./cli/Cargo.toml
+
+      - name: Test (native)
+        run: |
+          cargo test --manifest-path ./client/Cargo.toml --no-default-features --features async-std --features native_crypto
+      - name: Test (OpenSSL)
+        run: |
+          cargo test --manifest-path ./client/Cargo.toml --no-default-features --features async-std --features openssl_crypto
 
   fmt:
     name: Rustfmt
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
@@ -61,7 +73,7 @@ jobs:
 
   clippy:
     name: Clippy
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
