@@ -28,6 +28,8 @@
 //! # }
 //! ```
 
+#[cfg(feature = "async-std")]
+use std::io;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -41,8 +43,6 @@ use async_lock::{Mutex, RwLock};
 #[cfg(feature = "async-std")]
 use futures_lite::AsyncReadExt;
 use once_cell::sync::OnceCell;
-#[cfg(feature = "async-std")]
-use std::io;
 #[cfg(feature = "tokio")]
 use tokio::{
     fs, io,
