@@ -6,9 +6,7 @@
 // - Make more things async
 
 #[cfg(feature = "async-std")]
-use async_fs::unix::OpenOptionsExt;
-#[cfg(feature = "async-std")]
-use futures_lite::AsyncWriteExt;
+use std::io;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -16,11 +14,13 @@ use std::{
 
 #[cfg(feature = "async-std")]
 use async_fs as fs;
+#[cfg(feature = "async-std")]
+use async_fs::unix::OpenOptionsExt;
+#[cfg(feature = "async-std")]
+use futures_lite::AsyncWriteExt;
 use once_cell::sync::Lazy;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "async-std")]
-use std::io;
 #[cfg(feature = "tokio")]
 use tokio::{fs, io, io::AsyncWriteExt};
 use zbus::zvariant::{self, Type};
