@@ -1,5 +1,5 @@
-pub(crate) static DESTINATION: &str = "org.freedesktop.secrets";
-pub(crate) static PATH: &str = "/org/freedesktop/secrets";
+pub(crate) const DESTINATION: &str = "org.freedesktop.secrets";
+pub(crate) const PATH: &str = "/org/freedesktop/secrets";
 
 /// A common trait implemented by objects that can be
 /// locked or unlocked. Like [`Collection`] or [`Item`].
