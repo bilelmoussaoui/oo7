@@ -1,0 +1,102 @@
+[package]
+name = "oo7"
+version = "0.3.0"
+edition = "2021"
+authors = ["Bilal Elmoussaoui", "Sophie Herold", "Maximiliano Sandoval"]
+description = "James Bond went on a new mission and this time as a Secret Service provider"
+repository = "https://github.com/bilelmoussaoui/oo7"
+homepage = "https://github.com/bilelmoussaoui/oo7"
+keywords = ["keyring", "secret", "service", "portal", "keychain"]
+exclude = ["org.freedesktop.Secrets.xml"]
+categories = ["os::linux-apis", "os", "api-bindings"]
+license = "MIT"
+rust-version = "1.66"
+
+[dependencies]
+
+zbus = { version = "3.5.0", default-features = false, features = ["gvariant"] }
+serde = "1.0"
+futures-lite = { version = "2.1", optional = true }
+futures-util = "0.3"
+rand = { version = "0.8", default-features = false }
+tokio = { version = "1.17", features = [
+    "sync",
+    "fs",
+    "io-util",
+], optional = true, default-features = false }
+byteorder = "1.0"
+num = "0.4.0"
+num-bigint-dig = { version = "0.8", features = ["zeroize"] }
+tracing = { version = "0.1", optional = true }
+zeroize = { version = "1", features = ["zeroize_derive"] }
+aes = { version = "0.8", features = ["zeroize"], optional = true }
+cbc = { version = "0.1", features = ["zeroize"], optional = true }
+cipher = { version = "0.4", features = [
+    "rand_core",
+    "zeroize",
+], optional = true }
+digest = { version = "0.10", optional = true }
+hkdf = { version = "0.12", optional = true }
+hmac = { version = "0.12", optional = true }
+pbkdf2 = { version = "0.12", optional = true }
+sha2 = { version = "0.10", optional = true }
+openssl = { version = "0.10", optional = true }
+once_cell = "1.9"
+async-fs = { version = "2.1.0", optional = true }
+async-lock = { version = "3.2.0", optional = true }
+async-io = { version = "2.2.2", optional = true }
+blocking = { version = "1.5.1", optional = true }
+
+[dev-dependencies]
+async-std = { version = "1.11", features = ["attributes"] }
+tokio = { version = "1.11", features = ["macros", "rt"] }
+
+[features]
+default = ["local_tests", "async-std", "native_crypto"]
+# Some tests requires a prompt to be displayed, which can't be easily
+# handled in CI unless we write a mock service. The feature allows to disabling those tests in CI
+local_tests = []
+# Enables unstable low-level API
+unstable = []
+# Build nicer docs (requires nightly)
+docs = []
+async-std = [
+    "zbus/async-io",
+    "dep:async-fs",
+    "dep:async-io",
+    "dep:async-lock",
+    "dep:blocking",
+    "dep:futures-lite",
+]
+tokio = ["zbus/tokio", "dep:tokio"]
+native_crypto = [
+    "aes",
+    "cbc",
+    "cipher",
+    "digest",
+    "hkdf",
+    "hmac",
+    "pbkdf2",
+    "sha2",
+]
+openssl_crypto = ["openssl"]
+
+[package.metadata.docs.rs]
+features = ["unstable"]
+rustc-args = ["--cfg", "docsrs"]
+rustdoc-args = ["--cfg", "docsrs", "--generate-link-to-definition"]
+
+[[example]]
+name = "basic"
+path = "examples/basic.rs"
+required-features = ["async-std"]
+
+[[example]]
+name = "basic_2"
+path = "examples/basic_2.rs"
+required-features = ["async-std"]
+
+[[example]]
+name = "dbus_service"
+path = "examples/dbus_service.rs"
+required-features = ["async-std"]

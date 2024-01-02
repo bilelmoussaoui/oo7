@@ -20,11 +20,6 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: check
-      - name: Check (keyring-util)
-        uses: actions-rs/cargo@v1
-        with:
-          working-directory: ./keyring-util
-          command: check
 
   test:
     name: Test Suite
@@ -46,10 +41,6 @@ jobs:
       - name: Build and test (OpenSSL)
         run: |
           dbus-run-session -- cargo test --no-default-features --features async-std --features openssl_crypto
-      - name: Build (keyring-util)
-        working-directory: ./keyring-util
-        run: |
-          cargo build
 
   fmt:
     name: Rustfmt
@@ -67,12 +58,6 @@ jobs:
         with:
           command: fmt
           args: --all -- --check
-      - name: Rust Format (keyring-util)
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          working-directory: ./keyring-util
-          args: --all -- --check
 
   clippy:
     name: Clippy
@@ -89,10 +74,4 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: -- -D warnings
-      - name: Clippy (keyring-util)
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          working-directory: ./keyring-util
           args: -- -D warnings
