@@ -106,28 +106,28 @@ async fn main() -> Result<(), Error> {
                 StoreArgs::from_arg_matches(matches).map_err(|e| Error::new(&e.to_string()))?;
             let attributes = parse_attributes(&args.attributes)?;
 
-            store(&args.label, attributes).await
+            store(&args.label, &attributes).await
         }
         Some(("lookup", matches)) => {
             let args =
                 LookupArgs::from_arg_matches(matches).map_err(|e| Error::new(&e.to_string()))?;
             let attributes = parse_attributes(&args.attributes)?;
 
-            lookup(attributes).await
+            lookup(&attributes).await
         }
         Some(("search", matches)) => {
             let args =
                 SearchArgs::from_arg_matches(matches).map_err(|e| Error::new(&e.to_string()))?;
             let attributes = parse_attributes(&args.attributes)?;
 
-            search(attributes, args.all).await
+            search(&attributes, args.all).await
         }
         Some(("delete", matches)) => {
             let args =
                 LookupArgs::from_arg_matches(matches).map_err(|e| Error::new(&e.to_string()))?;
             let attributes = parse_attributes(&args.attributes)?;
 
-            delete(attributes).await
+            delete(&attributes).await
         }
         Some(("lock", _matches)) => lock().await,
         Some(("unlock", _matches)) => unlock().await,
@@ -155,7 +155,7 @@ fn parse_attributes(attributes: &[String]) -> Result<HashMap<&str, &str>, Error>
     }
 }
 
-async fn store(label: &str, attributes: HashMap<&str, &str>) -> Result<(), Error> {
+async fn store(label: &str, attributes: &HashMap<&str, &str>) -> Result<(), Error> {
     let collection = collection().await?;
 
     print!("Type a secret: ");
@@ -171,7 +171,7 @@ async fn store(label: &str, attributes: HashMap<&str, &str>) -> Result<(), Error
     Ok(())
 }
 
-async fn lookup(attributes: HashMap<&str, &str>) -> Result<(), Error> {
+async fn lookup(attributes: &HashMap<&str, &str>) -> Result<(), Error> {
     let collection = collection().await?;
     let items = collection.search_items(attributes).await?;
 
@@ -185,7 +185,7 @@ async fn lookup(attributes: HashMap<&str, &str>) -> Result<(), Error> {
     Ok(())
 }
 
-async fn search(attributes: HashMap<&str, &str>, all: bool) -> Result<(), Error> {
+async fn search(attributes: &HashMap<&str, &str>, all: bool) -> Result<(), Error> {
     let collection = collection().await?;
     let items = collection.search_items(attributes).await?;
 
@@ -200,7 +200,7 @@ async fn search(attributes: HashMap<&str, &str>, all: bool) -> Result<(), Error>
     Ok(())
 }
 
-async fn delete(attributes: HashMap<&str, &str>) -> Result<(), Error> {
+async fn delete(attributes: &HashMap<&str, &str>) -> Result<(), Error> {
     let collection = collection().await?;
     let items = collection.search_items(attributes).await?;
 
