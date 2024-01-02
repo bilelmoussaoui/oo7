@@ -35,12 +35,12 @@
 /// The default collection alias.
 ///
 /// In general, you are supposed to use [`Service::default_collection`].
-pub static DEFAULT_COLLECTION: &str = "default";
+pub const DEFAULT_COLLECTION: &str = "default";
 
 /// A session collection.
 ///
 /// The collection is cleared when the user ends the session.
-pub static SESSION_COLLECTION: &str = "session";
+pub const SESSION_COLLECTION: &str = "session";
 
 /// Barebone DBus API of the Secret Service specifications.
 ///

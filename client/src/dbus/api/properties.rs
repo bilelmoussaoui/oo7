@@ -3,10 +3,10 @@ use std::collections::HashMap;
 use serde::ser::{Serialize, SerializeMap};
 use zbus::zvariant::{Type, Value};
 
-static ITEM_PROPERTY_LABEL: &str = "org.freedesktop.Secret.Item.Label";
-static ITEM_PROPERTY_ATTRIBUTES: &str = "org.freedesktop.Secret.Item.Attributes";
+const ITEM_PROPERTY_LABEL: &str = "org.freedesktop.Secret.Item.Label";
+const ITEM_PROPERTY_ATTRIBUTES: &str = "org.freedesktop.Secret.Item.Attributes";
 
-static COLLECTION_PROPERTY_LABEL: &str = "org.freedesktop.Secret.Collection.Label";
+const COLLECTION_PROPERTY_LABEL: &str = "org.freedesktop.Secret.Collection.Label";
 
 #[derive(Debug, Type)]
 #[zvariant(signature = "a{sv}")]
