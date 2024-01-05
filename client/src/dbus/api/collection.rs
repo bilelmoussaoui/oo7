@@ -51,7 +51,7 @@ impl<'a> Collection<'a> {
     }
 
     #[doc(alias = "ItemCreated")]
-    pub async fn receive_item_created(&self) -> Result<impl Stream<Item = Item<'_>>, Error> {
+    pub async fn receive_item_created(&self) -> Result<impl Stream<Item = Item<'a>> + '_, Error> {
         let mut stream = self.inner().receive_signal("ItemCreated").await?;
         let conn = self.inner().connection();
         Ok(stream.filter_map(move |message| async move {
@@ -67,7 +67,7 @@ impl<'a> Collection<'a> {
     }
 
     #[doc(alias = "ItemChanged")]
-    pub async fn receive_item_changed(&self) -> Result<impl Stream<Item = Item<'_>>, Error> {
+    pub async fn receive_item_changed(&self) -> Result<impl Stream<Item = Item<'a>> + '_, Error> {
         let mut stream = self.inner().receive_signal("ItemChanged").await?;
         let conn = self.inner().connection();
         Ok(stream.filter_map(move |message| async move {
