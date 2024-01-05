@@ -52,7 +52,7 @@ impl<'a> Collection<'a> {
 
     #[doc(alias = "ItemCreated")]
     pub async fn receive_item_created(&self) -> Result<impl Stream<Item = Item<'a>> + '_, Error> {
-        let mut stream = self.inner().receive_signal("ItemCreated").await?;
+        let stream = self.inner().receive_signal("ItemCreated").await?;
         let conn = self.inner().connection();
         Ok(stream.filter_map(move |message| async move {
             let path = message.body::<OwnedObjectPath>().ok()?;
@@ -62,13 +62,13 @@ impl<'a> Collection<'a> {
 
     #[doc(alias = "ItemDeleted")]
     pub async fn receive_item_deleted(&self) -> Result<impl Stream<Item = OwnedObjectPath>, Error> {
-        let mut stream = self.inner().receive_signal("ItemDeleted").await?;
+        let stream = self.inner().receive_signal("ItemDeleted").await?;
         Ok(stream.filter_map(move |message| async move { message.body::<OwnedObjectPath>().ok() }))
     }
 
     #[doc(alias = "ItemChanged")]
     pub async fn receive_item_changed(&self) -> Result<impl Stream<Item = Item<'a>> + '_, Error> {
-        let mut stream = self.inner().receive_signal("ItemChanged").await?;
+        let stream = self.inner().receive_signal("ItemChanged").await?;
         let conn = self.inner().connection();
         Ok(stream.filter_map(move |message| async move {
             let path = message.body::<OwnedObjectPath>().ok()?;
