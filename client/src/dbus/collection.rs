@@ -2,8 +2,10 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 #[cfg(feature = "async-std")]
 use async_lock::RwLock;
+use futures_util::{Stream, StreamExt};
 #[cfg(feature = "tokio")]
 use tokio::sync::RwLock;
+use zbus::zvariant::OwnedObjectPath;
 
 use super::{api, Algorithm, Error, Item};
 use crate::Key;
@@ -210,6 +212,29 @@ impl<'a> Collection<'a> {
             *self.available.write().await = false;
             Ok(())
         }
+    }
+
+    /// Stream yielding when new items get created
+    pub async fn receive_item_created(&self) -> Result<impl Stream<Item = Item<'a>> + '_, Error> {
+        Ok(self
+            .inner
+            .receive_item_created()
+            .await?
+            .map(|item| self.new_item(item)))
+    }
+
+    /// Stream yielding when existing items get changed
+    pub async fn receive_item_changed(&self) -> Result<impl Stream<Item = Item<'a>> + '_, Error> {
+        Ok(self
+            .inner
+            .receive_item_changed()
+            .await?
+            .map(|item| self.new_item(item)))
+    }
+
+    /// Stream yielding when existing items get deleted
+    pub async fn receive_item_deleted(&self) -> Result<impl Stream<Item = OwnedObjectPath>, Error> {
+        self.inner.receive_item_deleted().await
     }
 
     // Get public `Item`` from `api::Item`
