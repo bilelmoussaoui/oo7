@@ -63,15 +63,7 @@ impl<'a> Collection<'a> {
                 .items()
                 .await?
                 .into_iter()
-                .map(|item| {
-                    Item::new(
-                        Arc::clone(&self.service),
-                        Arc::clone(&self.session),
-                        self.algorithm,
-                        item,
-                        self.aes_key.as_ref().map(Arc::clone),
-                    )
-                })
+                .map(|item| self.new_item(item))
                 .collect::<Vec<_>>())
         }
     }
@@ -185,13 +177,7 @@ impl<'a> Collection<'a> {
                 .create_item(label, attributes, &secret, replace)
                 .await?;
 
-            Ok(Item::new(
-                Arc::clone(&self.service),
-                Arc::clone(&self.session),
-                self.algorithm,
-                item,
-                self.aes_key.as_ref().map(Arc::clone),
-            ))
+            Ok(self.new_item(item))
         }
     }
 
@@ -224,6 +210,17 @@ impl<'a> Collection<'a> {
             *self.available.write().await = false;
             Ok(())
         }
+    }
+
+    // Get public `Item`` from `api::Item`
+    fn new_item(&self, item: api::Item<'a>) -> Item<'a> {
+        Item::new(
+            Arc::clone(&self.service),
+            Arc::clone(&self.session),
+            self.algorithm,
+            item,
+            self.aes_key.as_ref().map(Arc::clone),
+        )
     }
 }
 
