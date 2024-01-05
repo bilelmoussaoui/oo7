@@ -4,6 +4,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use async_lock::RwLock;
 #[cfg(feature = "tokio")]
 use tokio::sync::RwLock;
+use zbus::zvariant::ObjectPath;
 use zeroize::Zeroizing;
 
 use super::{api, Algorithm, Error};
@@ -194,5 +195,10 @@ impl<'a> Item<'a> {
             self.service.lock(&[self.inner.inner().path()]).await?;
             Ok(())
         }
+    }
+
+    /// Returns item path
+    pub fn path(&self) -> &ObjectPath<'_> {
+        self.inner.inner().path()
     }
 }
