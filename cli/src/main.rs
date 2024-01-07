@@ -11,6 +11,8 @@ use oo7::{
     zbus,
 };
 
+const BINARY_NAME: &'static str = env!("CARGO_BIN_NAME");
+
 struct Error(String);
 
 impl fmt::Debug for Error {
@@ -41,7 +43,7 @@ impl Termination for Error {
 #[command(
     name = "store",
     about = "Store a secret",
-    after_help = "The contents of the secret will be asked afterwards.\n\nExample:\n  keyring-util store 'My Personal Mail' smtp-port 1025 imap-port 143"
+    after_help = format!("The contents of the secret will be asked afterwards.\n\nExample:\n  {} store 'My Personal Mail' smtp-port 1025 imap-port 143", BINARY_NAME)
 )]
 struct StoreArgs {
     #[clap(help = "Description for the secret")]
@@ -54,7 +56,7 @@ struct StoreArgs {
 #[command(
     name = "search",
     about = "Search entries with matching attributes",
-    after_help = "Example:\n  keyring-util search --all smtp-port 1025"
+    after_help = format!("Example:\n  {} search --all smtp-port 1025", BINARY_NAME)
 )]
 struct SearchArgs {
     #[clap(help = "List of attributes. This is a space separated list of pairs of key value")]
@@ -71,7 +73,7 @@ struct SearchArgs {
 #[command(
     name = "lookup",
     about = "Retrieve a secret",
-    after_help = "Example:\n  keyring-util lookup smtp-port 1025"
+    after_help = format!("Example:\n  {} lookup smtp-port 1025", BINARY_NAME)
 )]
 struct LookupArgs {
     #[clap(help = "List of attributes. This is a space separated list of pairs of key value")]
@@ -82,7 +84,7 @@ struct LookupArgs {
 #[command(
     name = "delete",
     about = "Delete a secret",
-    after_help = "Will delete all secrets with matching attributes.\n\nExample:\n  keyring-util delete smtp-port 1025"
+    after_help = format!("Will delete all secrets with matching attributes.\n\nExample:\n  {} delete smtp-port 1025", BINARY_NAME)
 )]
 struct DeleteArgs {
     #[clap(help = "List of attributes. This is a space separated list of pairs of key value")]
@@ -91,8 +93,8 @@ struct DeleteArgs {
 
 #[async_std::main]
 async fn main() -> Result<(), Error> {
-    let cmd = Command::new("keyring-util")
-        .bin_name("keyring-util")
+    let cmd = Command::new(BINARY_NAME)
+        .bin_name(BINARY_NAME)
         .subcommand_required(true)
         .subcommand(StoreArgs::command())
         .subcommand(LookupArgs::command())
