@@ -7,7 +7,7 @@ use tokio::sync::RwLock;
 use zeroize::Zeroizing;
 
 use crate::{
-    dbus::{self, Algorithm, DEFAULT_COLLECTION},
+    dbus::{self, DEFAULT_COLLECTION},
     portal, Result,
 };
 
@@ -52,13 +52,7 @@ impl Keyring {
                 "Application is not sandboxed, falling back to the Sercret Service backend"
             );
         }
-        let service = match dbus::Service::new(Algorithm::Encrypted).await {
-            Ok(service) => Ok(service),
-            Err(dbus::Error::Zbus(zbus::Error::MethodError(_, _, _))) => {
-                dbus::Service::new(Algorithm::Plain).await
-            }
-            Err(e) => Err(e),
-        }?;
+        let service = dbus::Service::new().await?;
         let collection = match service.default_collection().await {
             Ok(c) => Ok(c),
             Err(dbus::Error::NotFound(_)) => {

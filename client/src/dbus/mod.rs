@@ -2,10 +2,10 @@
 //!
 //! That is usually done with
 //! ```no_run
-//! use oo7::dbus::{Algorithm, Service};
+//! use oo7::dbus::Service;
 //!
 //! # async fn run() -> oo7::Result<()> {
-//! let service = Service::new(Algorithm::Plain).await?;
+//! let service = Service::new().await?;
 //!
 //! let mut attributes = std::collections::HashMap::new();
 //! attributes.insert("type", "password");
@@ -55,7 +55,7 @@ pub mod api;
 mod api;
 
 mod algorithm;
-pub use algorithm::Algorithm;
+pub(crate) use algorithm::Algorithm;
 mod item;
 pub use item::Item;
 mod error;

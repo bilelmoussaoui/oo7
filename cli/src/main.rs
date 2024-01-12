@@ -6,10 +6,7 @@ use std::{
 };
 
 use clap::{Command, CommandFactory, FromArgMatches, Parser};
-use oo7::{
-    dbus::{Algorithm, Collection, Service},
-    zbus,
-};
+use oo7::dbus::{Collection, Service};
 
 const BINARY_NAME: &'static str = env!("CARGO_BIN_NAME");
 
@@ -271,14 +268,7 @@ async fn print_item<'a>(item: &oo7::dbus::Item<'a>) -> Result<(), Error> {
 }
 
 async fn collection<'a>() -> Result<Collection<'a>, Error> {
-    let service = match Service::new(Algorithm::Encrypted).await {
-        Ok(service) => Ok(service),
-        Err(oo7::dbus::Error::Zbus(zbus::Error::MethodError(_, _, _))) => {
-            Service::new(Algorithm::Plain).await
-        }
-        Err(e) => Err(e),
-    }?;
-
+    let service = Service::new().await?;
     let collection = match service.default_collection().await {
         Ok(c) => Ok(c),
         Err(oo7::dbus::Error::NotFound(_)) => {
