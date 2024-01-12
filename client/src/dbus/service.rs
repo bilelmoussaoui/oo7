@@ -13,10 +13,10 @@ use crate::Key;
 /// collection. The library handles that automatically for you.
 ///
 /// ```no_run
-/// use oo7::dbus::{Algorithm, Service};
+/// use oo7::dbus::Service;
 ///
 /// # async fn run() -> oo7::Result<()> {
-/// let service = Service::new(Algorithm::Plain).await?;
+/// let service = Service::new().await?;
 /// let collection = service.default_collection().await?;
 /// // Do something with the collection
 ///
@@ -32,8 +32,29 @@ pub struct Service<'a> {
 }
 
 impl<'a> Service<'a> {
+    /// Create a new instance of the Service, an encrypted communication would
+    /// be attempted first and would fall back to a plain one if that fails.
+    pub async fn new() -> Result<Service<'a>, Error> {
+        let service = match Self::encrypted().await {
+            Ok(service) => Ok(service),
+            Err(Error::Zbus(zbus::Error::MethodError(_, _, _))) => Self::plain().await,
+            Err(e) => Err(e),
+        }?;
+        Ok(service)
+    }
+
+    /// Create a new instance of the Service with plain algorithm.
+    pub async fn plain() -> Result<Service<'a>, Error> {
+        Self::with_algorithm(Algorithm::Plain).await
+    }
+
+    /// Create a new instance of the Service with encrypted algorithm.
+    pub async fn encrypted() -> Result<Service<'a>, Error> {
+        Self::with_algorithm(Algorithm::Encrypted).await
+    }
+
     /// Create a new instance of the Service.
-    pub async fn new(algorithm: Algorithm) -> Result<Service<'a>, Error> {
+    async fn with_algorithm(algorithm: Algorithm) -> Result<Service<'a>, Error> {
         let cnx = zbus::Connection::session().await?;
         let service = Arc::new(api::Service::new(&cnx).await?);
 
@@ -146,12 +167,12 @@ impl<'a> Service<'a> {
 #[cfg(feature = "async-std")]
 mod tests {
     #[cfg(feature = "local_tests")]
-    use super::{Algorithm, Service};
+    use super::Service;
 
     #[async_std::test]
     #[cfg(feature = "local_tests")]
     async fn create_collection() {
-        let service = Service::new(Algorithm::Plain).await.unwrap();
+        let service = Service::new().await.unwrap();
         let collection = service.create_collection("somelabel", None).await.unwrap();
 
         let found_collection = service.with_label("somelabel").await.unwrap();

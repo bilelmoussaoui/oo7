@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
-use oo7::dbus::{Algorithm, Service};
+use oo7::dbus::Service;
 
 #[async_std::main]
 async fn main() -> oo7::Result<()> {
-    let service = Service::new(Algorithm::Plain).await?;
+    let service = Service::new().await?;
 
     let mut attributes = HashMap::new();
     attributes.insert("type", "token");

@@ -310,14 +310,14 @@ mod tests {
     #[async_std::test]
     #[cfg(feature = "local_tests")]
     async fn create_plain_item() {
-        let service = Service::new(Algorithm::Plain).await.unwrap();
+        let service = Service::plain().await.unwrap();
         create_item(service, false).await;
     }
 
     #[async_std::test]
     #[cfg(feature = "local_tests")]
     async fn create_encrypted_item() {
-        let service = Service::new(Algorithm::Encrypted).await.unwrap();
+        let service = Service::encrypted().await.unwrap();
         create_item(service, true).await;
     }
 }
