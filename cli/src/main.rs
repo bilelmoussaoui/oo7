@@ -8,7 +8,7 @@ use std::{
 use clap::{Command, CommandFactory, FromArgMatches, Parser};
 use oo7::dbus::{Collection, Service};
 
-const BINARY_NAME: &'static str = env!("CARGO_BIN_NAME");
+const BINARY_NAME: &str = env!("CARGO_BIN_NAME");
 
 struct Error(String);
 
