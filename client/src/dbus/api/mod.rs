@@ -21,7 +21,10 @@ mod session;
 pub use collection::Collection;
 pub use item::Item;
 pub(crate) use prompt::Prompt;
+#[cfg(not(feature = "unstable"))]
 pub(crate) use properties::Properties;
+#[cfg(feature = "unstable")]
+pub use properties::Properties;
 pub use secret::Secret;
 pub use service::Service;
 pub use session::Session;

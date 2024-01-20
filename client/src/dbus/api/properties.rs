@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
-use serde::ser::{Serialize, SerializeMap};
-use zbus::zvariant::{Type, Value};
+use serde::{
+    ser::{Serialize, SerializeMap},
+    Deserialize,
+};
+use zbus::zvariant::{self, OwnedValue, Type, Value};
 
 const ITEM_PROPERTY_LABEL: &str = "org.freedesktop.Secret.Item.Label";
 const ITEM_PROPERTY_ATTRIBUTES: &str = "org.freedesktop.Secret.Item.Attributes";
@@ -10,45 +13,55 @@ const COLLECTION_PROPERTY_LABEL: &str = "org.freedesktop.Secret.Collection.Label
 
 #[derive(Debug, Type)]
 #[zvariant(signature = "a{sv}")]
-pub struct Properties<'a> {
-    label: &'a str,
-    attributes: Option<&'a HashMap<&'a str, &'a str>>,
-    is_collection: bool,
+pub struct Properties {
+    label: String,
+    attributes: Option<HashMap<String, String>>,
 }
 
-impl<'a> Properties<'a> {
-    pub fn for_item(label: &'a str, attributes: &'a HashMap<&'a str, &'a str>) -> Self {
+impl Properties {
+    pub fn for_item(label: &str, attributes: &HashMap<&str, &str>) -> Self {
         Self {
-            label,
-            attributes: Some(attributes),
-            is_collection: false,
+            label: label.to_owned(),
+            attributes: Some(
+                attributes
+                    .iter()
+                    .map(|(k, v)| (k.to_string(), v.to_string()))
+                    .collect(),
+            ),
         }
     }
 
-    pub fn for_collection(label: &'a str) -> Self {
+    pub fn for_collection(label: &str) -> Self {
         Self {
-            label,
+            label: label.to_owned(),
             attributes: None,
-            is_collection: true,
         }
+    }
+
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+
+    pub fn attributes(&self) -> Option<&HashMap<String, String>> {
+        self.attributes.as_ref()
     }
 }
 
-impl<'a> Serialize for Properties<'a> {
+impl Serialize for Properties {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        if self.is_collection {
+        if self.attributes.is_none() {
             let mut map = serializer.serialize_map(Some(1))?;
-            map.serialize_entry(COLLECTION_PROPERTY_LABEL, &Value::from(self.label))?;
+            map.serialize_entry(COLLECTION_PROPERTY_LABEL, &Value::from(&self.label))?;
             map.end()
         } else {
             let mut map = serializer.serialize_map(Some(2))?;
-            map.serialize_entry(ITEM_PROPERTY_LABEL, &Value::from(self.label))?;
+            map.serialize_entry(ITEM_PROPERTY_LABEL, &Value::from(&self.label))?;
             let mut dict = zbus::zvariant::Dict::new(String::signature(), String::signature());
 
-            if let Some(attributes) = self.attributes {
+            if let Some(attributes) = &self.attributes {
                 for (key, value) in attributes {
                     dict.add(key, value).expect("Key/Value of correct types");
                 }
@@ -56,6 +69,32 @@ impl<'a> Serialize for Properties<'a> {
 
             map.serialize_entry(ITEM_PROPERTY_ATTRIBUTES, &Value::from(dict))?;
             map.end()
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Properties {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let map: HashMap<&str, Value<'_>> = HashMap::deserialize(deserializer)?;
+        if map.contains_key(COLLECTION_PROPERTY_LABEL) {
+            let label =
+                zvariant::Str::try_from(map.get(COLLECTION_PROPERTY_LABEL).unwrap()).unwrap();
+            Ok(Self::for_collection(&label))
+        } else {
+            let label = zvariant::Str::try_from(map.get(ITEM_PROPERTY_LABEL).unwrap()).unwrap();
+            let attributes = HashMap::<String, String>::try_from(
+                map.get(ITEM_PROPERTY_ATTRIBUTES).unwrap().clone(),
+            )
+            .unwrap();
+            let attributes = attributes
+                .iter()
+                .map(|(key, val)| (key.as_str(), val.as_str()))
+                .collect::<HashMap<_, _>>();
+
+            Ok(Self::for_item(&label, &attributes))
         }
     }
 }
