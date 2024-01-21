@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-async-std = { version = "1.12.0", features = [ "attributes" ] }
+tokio = { version = "1.17", features = [ "macros", "rt-multi-thread" ] }
 chrono = { version = "0.4.31", default-features = false, features = ["alloc", "clock"] }
 clap = { version = "4.4.6", features = [ "cargo", "derive" ] }
 oo7 = { path = "../client" }

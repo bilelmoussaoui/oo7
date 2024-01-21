@@ -88,7 +88,7 @@ struct DeleteArgs {
     attributes: Vec<String>,
 }
 
-#[async_std::main]
+#[tokio::main]
 async fn main() -> Result<(), Error> {
     let cmd = Command::new(BINARY_NAME)
         .bin_name(BINARY_NAME)
