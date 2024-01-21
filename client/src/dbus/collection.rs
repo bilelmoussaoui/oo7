@@ -255,7 +255,7 @@ mod tests {
     #[cfg(feature = "local_tests")]
     use super::*;
     #[cfg(feature = "local_tests")]
-    use crate::dbus::Service;
+    use crate::dbus::{self, Service};
 
     #[cfg(feature = "local_tests")]
     async fn create_item(service: Service<'_>, encrypted: bool) {
@@ -268,7 +268,15 @@ mod tests {
         attributes.insert("type", value);
         let secret = "a password".as_bytes();
 
-        let collection = service.default_collection().await.unwrap();
+        let collection = match service.default_collection().await {
+            Err(dbus::Error::NotFound(_)) => {
+                service
+                    .create_collection("Default", Some(dbus::DEFAULT_COLLECTION))
+                    .await
+            }
+            e => e,
+        }
+        .unwrap();
         let n_items = collection.items().await.unwrap().len();
         let n_search_items = collection.search_items(&attributes).await.unwrap().len();
 
