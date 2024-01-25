@@ -57,8 +57,6 @@ default = ["local_tests", "async-std", "native_crypto"]
 local_tests = []
 # Enables unstable low-level API
 unstable = []
-# Build nicer docs (requires nightly)
-docs = []
 async-std = [
     "zbus/async-io",
     "dep:async-fs",
