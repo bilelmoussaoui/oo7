@@ -48,8 +48,7 @@ async-io = { version = "2.2.2", optional = true }
 blocking = { version = "1.5.1", optional = true }
 
 [dev-dependencies]
-async-std = { version = "1.11", features = ["attributes"] }
-tokio = { version = "1.11", features = ["macros", "rt"] }
+tokio = { version = "1.11", features = ["macros", "rt-multi-thread"] }
 
 [features]
 default = ["local_tests", "async-std", "native_crypto"]
@@ -89,14 +88,14 @@ rustdoc-args = ["--cfg", "docsrs", "--generate-link-to-definition"]
 [[example]]
 name = "basic"
 path = "examples/basic.rs"
-required-features = ["async-std"]
+required-features = ["tokio"]
 
 [[example]]
 name = "basic_2"
 path = "examples/basic_2.rs"
-required-features = ["async-std"]
+required-features = ["tokio"]
 
 [[example]]
 name = "dbus_service"
 path = "examples/dbus_service.rs"
-required-features = ["async-std"]
+required-features = ["tokio"]

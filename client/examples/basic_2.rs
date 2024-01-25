@@ -5,7 +5,7 @@ use oo7::Keyring;
 
 static KEYRING: OnceCell<Keyring> = OnceCell::new();
 
-#[async_std::main]
+#[tokio::main]
 async fn main() -> oo7::Result<()> {
     let keyring = Keyring::new().await?;
     KEYRING.set(keyring).unwrap();

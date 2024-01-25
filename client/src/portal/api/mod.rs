@@ -308,7 +308,7 @@ fn hash_attributes<'a, K: AsRef<str>>(
 }
 
 #[cfg(test)]
-#[cfg(feature = "async-std")]
+#[cfg(feature = "tokio")]
 mod tests {
     use super::*;
 
@@ -319,7 +319,7 @@ mod tests {
         48, 159, 0, 146,
     ];
 
-    #[async_std::test]
+    #[tokio::test]
     async fn keyfile_add_remove() -> Result<(), Error> {
         let needle = HashMap::from([(String::from("key"), String::from("value"))]);
 
@@ -339,7 +339,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn keyfile_dump_load() -> Result<(), Error> {
         let _silent = std::fs::remove_file("/tmp/test.keyring");
 
@@ -356,7 +356,7 @@ mod tests {
         );
         new_keyring.dump("/tmp/test.keyring", None).await?;
 
-        let blob = async_std::fs::read("/tmp/test.keyring").await?;
+        let blob = tokio::fs::read("/tmp/test.keyring").await?;
 
         let loaded_keyring = Keyring::try_from(blob.as_slice())?;
         let loaded_items =

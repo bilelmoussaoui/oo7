@@ -250,7 +250,7 @@ impl<'a> Collection<'a> {
 }
 
 #[cfg(test)]
-#[cfg(feature = "async-std")]
+#[cfg(feature = "tokio")]
 mod tests {
     #[cfg(feature = "local_tests")]
     use super::*;
@@ -303,14 +303,14 @@ mod tests {
         );
     }
 
-    #[async_std::test]
+    #[tokio::test]
     #[cfg(feature = "local_tests")]
     async fn create_plain_item() {
         let service = Service::plain().await.unwrap();
         create_item(service, false).await;
     }
 
-    #[async_std::test]
+    #[tokio::test]
     #[cfg(feature = "local_tests")]
     async fn create_encrypted_item() {
         let service = Service::encrypted().await.unwrap();

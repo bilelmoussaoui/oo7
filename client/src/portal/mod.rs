@@ -320,22 +320,12 @@ impl Keyring {
 }
 
 #[cfg(test)]
+#[cfg(feature = "tokio")]
 mod tests {
     use super::*;
 
-    #[cfg(feature = "async-std")]
-    #[async_std::test]
-    async fn repeated_write() -> Result<(), Error> {
-        repeated_write_().await
-    }
-
-    #[cfg(feature = "tokio")]
     #[tokio::test]
     async fn repeated_write() -> Result<(), Error> {
-        repeated_write_().await
-    }
-
-    async fn repeated_write_() -> Result<(), Error> {
         let path = std::path::PathBuf::from("../../tests/test.keyring");
 
         let secret = Secret::from(vec![1, 2]);
@@ -347,8 +337,7 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(feature = "async-std")]
-    #[async_std::test]
+    #[tokio::test]
     async fn delete() -> Result<(), Error> {
         let path = std::path::PathBuf::from("../../tests/test-delete.keyring");
 
@@ -366,7 +355,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn write_with_weak_key() -> Result<(), Error> {
         let path = std::path::PathBuf::from("../../tests/write_with_weak_key.keyring");
 
@@ -385,7 +374,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn write_with_strong_key() -> Result<(), Error> {
         let path = std::path::PathBuf::from("../../tests/write_with_strong_key.keyring");
 
@@ -402,20 +391,19 @@ mod tests {
         Secret::from([1, 2].into_iter().cycle().take(64).collect::<Vec<_>>())
     }
 
-    #[cfg(feature = "async-std")]
-    #[async_std::test]
+    #[tokio::test]
     async fn concurrent_writes() -> Result<(), Error> {
         let path = std::path::PathBuf::from("../../tests/concurrent_writes.keyring");
 
         let keyring = Arc::new(Keyring::load(&path, strong_key()).await?);
 
         let keyring_clone = keyring.clone();
-        let handle_1 = async_std::task::spawn(async move { keyring_clone.write().await });
-        let handle_2 = async_std::task::spawn(async move { keyring.write().await });
+        let handle_1 = tokio::task::spawn(async move { keyring_clone.write().await });
+        let handle_2 = tokio::task::spawn(async move { keyring.write().await });
 
         let (res_1, res_2) = futures_util::future::join(handle_1, handle_2).await;
-        res_1?;
-        res_2?;
+        res_1.unwrap()?;
+        res_2.unwrap()?;
 
         Ok(())
     }
