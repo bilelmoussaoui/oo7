@@ -6,3 +6,13 @@ members = [
   "cli",
   "portal",
 ]
+
+[workspace.package]
+version = "0.3.0"
+edition = "2021"
+authors = ["Bilal Elmoussaoui", "Sophie Herold", "Maximiliano Sandoval"]
+repository = "https://github.com/bilelmoussaoui/oo7"
+homepage = "https://github.com/bilelmoussaoui/oo7"
+license = "MIT"
+rust-version = "1.66"
+exclude = ["org.freedesktop.Secrets.xml"]
