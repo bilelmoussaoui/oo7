@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use oo7::dbus::Service;
 
-#[async_std::main]
+#[tokio::main]
 async fn main() -> oo7::Result<()> {
     let service = Service::new().await?;
 

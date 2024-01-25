@@ -164,12 +164,12 @@ impl<'a> Service<'a> {
 }
 
 #[cfg(test)]
-#[cfg(feature = "async-std")]
+#[cfg(feature = "tokio")]
 mod tests {
     #[cfg(feature = "local_tests")]
     use super::Service;
 
-    #[async_std::test]
+    #[tokio::test]
     #[cfg(feature = "local_tests")]
     async fn create_collection() {
         let service = Service::new().await.unwrap();
