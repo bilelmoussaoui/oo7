@@ -1,6 +1,5 @@
-use std::collections::HashMap;
+use std::{cell::OnceCell, collections::HashMap};
 
-use once_cell::sync::OnceCell;
 use oo7::Keyring;
 
 static KEYRING: OnceCell<Keyring> = OnceCell::new();

@@ -18,7 +18,6 @@ use async_fs as fs;
 use async_fs::unix::OpenOptionsExt;
 #[cfg(feature = "async-std")]
 use futures_lite::AsyncWriteExt;
-use once_cell::sync::Lazy;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "tokio")]
@@ -39,9 +38,6 @@ const FILE_HEADER_LEN: usize = FILE_HEADER.len();
 
 const MAJOR_VERSION: u8 = 1;
 const MINOR_VERSION: u8 = 0;
-
-pub(super) static GVARIANT_ENCODING: Lazy<zvariant::EncodingContext<byteorder::LE>> =
-    Lazy::new(|| zvariant::EncodingContext::<byteorder::LE>::new_gvariant(0));
 
 mod attribute_value;
 mod encrypted_item;
@@ -227,11 +223,12 @@ impl Keyring {
     }
 
     fn as_bytes(&self) -> Result<Vec<u8>, Error> {
+        let ctx = zvariant::EncodingContext::<byteorder::LE>::new_gvariant(0);
         let mut blob = FILE_HEADER.to_vec();
 
         blob.push(MAJOR_VERSION);
         blob.push(MINOR_VERSION);
-        blob.append(&mut zvariant::to_bytes(*GVARIANT_ENCODING, &self)?);
+        blob.append(&mut zvariant::to_bytes(ctx, &self)?);
 
         Ok(blob)
     }
@@ -273,7 +270,8 @@ impl TryFrom<&[u8]> for Keyring {
         }
 
         if let Some(data) = value.get((FILE_HEADER_LEN + 2)..) {
-            let keyring: Self = zvariant::from_slice(data, *GVARIANT_ENCODING)?;
+            let ctx = zvariant::EncodingContext::<byteorder::LE>::new_gvariant(0);
+            let keyring: Self = zvariant::from_slice(data, ctx)?;
 
             if keyring.salt.len() != keyring.salt_size as usize {
                 Err(Error::SaltSizeMismatch(
