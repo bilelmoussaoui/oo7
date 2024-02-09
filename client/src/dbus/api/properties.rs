@@ -4,7 +4,7 @@ use serde::{
     ser::{Serialize, SerializeMap},
     Deserialize,
 };
-use zbus::zvariant::{self, OwnedValue, Type, Value};
+use zbus::zvariant::{self, Type, Value};
 
 const ITEM_PROPERTY_LABEL: &str = "org.freedesktop.Secret.Item.Label";
 const ITEM_PROPERTY_ATTRIBUTES: &str = "org.freedesktop.Secret.Item.Attributes";
