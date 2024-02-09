@@ -37,7 +37,7 @@ impl<'a> Service<'a> {
     pub async fn receive_collection_created(
         &self,
     ) -> Result<impl Stream<Item = Collection<'_>>, Error> {
-        let mut stream = self.inner().receive_signal("CollectionCreated").await?;
+        let stream = self.inner().receive_signal("CollectionCreated").await?;
         let conn = self.inner().connection();
         Ok(stream.filter_map(move |message| async move {
             let path = message.body::<OwnedObjectPath>().ok()?;
@@ -49,7 +49,7 @@ impl<'a> Service<'a> {
     pub async fn receive_collection_deleted(
         &self,
     ) -> Result<impl Stream<Item = Collection<'_>>, Error> {
-        let mut stream = self.inner().receive_signal("CollectionDeleted").await?;
+        let stream = self.inner().receive_signal("CollectionDeleted").await?;
         let conn = self.inner().connection();
         Ok(stream.filter_map(move |message| async move {
             let path = message.body::<OwnedObjectPath>().ok()?;
@@ -61,7 +61,7 @@ impl<'a> Service<'a> {
     pub async fn receive_collection_changed(
         &self,
     ) -> Result<impl Stream<Item = Collection<'_>>, Error> {
-        let mut stream = self.inner().receive_signal("CollectionChanged").await?;
+        let stream = self.inner().receive_signal("CollectionChanged").await?;
         let conn = self.inner().connection();
         Ok(stream.filter_map(move |message| async move {
             let path = message.body::<OwnedObjectPath>().ok()?;
