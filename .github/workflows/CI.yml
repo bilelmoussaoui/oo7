@@ -54,10 +54,10 @@ jobs:
 
       - name: Test (native)
         run: |
-          cargo test --manifest-path ./client/Cargo.toml --no-default-features --features async-std --features native_crypto
+          cargo test --manifest-path ./client/Cargo.toml --no-default-features --features tokio --features native_crypto
       - name: Test (OpenSSL)
         run: |
-          cargo test --manifest-path ./client/Cargo.toml --no-default-features --features async-std --features openssl_crypto
+          cargo test --manifest-path ./client/Cargo.toml --no-default-features --features tokio --features openssl_crypto
 
   fmt:
     name: Rustfmt
