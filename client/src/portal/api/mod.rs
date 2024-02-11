@@ -7,7 +7,10 @@
 
 #[cfg(feature = "async-std")]
 use std::io;
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::OnceLock,
+};
 
 #[cfg(feature = "async-std")]
 use async_fs as fs;
@@ -15,7 +18,6 @@ use async_fs as fs;
 use async_fs::unix::OpenOptionsExt;
 #[cfg(feature = "async-std")]
 use futures_lite::AsyncWriteExt;
-use once_cell::sync::Lazy;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "tokio")]
@@ -37,9 +39,6 @@ const FILE_HEADER_LEN: usize = FILE_HEADER.len();
 const MAJOR_VERSION: u8 = 1;
 const MINOR_VERSION: u8 = 0;
 
-pub(super) static GVARIANT_ENCODING: Lazy<zvariant::EncodingContext<byteorder::LE>> =
-    Lazy::new(|| zvariant::EncodingContext::<byteorder::LE>::new_gvariant(0));
-
 mod attribute_value;
 mod encrypted_item;
 
@@ -52,6 +51,11 @@ use crate::{
     portal::{Error, WeakKeyError},
     AsAttributes, Key,
 };
+
+pub(super) fn gvariant_encoding() -> &'static zvariant::EncodingContext<byteorder::LE> {
+    static ENCODING: OnceLock<zvariant::EncodingContext<byteorder::LE>> = OnceLock::new();
+    ENCODING.get_or_init(|| zvariant::EncodingContext::<byteorder::LE>::new_gvariant(0))
+}
 
 /// Logical contents of a keyring file
 #[derive(Deserialize, Serialize, Type, Debug)]
@@ -215,7 +219,7 @@ impl Keyring {
 
         blob.push(MAJOR_VERSION);
         blob.push(MINOR_VERSION);
-        blob.append(&mut zvariant::to_bytes(*GVARIANT_ENCODING, &self)?);
+        blob.append(&mut zvariant::to_bytes(*gvariant_encoding(), &self)?);
 
         Ok(blob)
     }
@@ -257,7 +261,7 @@ impl TryFrom<&[u8]> for Keyring {
         }
 
         if let Some(data) = value.get((FILE_HEADER_LEN + 2)..) {
-            let keyring: Self = zvariant::from_slice(data, *GVARIANT_ENCODING)?;
+            let keyring: Self = zvariant::from_slice(data, *gvariant_encoding())?;
 
             if keyring.salt.len() != keyring.salt_size as usize {
                 Err(Error::SaltSizeMismatch(

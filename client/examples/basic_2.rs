@@ -1,9 +1,8 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::OnceLock};
 
-use once_cell::sync::OnceCell;
 use oo7::Keyring;
 
-static KEYRING: OnceCell<Keyring> = OnceCell::new();
+static KEYRING: OnceLock<Keyring> = OnceLock::new();
 
 #[tokio::main]
 async fn main() -> oo7::Result<()> {

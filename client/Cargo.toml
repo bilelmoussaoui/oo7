@@ -40,7 +40,6 @@ hmac = { version = "0.12", optional = true }
 pbkdf2 = { version = "0.12", optional = true }
 sha2 = { version = "0.10", optional = true }
 openssl = { version = "0.10", optional = true }
-once_cell = "1.9"
 async-fs = { version = "2.1.0", optional = true }
 async-lock = { version = "3.2.0", optional = true }
 async-io = { version = "2.2.2", optional = true }
