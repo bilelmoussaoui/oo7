@@ -68,6 +68,8 @@ mod secret;
 pub use error::{Error, InvalidItemError, WeakKeyError};
 pub use item::Item;
 pub use secret::Secret;
+#[cfg(feature = "unstable")]
+pub use secret::SecretProxy;
 
 type ItemDefinition = (String, HashMap<String, String>, Zeroizing<Vec<u8>>, bool);
 

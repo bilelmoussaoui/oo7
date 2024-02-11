@@ -13,7 +13,7 @@ use std::{
 use futures_util::FutureExt;
 use oo7::{
     dbus::Service,
-    zbus::{self, dbus_interface, zvariant},
+    zbus::{self, dbus_interface, zvariant, ProxyDefault},
 };
 use ring::rand::SecureRandom;
 use tokio::io::AsyncWriteExt;
@@ -27,7 +27,6 @@ use crate::{
 const PORTAL_VERSION: u32 = 1;
 const PORTAL_SECRET_SIZE: usize = 64;
 const PORTAL_NAME: &str = "org.freedesktop.impl.portal.desktop.oo7";
-const PORTAL_PATH: &str = "/org/freedesktop/portal/desktop";
 
 struct Secret;
 
@@ -139,7 +138,7 @@ async fn main() -> Result<(), zbus::Error> {
 
     let backend = Secret;
     let cnx = zbus::ConnectionBuilder::session()?
-        .serve_at(PORTAL_PATH, backend)?
+        .serve_at(oo7::portal::SecretProxy::PATH, backend)?
         .build()
         .await?;
     // NOTE For debugging.
