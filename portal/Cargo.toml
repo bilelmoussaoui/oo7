@@ -12,7 +12,7 @@ version.workspace = true
 [dependencies]
 futures-channel = "0.3"
 futures-util = "0.3"
-oo7 = { path = "../client" }
+oo7 = { path = "../client", features = ["unstable"]}
 ring = "0.17.5"
 secrecy = { version = "0.8", features = ["alloc"] }
 serde = { version = "1.0", features = ["derive"] }
