@@ -29,13 +29,11 @@ use super::Error;
 ///
 /// We use this secret to encrypt the app's [`Keyring`](crate::portal::Keyring).
 #[derive(Debug, Zeroize, ZeroizeOnDrop)]
-pub struct Secret {
-    secret: Vec<u8>,
-}
+pub struct Secret(Vec<u8>);
 
 impl From<Vec<u8>> for Secret {
     fn from(secret: Vec<u8>) -> Self {
-        Self { secret }
+        Self(secret)
     }
 }
 
@@ -43,7 +41,7 @@ impl std::ops::Deref for Secret {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
-        &self.secret
+        &self.0
     }
 }
 
@@ -175,5 +173,5 @@ pub async fn retrieve() -> Result<Secret, Error> {
     #[cfg(feature = "tracing")]
     tracing::debug!("Secret received from the portal successfully");
 
-    Ok(Secret { secret: buf })
+    Ok(Secret::from(buf))
 }
