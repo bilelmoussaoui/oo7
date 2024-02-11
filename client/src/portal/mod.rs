@@ -205,16 +205,18 @@ impl Keyring {
         secret: impl AsRef<[u8]>,
         replace: bool,
     ) -> Result<Item, Error> {
-        let mut opt_key = self.key.write().await;
-        let key = self.derive_key(&mut opt_key).await;
-        let mut keyring = self.keyring.write().await;
-        if replace {
-            keyring.remove_items(attributes, key)?;
-        }
-        let item = Item::new(label, attributes, secret);
-        let encrypted_item = item.encrypt(key)?;
-        keyring.items.push(encrypted_item);
-
+        let item = {
+            let mut opt_key = self.key.write().await;
+            let key = self.derive_key(&mut opt_key).await;
+            let mut keyring = self.keyring.write().await;
+            if replace {
+                keyring.remove_items(attributes, key)?;
+            }
+            let item = Item::new(label, attributes, secret);
+            let encrypted_item = item.encrypt(key)?;
+            keyring.items.push(encrypted_item);
+            item
+        };
         match self.write().await {
             Err(e) => Err(e),
             Ok(_) => Ok(item),
