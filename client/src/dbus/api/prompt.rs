@@ -22,7 +22,7 @@ impl<'a> Prompt<'a> {
         P::Error: Into<zbus::Error>,
     {
         let path = object_path.try_into().map_err(Into::into)?;
-        if path.as_str() != "/" {
+        if path != ObjectPath::default() {
             let inner = zbus::ProxyBuilder::new_bare(connection)
                 .interface("org.freedesktop.Secret.Prompt")?
                 .path(path)?

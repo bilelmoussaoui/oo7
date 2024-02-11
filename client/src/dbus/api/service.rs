@@ -215,9 +215,9 @@ impl<'a> Service<'a> {
             .call_method("ReadAlias", &(name))
             .await
             .map_err::<ServiceError, _>(From::from)?
-            .body::<zbus::zvariant::OwnedObjectPath>()?;
+            .body::<OwnedObjectPath>()?;
 
-        if collection_path.as_str() != "/" {
+        if collection_path != OwnedObjectPath::default() {
             let collection = Collection::new(self.inner().connection(), collection_path).await?;
             Ok(Some(collection))
         } else {
