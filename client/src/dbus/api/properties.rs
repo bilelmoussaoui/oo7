@@ -6,6 +6,8 @@ use serde::{
 };
 use zbus::zvariant::{self, Type, Value};
 
+use crate::AsAttributes;
+
 const ITEM_PROPERTY_LABEL: &str = "org.freedesktop.Secret.Item.Label";
 const ITEM_PROPERTY_ATTRIBUTES: &str = "org.freedesktop.Secret.Item.Attributes";
 
@@ -19,11 +21,12 @@ pub struct Properties {
 }
 
 impl Properties {
-    pub fn for_item(label: &str, attributes: &HashMap<&str, &str>) -> Self {
+    pub fn for_item(label: &str, attributes: &impl AsAttributes) -> Self {
         Self {
             label: label.to_owned(),
             attributes: Some(
                 attributes
+                    .as_attributes()
                     .iter()
                     .map(|(k, v)| (k.to_string(), v.to_string()))
                     .collect(),
@@ -89,11 +92,6 @@ impl<'de> Deserialize<'de> for Properties {
                 map.get(ITEM_PROPERTY_ATTRIBUTES).unwrap().clone(),
             )
             .unwrap();
-            let attributes = attributes
-                .iter()
-                .map(|(key, val)| (key.as_str(), val.as_str()))
-                .collect::<HashMap<_, _>>();
-
             Ok(Self::for_item(&label, &attributes))
         }
     }

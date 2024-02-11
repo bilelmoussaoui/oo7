@@ -8,7 +8,7 @@ use zeroize::Zeroizing;
 
 use crate::{
     dbus::{self, DEFAULT_COLLECTION},
-    portal, Result,
+    portal, AsAttributes, Result,
 };
 
 /// A [Secret Service](crate::dbus) or [file](crate::portal) backed keyring
@@ -90,7 +90,7 @@ impl Keyring {
     }
 
     /// Remove items that matches the attributes.
-    pub async fn delete(&self, attributes: &HashMap<&str, &str>) -> Result<()> {
+    pub async fn delete(&self, attributes: &impl AsAttributes) -> Result<()> {
         match self {
             Self::DBus(backend) => {
                 let items = backend.search_items(attributes).await?;
@@ -132,14 +132,14 @@ impl Keyring {
     pub async fn create_item(
         &self,
         label: &str,
-        attributes: HashMap<&str, &str>,
+        attributes: &impl AsAttributes,
         secret: impl AsRef<[u8]>,
         replace: bool,
     ) -> Result<()> {
         match self {
             Self::DBus(backend) => {
                 backend
-                    .create_item(label, &attributes, secret, replace, "text/plain")
+                    .create_item(label, attributes, secret, replace, "text/plain")
                     .await?;
             }
             Self::File(backend) => {
@@ -152,7 +152,7 @@ impl Keyring {
     }
 
     /// Find items based on their attributes.
-    pub async fn search_items(&self, attributes: &HashMap<&str, &str>) -> Result<Vec<Item>> {
+    pub async fn search_items(&self, attributes: &impl AsAttributes) -> Result<Vec<Item>> {
         let items = match self {
             Self::DBus(backend) => {
                 let items = backend.search_items(attributes).await?;
@@ -204,18 +204,11 @@ impl Item {
                 item.write().await.set_label(label);
 
                 let item_guard = item.read().await;
-                let attributes = item_guard
-                    .attributes()
-                    .iter()
-                    .map(|(k, v)| (k.to_owned(), v.to_string()))
-                    .collect::<HashMap<_, _>>();
+
                 backend
                     .create_item(
                         item_guard.label(),
-                        attributes
-                            .iter()
-                            .map(|(k, v)| (k.as_str(), v.as_str()))
-                            .collect::<HashMap<_, _>>(),
+                        &item_guard.attributes(),
                         &*item_guard.secret(),
                         true,
                     )
@@ -242,10 +235,10 @@ impl Item {
     }
 
     /// Sets the item attributes.
-    pub async fn set_attributes(&self, attributes: HashMap<&str, &str>) -> Result<()> {
+    pub async fn set_attributes(&self, attributes: &impl AsAttributes) -> Result<()> {
         match self {
             Self::File(item, backend) => {
-                item.write().await.set_attributes(attributes.clone());
+                item.write().await.set_attributes(attributes);
                 let item_guard = item.read().await;
                 backend
                     .create_item(item_guard.label(), attributes, &*item_guard.secret(), true)
@@ -262,19 +255,11 @@ impl Item {
             Self::File(item, backend) => {
                 item.write().await.set_secret(secret);
                 let item_guard = item.read().await;
-                let attributes = item_guard
-                    .attributes()
-                    .iter()
-                    .map(|(k, v)| (k.to_owned(), v.to_string()))
-                    .collect::<HashMap<_, _>>();
 
                 backend
                     .create_item(
                         item_guard.label(),
-                        attributes
-                            .iter()
-                            .map(|(k, v)| (k.as_str(), v.as_str()))
-                            .collect::<HashMap<_, _>>(),
+                        &item_guard.attributes(),
                         &*item_guard.secret(),
                         true,
                     )
@@ -330,22 +315,9 @@ impl Item {
     pub async fn delete(&self) -> Result<()> {
         match self {
             Self::File(item, backend) => {
-                let attributes = item
-                    .read()
-                    .await
-                    .attributes()
-                    .iter()
-                    .map(|(k, v)| (k.to_owned(), v.to_string()))
-                    .collect::<HashMap<_, _>>();
+                let item_guard = item.read().await;
 
-                backend
-                    .delete(
-                        &attributes
-                            .iter()
-                            .map(|(k, v)| (k.as_str(), v.as_str()))
-                            .collect::<HashMap<_, _>>(),
-                    )
-                    .await?;
+                backend.delete(&item_guard.attributes()).await?;
             }
             Self::DBus(item) => {
                 item.delete().await?;

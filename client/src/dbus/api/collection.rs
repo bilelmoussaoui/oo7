@@ -5,7 +5,10 @@ use serde::Serialize;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath, Type};
 
 use super::{Item, Prompt, Properties, Secret, Unlockable, DESTINATION};
-use crate::dbus::{Error, ServiceError};
+use crate::{
+    dbus::{Error, ServiceError},
+    AsAttributes,
+};
 
 #[derive(Type)]
 #[zvariant(signature = "o")]
@@ -130,11 +133,11 @@ impl<'a> Collection<'a> {
     #[doc(alias = "SearchItems")]
     pub async fn search_items(
         &self,
-        attributes: &HashMap<&str, &str>,
+        attributes: &impl AsAttributes,
     ) -> Result<Vec<Item<'a>>, Error> {
         let msg = self
             .inner()
-            .call_method("SearchItems", &(attributes))
+            .call_method("SearchItems", &(attributes.as_attributes()))
             .await
             .map_err::<ServiceError, _>(From::from)?;
 
@@ -146,7 +149,7 @@ impl<'a> Collection<'a> {
     pub async fn create_item(
         &self,
         label: &str,
-        attributes: &HashMap<&str, &str>,
+        attributes: &impl AsAttributes,
         secret: &Secret<'_>,
         replace: bool,
     ) -> Result<Item<'a>, Error> {

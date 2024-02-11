@@ -6,7 +6,10 @@ use std::{
 };
 
 use clap::{Command, CommandFactory, FromArgMatches, Parser};
-use oo7::dbus::{Collection, Service};
+use oo7::{
+    dbus::{Collection, Service},
+    AsAttributes,
+};
 
 const BINARY_NAME: &str = env!("CARGO_BIN_NAME");
 
@@ -135,7 +138,7 @@ async fn main() -> Result<(), Error> {
     }
 }
 
-fn parse_attributes(attributes: &[String]) -> Result<HashMap<&str, &str>, Error> {
+fn parse_attributes(attributes: &[String]) -> Result<HashMap<String, String>, Error> {
     // Should this allow attribute-less secrets?
     let mut attributes = attributes.iter();
     if attributes.len() == 0 {
@@ -145,7 +148,7 @@ fn parse_attributes(attributes: &[String]) -> Result<HashMap<&str, &str>, Error>
     }
     let mut result = HashMap::new();
     while let (Some(k), Some(v)) = (attributes.next(), attributes.next()) {
-        result.insert(k.as_str(), v.as_str());
+        result.insert(k.to_owned(), v.to_owned());
     }
     match attributes.next() {
         None => Ok(result),
@@ -155,7 +158,7 @@ fn parse_attributes(attributes: &[String]) -> Result<HashMap<&str, &str>, Error>
     }
 }
 
-async fn store(label: &str, attributes: &HashMap<&str, &str>) -> Result<(), Error> {
+async fn store(label: &str, attributes: &impl AsAttributes) -> Result<(), Error> {
     let collection = collection().await?;
 
     print!("Type a secret: ");
@@ -171,7 +174,7 @@ async fn store(label: &str, attributes: &HashMap<&str, &str>) -> Result<(), Erro
     Ok(())
 }
 
-async fn lookup(attributes: &HashMap<&str, &str>) -> Result<(), Error> {
+async fn lookup(attributes: &impl AsAttributes) -> Result<(), Error> {
     let collection = collection().await?;
     let items = collection.search_items(attributes).await?;
 
@@ -185,7 +188,7 @@ async fn lookup(attributes: &HashMap<&str, &str>) -> Result<(), Error> {
     Ok(())
 }
 
-async fn search(attributes: &HashMap<&str, &str>, all: bool) -> Result<(), Error> {
+async fn search(attributes: &impl AsAttributes, all: bool) -> Result<(), Error> {
     let collection = collection().await?;
     let items = collection.search_items(attributes).await?;
 
@@ -200,7 +203,7 @@ async fn search(attributes: &HashMap<&str, &str>, all: bool) -> Result<(), Error
     Ok(())
 }
 
-async fn delete(attributes: &HashMap<&str, &str>) -> Result<(), Error> {
+async fn delete(attributes: &impl AsAttributes) -> Result<(), Error> {
     let collection = collection().await?;
     let items = collection.search_items(attributes).await?;
 

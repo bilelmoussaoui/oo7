@@ -8,7 +8,7 @@ use super::{
     api::{AttributeValue, EncryptedItem, GVARIANT_ENCODING},
     Error,
 };
-use crate::{crypto, Key};
+use crate::{crypto, AsAttributes, Key};
 
 /// An item stored in the file backend.
 #[derive(Deserialize, Serialize, Type, Clone, Debug, Zeroize, ZeroizeOnDrop)]
@@ -27,7 +27,7 @@ pub struct Item {
 impl Item {
     pub(crate) fn new(
         label: impl ToString,
-        attributes: HashMap<impl ToString, impl ToString>,
+        attributes: &impl AsAttributes,
         secret: impl AsRef<[u8]>,
     ) -> Self {
         let now = std::time::SystemTime::UNIX_EPOCH
@@ -37,6 +37,7 @@ impl Item {
 
         Self {
             attributes: attributes
+                .as_attributes()
                 .into_iter()
                 .map(|(k, v)| (k.to_string(), v.into()))
                 .collect(),
@@ -53,8 +54,9 @@ impl Item {
     }
 
     /// Update the item attributes.
-    pub fn set_attributes(&mut self, attributes: HashMap<&str, &str>) {
+    pub fn set_attributes(&mut self, attributes: &impl AsAttributes) {
         self.attributes = attributes
+            .as_attributes()
             .into_iter()
             .map(|(k, v)| (k.to_string(), v.into()))
             .collect();

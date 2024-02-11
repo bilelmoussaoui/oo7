@@ -8,7 +8,7 @@ use zbus::zvariant::ObjectPath;
 use zeroize::Zeroizing;
 
 use super::{api, Algorithm, Error};
-use crate::{crypto, Key};
+use crate::{crypto, AsAttributes, Key};
 
 /// A secret with a label and attributes to identify it.
 ///
@@ -113,7 +113,7 @@ impl<'a> Item<'a> {
     }
 
     /// Update the item attributes.
-    pub async fn set_attributes(&self, attributes: HashMap<&str, &str>) -> Result<(), Error> {
+    pub async fn set_attributes(&self, attributes: &impl AsAttributes) -> Result<(), Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {

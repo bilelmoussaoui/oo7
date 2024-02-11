@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 #[cfg(feature = "async-std")]
 use async_lock::RwLock;
@@ -8,7 +8,7 @@ use tokio::sync::RwLock;
 use zbus::zvariant::OwnedObjectPath;
 
 use super::{api, Algorithm, Error, Item};
-use crate::Key;
+use crate::{AsAttributes, Key};
 
 /// A collection allows to store and retrieve items.
 ///
@@ -119,7 +119,7 @@ impl<'a> Collection<'a> {
     /// Search for items based on their attributes.
     pub async fn search_items(
         &self,
-        attributes: &HashMap<&str, &str>,
+        attributes: &impl AsAttributes,
     ) -> Result<Vec<Item<'a>>, Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
@@ -155,7 +155,7 @@ impl<'a> Collection<'a> {
     pub async fn create_item(
         &self,
         label: &str,
-        attributes: &HashMap<&str, &str>,
+        attributes: &impl AsAttributes,
         secret: impl AsRef<[u8]>,
         replace: bool,
         content_type: &str,

@@ -10,7 +10,7 @@
 //! keyring
 //!     .create_item(
 //!         "My Label",
-//!         HashMap::from([("account", "alice")]),
+//!         &HashMap::from([("account", "alice")]),
 //!         b"My Password",
 //!         true,
 //!     )
@@ -51,13 +51,15 @@ use tokio::{
 };
 use zeroize::Zeroizing;
 
-use crate::Key;
+use crate::{AsAttributes, Key};
 
 #[cfg(feature = "unstable")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 pub mod api;
 #[cfg(not(feature = "unstable"))]
 mod api;
+
+pub(crate) use api::AttributeValue;
 
 mod error;
 mod item;
@@ -160,7 +162,7 @@ impl Keyring {
     }
 
     /// Search items matching the attributes.
-    pub async fn search_items(&self, attributes: &HashMap<&str, &str>) -> Result<Vec<Item>, Error> {
+    pub async fn search_items(&self, attributes: &impl AsAttributes) -> Result<Vec<Item>, Error> {
         let mut opt_key = self.key.write().await;
         let key = self.derive_key(&mut opt_key).await;
         let keyring = self.keyring.read().await;
@@ -168,10 +170,7 @@ impl Keyring {
     }
 
     /// Find the first item matching the attributes.
-    pub async fn lookup_item(
-        &self,
-        attributes: &HashMap<&str, &str>,
-    ) -> Result<Option<Item>, Error> {
+    pub async fn lookup_item(&self, attributes: &impl AsAttributes) -> Result<Option<Item>, Error> {
         let mut opt_key = self.key.write().await;
         let key = self.derive_key(&mut opt_key).await;
         let keyring = self.keyring.read().await;
@@ -179,7 +178,7 @@ impl Keyring {
     }
 
     /// Delete an item.
-    pub async fn delete(&self, attributes: &HashMap<&str, &str>) -> Result<(), Error> {
+    pub async fn delete(&self, attributes: &impl AsAttributes) -> Result<(), Error> {
         {
             let mut opt_key = self.key.write().await;
             let key = self.derive_key(&mut opt_key).await;
@@ -202,7 +201,7 @@ impl Keyring {
     pub async fn create_item(
         &self,
         label: &str,
-        attributes: HashMap<&str, &str>,
+        attributes: &impl AsAttributes,
         secret: impl AsRef<[u8]>,
         replace: bool,
     ) -> Result<Item, Error> {
@@ -210,7 +209,7 @@ impl Keyring {
         let key = self.derive_key(&mut opt_key).await;
         let mut keyring = self.keyring.write().await;
         if replace {
-            keyring.remove_items(&attributes, key)?;
+            keyring.remove_items(attributes, key)?;
         }
         let item = Item::new(label, attributes, secret);
         let encrypted_item = item.encrypt(key)?;
@@ -269,7 +268,7 @@ impl Keyring {
             if replace {
                 keyring.remove_items(&attributes, key)?;
             }
-            let item = Item::new(label, attributes, &*secret);
+            let item = Item::new(label, &attributes, &*secret);
             let encrypted_item = item.encrypt(key)?;
             keyring.items.push(encrypted_item);
         }
@@ -324,11 +323,13 @@ impl Keyring {
 #[cfg(test)]
 #[cfg(feature = "tokio")]
 mod tests {
+    use std::{collections::HashMap, path::PathBuf};
+
     use super::*;
 
     #[tokio::test]
     async fn repeated_write() -> Result<(), Error> {
-        let path = std::path::PathBuf::from("../../tests/test.keyring");
+        let path = PathBuf::from("../../tests/test.keyring");
 
         let secret = Secret::from(vec![1, 2]);
         let keyring = Keyring::load(&path, secret).await?;
@@ -341,11 +342,12 @@ mod tests {
 
     #[tokio::test]
     async fn delete() -> Result<(), Error> {
-        let path = std::path::PathBuf::from("../../tests/test-delete.keyring");
+        let path = PathBuf::from("../../tests/test-delete.keyring");
 
         let keyring = Keyring::load(&path, strong_key()).await?;
+        let attributes: HashMap<&str, &str> = HashMap::default();
         keyring
-            .create_item("Label", Default::default(), "secret", false)
+            .create_item("Label", &attributes, "secret", false)
             .await?;
 
         keyring.delete_item_index(0).await?;
@@ -359,13 +361,14 @@ mod tests {
 
     #[tokio::test]
     async fn write_with_weak_key() -> Result<(), Error> {
-        let path = std::path::PathBuf::from("../../tests/write_with_weak_key.keyring");
+        let path = PathBuf::from("../../tests/write_with_weak_key.keyring");
 
         let secret = Secret::from(vec![1, 2]);
         let keyring = Keyring::load(&path, secret).await?;
+        let attributes: HashMap<&str, &str> = HashMap::default();
 
         let result = keyring
-            .create_item("label", Default::default(), "my-password", false)
+            .create_item("label", &attributes, "my-password", false)
             .await;
 
         assert!(matches!(
@@ -378,12 +381,13 @@ mod tests {
 
     #[tokio::test]
     async fn write_with_strong_key() -> Result<(), Error> {
-        let path = std::path::PathBuf::from("../../tests/write_with_strong_key.keyring");
+        let path = PathBuf::from("../../tests/write_with_strong_key.keyring");
 
         let keyring = Keyring::load(&path, strong_key()).await?;
+        let attributes: HashMap<&str, &str> = HashMap::default();
 
         keyring
-            .create_item("label", Default::default(), "my-password", false)
+            .create_item("label", &attributes, "my-password", false)
             .await?;
 
         Ok(())
@@ -395,7 +399,7 @@ mod tests {
 
     #[tokio::test]
     async fn concurrent_writes() -> Result<(), Error> {
-        let path = std::path::PathBuf::from("../../tests/concurrent_writes.keyring");
+        let path = PathBuf::from("../../tests/concurrent_writes.keyring");
 
         let keyring = Arc::new(Keyring::load(&path, strong_key()).await?);
 
