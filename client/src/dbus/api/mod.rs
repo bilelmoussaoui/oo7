@@ -24,6 +24,7 @@ pub(crate) use prompt::Prompt;
 #[cfg(not(feature = "unstable"))]
 pub(crate) use properties::Properties;
 #[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 pub use properties::Properties;
 pub use secret::Secret;
 pub use service::Service;
