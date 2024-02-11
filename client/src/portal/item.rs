@@ -5,7 +5,7 @@ use zbus::zvariant::{self, Type};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 use super::{
-    api::{AttributeValue, EncryptedItem, GVARIANT_ENCODING},
+    api::{gvariant_encoding, AttributeValue, EncryptedItem},
     Error,
 };
 use crate::{crypto, AsAttributes, Key};
@@ -105,7 +105,7 @@ impl Item {
     pub(crate) fn encrypt(&self, key: &Key) -> Result<EncryptedItem, Error> {
         key.check_strength()?;
 
-        let decrypted = Zeroizing::new(zvariant::to_bytes(*GVARIANT_ENCODING, &self)?);
+        let decrypted = Zeroizing::new(zvariant::to_bytes(*gvariant_encoding(), &self)?);
 
         let iv = crypto::generate_iv();
 
@@ -131,6 +131,6 @@ impl TryFrom<&[u8]> for Item {
     type Error = Error;
 
     fn try_from(value: &[u8]) -> Result<Self, Error> {
-        Ok(zvariant::from_slice(value, *GVARIANT_ENCODING)?)
+        Ok(zvariant::from_slice(value, *gvariant_encoding())?)
     }
 }

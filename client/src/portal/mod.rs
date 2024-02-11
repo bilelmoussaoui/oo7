@@ -33,7 +33,7 @@ use std::io;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, OnceLock},
 };
 
 #[cfg(feature = "async-std")]
@@ -42,7 +42,6 @@ use async_fs as fs;
 use async_lock::{Mutex, RwLock};
 #[cfg(feature = "async-std")]
 use futures_lite::AsyncReadExt;
-use once_cell::sync::OnceCell;
 #[cfg(feature = "tokio")]
 use tokio::{
     fs, io,
@@ -82,7 +81,7 @@ pub struct Keyring {
     /// Times are stored before reading the file to detect
     /// file changes before writing
     mtime: Mutex<Option<std::time::SystemTime>>,
-    key: OnceCell<Key>,
+    key: OnceLock<Key>,
     secret: Arc<Secret>,
 }
 
