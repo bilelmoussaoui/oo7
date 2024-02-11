@@ -59,7 +59,7 @@ impl<'a> Collection<'a> {
         let conn = self.inner().connection();
         Ok(stream.filter_map(move |message| async move {
             let path = message.body::<OwnedObjectPath>().ok()?;
-            Item::new(&conn.clone(), path).await.ok()
+            Item::new(conn, path).await.ok()
         }))
     }
 
@@ -75,7 +75,7 @@ impl<'a> Collection<'a> {
         let conn = self.inner().connection();
         Ok(stream.filter_map(move |message| async move {
             let path = message.body::<OwnedObjectPath>().ok()?;
-            Item::new(&conn.clone(), path).await.ok()
+            Item::new(conn, path).await.ok()
         }))
     }
 

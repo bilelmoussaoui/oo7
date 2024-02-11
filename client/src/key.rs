@@ -29,7 +29,7 @@ impl Key {
     }
 
     pub(crate) fn check_strength(&self) -> Result<(), portal::WeakKeyError> {
-        self.strength.clone()
+        self.strength
     }
 
     pub(crate) fn new_with_strength(

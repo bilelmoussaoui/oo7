@@ -126,7 +126,7 @@ impl std::fmt::Display for InvalidItemError {
 }
 
 /// Details about why an encryption key is consider too weak for writing
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum WeakKeyError {
     /// Avoid attack on existing files
     IterationCountTooLow(u32),
