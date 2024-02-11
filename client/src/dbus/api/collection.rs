@@ -123,7 +123,7 @@ impl<'a> Collection<'a> {
             .call_method("Delete", &())
             .await
             .map_err::<ServiceError, _>(From::from)?
-            .body::<zbus::zvariant::OwnedObjectPath>()?;
+            .body::<OwnedObjectPath>()?;
         if let Some(prompt) = Prompt::new(self.inner().connection(), prompt_path).await? {
             let _ = prompt.receive_completed().await?;
         }

@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fmt, hash::Hash, time::Duration};
 
 use serde::Serialize;
-use zbus::zvariant::{ObjectPath, Type};
+use zbus::zvariant::{ObjectPath, OwnedObjectPath, Type};
 
 use super::{secret::SecretInner, Prompt, Secret, Session, Unlockable, DESTINATION};
 use crate::{
@@ -99,7 +99,7 @@ impl<'a> Item<'a> {
             .call_method("Delete", &())
             .await
             .map_err::<ServiceError, _>(From::from)?
-            .body::<zbus::zvariant::OwnedObjectPath>()?;
+            .body::<OwnedObjectPath>()?;
         if let Some(prompt) = Prompt::new(self.inner().connection(), prompt_path).await? {
             let _ = prompt.receive_completed().await?;
         }
