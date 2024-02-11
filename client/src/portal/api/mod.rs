@@ -7,10 +7,7 @@
 
 #[cfg(feature = "async-std")]
 use std::io;
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 #[cfg(feature = "async-std")]
 use async_fs as fs;
@@ -53,7 +50,7 @@ use super::{Item, Secret};
 use crate::{
     crypto,
     portal::{Error, WeakKeyError},
-    Key,
+    AsAttributes, Key,
 };
 
 /// Logical contents of a keyring file
@@ -168,53 +165,40 @@ impl Keyring {
 
     pub fn search_items(
         &self,
-        attributes: &HashMap<impl AsRef<str>, impl AsRef<str>>,
+        attributes: &impl AsAttributes,
         key: &Key,
     ) -> Result<Vec<Item>, Error> {
-        let hashed_search = hash_attributes(attributes, key);
+        let hashed_search = attributes.hash(key);
 
         self.items
             .iter()
-            .filter(|e| {
-                hashed_search.iter().all(|(search_key, search_hash)| {
-                    e.hashed_attributes.get(search_key.as_ref()) == Some(search_hash)
-                })
-            })
+            .filter(|e| hashed_search.iter().all(|(k, v)| e.has_attribute(k, v)))
             .map(|e| (*e).clone().decrypt(key))
             .collect()
     }
 
     pub fn lookup_item(
         &self,
-        attributes: &HashMap<impl AsRef<str>, impl AsRef<str>>,
+        attributes: &impl AsAttributes,
         key: &Key,
     ) -> Result<Option<Item>, Error> {
-        let hashed_search = hash_attributes(attributes, key);
+        let hashed_search = attributes.hash(key);
 
         self.items
             .iter()
-            .find(|e| {
-                hashed_search.iter().all(|(search_key, search_hash)| {
-                    e.hashed_attributes.get(search_key.as_ref()) == Some(search_hash)
-                })
-            })
+            .find(|e| hashed_search.iter().all(|(k, v)| e.has_attribute(k, v)))
             .map(|e| (*e).clone().decrypt(key))
             .transpose()
     }
 
-    pub fn remove_items(
-        &mut self,
-        attributes: &HashMap<impl AsRef<str>, impl AsRef<str>>,
-        key: &Key,
-    ) -> Result<(), Error> {
-        let hashed_search = hash_attributes(attributes, key);
+    pub fn remove_items(&mut self, attributes: &impl AsAttributes, key: &Key) -> Result<(), Error> {
+        let hashed_search = attributes.hash(key);
 
-        let (remove, keep): (Vec<EncryptedItem>, _) =
-            self.items.clone().into_iter().partition(|e| {
-                hashed_search.iter().all(|(search_key, search_hash)| {
-                    e.hashed_attributes.get(search_key.as_ref()) == Some(search_hash)
-                })
-            });
+        let (remove, keep): (Vec<EncryptedItem>, _) = self
+            .items
+            .clone()
+            .into_iter()
+            .partition(|e| hashed_search.iter().all(|(k, v)| e.has_attribute(k, v)));
 
         // check hashes for the ones to be removed
         for item in remove {
@@ -289,27 +273,11 @@ impl TryFrom<&[u8]> for Keyring {
     }
 }
 
-fn hash_attributes<'a, K: AsRef<str>>(
-    attributes: &'a HashMap<K, impl AsRef<str>>,
-    key: &Key,
-) -> Vec<(&'a K, Vec<u8>)> {
-    attributes
-        .iter()
-        .map(|(k, v)| {
-            (
-                k,
-                AttributeValue::from(v.as_ref())
-                    .mac(key)
-                    .as_slice()
-                    .to_vec(),
-            )
-        })
-        .collect()
-}
-
 #[cfg(test)]
 #[cfg(feature = "tokio")]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
 
     const SECRET: [u8; 64] = [
@@ -321,14 +289,14 @@ mod tests {
 
     #[tokio::test]
     async fn keyfile_add_remove() -> Result<(), Error> {
-        let needle = HashMap::from([(String::from("key"), String::from("value"))]);
+        let needle = HashMap::from([("key", "value")]);
 
         let mut keyring = Keyring::new();
         let key = keyring.derive_key(&SECRET.to_vec().into());
 
         keyring
             .items
-            .push(Item::new(String::from("Label"), needle.clone(), b"MyPassword").encrypt(&key)?);
+            .push(Item::new("Label", &needle, b"MyPassword").encrypt(&key)?);
 
         assert_eq!(keyring.search_items(&needle, &key)?.len(), 1);
 
@@ -348,8 +316,8 @@ mod tests {
 
         new_keyring.items.push(
             Item::new(
-                String::from("My Label"),
-                HashMap::from([(String::from("my-tag"), String::from("my tag value"))]),
+                "My Label",
+                &HashMap::from([("my-tag", "my tag value")]),
                 "A Password".as_bytes(),
             )
             .encrypt(&key)?,

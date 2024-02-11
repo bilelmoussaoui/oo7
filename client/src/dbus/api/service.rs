@@ -9,7 +9,7 @@ use super::{
 };
 use crate::{
     dbus::{Algorithm, Error, ServiceError},
-    Key,
+    AsAttributes, Key,
 };
 
 #[derive(Type)]
@@ -130,11 +130,11 @@ impl<'a> Service<'a> {
     #[doc(alias = "SearchItems")]
     pub async fn search_items(
         &self,
-        attributes: &HashMap<&str, &str>,
+        attributes: &impl AsAttributes,
     ) -> Result<(Vec<Item<'a>>, Vec<Item<'a>>), Error> {
         let (unlocked_item_paths, locked_item_paths) = self
             .inner()
-            .call_method("SearchItems", &(attributes))
+            .call_method("SearchItems", &(attributes.as_attributes()))
             .await
             .map_err::<ServiceError, _>(From::from)?
             .body::<(Vec<OwnedObjectPath>, Vec<OwnedObjectPath>)>()?;

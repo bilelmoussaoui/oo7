@@ -36,7 +36,7 @@ async fn run() -> oo7::Result<()> {
     // Store a secret
     keyring.create_item(
         "Item Label",
-        HashMap::from([("attribute", "attribute_value")]),
+        &HashMap::from([("attribute", "attribute_value")]),
         b"secret",
         true,
     ).await?;

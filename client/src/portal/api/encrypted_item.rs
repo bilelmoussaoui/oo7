@@ -13,6 +13,10 @@ pub(crate) struct EncryptedItem {
 }
 
 impl EncryptedItem {
+    pub fn has_attribute(&self, key: &str, blob: &[u8]) -> bool {
+        self.hashed_attributes.get(key).map(|b| b.as_slice()) == Some(blob)
+    }
+
     pub fn decrypt(mut self, key: &Key) -> Result<Item, Error> {
         let mac_tag = self.blob.split_off(self.blob.len() - crypto::mac_len());
 

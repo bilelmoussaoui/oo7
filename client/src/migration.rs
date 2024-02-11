@@ -1,13 +1,11 @@
-use std::collections::HashMap;
-
-use crate::{dbus::Service, portal::Keyring, Result};
+use crate::{dbus::Service, portal::Keyring, AsAttributes, Result};
 
 /// Helper to migrate your secrets from the host Secret Service
 /// to the sandboxed file backend.
 ///
 /// If the migration is successful, the items are removed from the host
 /// Secret Service.
-pub async fn migrate(attributes: Vec<HashMap<&str, &str>>, replace: bool) -> Result<()> {
+pub async fn migrate(attributes: Vec<impl AsAttributes>, replace: bool) -> Result<()> {
     let service = Service::new().await?;
     let file_backend = match Keyring::load_default().await {
         Ok(portal) => Ok(portal),

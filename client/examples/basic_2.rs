@@ -15,7 +15,7 @@ async fn main() -> oo7::Result<()> {
         .unwrap()
         .create_item(
             "Some Label",
-            HashMap::from([("attr", "value")]),
+            &HashMap::from([("attr", "value")]),
             b"secret",
             true,
         )

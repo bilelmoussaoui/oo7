@@ -4,7 +4,10 @@ use serde::Serialize;
 use zbus::zvariant::{ObjectPath, Type};
 
 use super::{secret::SecretInner, Prompt, Secret, Session, Unlockable, DESTINATION};
-use crate::dbus::{Error, ServiceError};
+use crate::{
+    dbus::{Error, ServiceError},
+    AsAttributes,
+};
 
 #[derive(Type)]
 #[zvariant(signature = "o")]
@@ -82,9 +85,9 @@ impl<'a> Item<'a> {
             .map_err(From::from)
     }
 
-    pub async fn set_attributes(&self, attributes: HashMap<&str, &str>) -> Result<(), Error> {
+    pub async fn set_attributes(&self, attributes: &impl AsAttributes) -> Result<(), Error> {
         self.inner()
-            .set_property("Attributes", attributes)
+            .set_property("Attributes", attributes.as_attributes())
             .await
             .map_err::<zbus::fdo::Error, _>(From::from)?;
         Ok(())
