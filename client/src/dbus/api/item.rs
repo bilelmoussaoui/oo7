@@ -1,7 +1,10 @@
 use std::{collections::HashMap, fmt, hash::Hash, time::Duration};
 
 use serde::Serialize;
-use zbus::zvariant::{ObjectPath, OwnedObjectPath, Type};
+use zbus::{
+    zvariant::{ObjectPath, OwnedObjectPath, Type},
+    ProxyDefault,
+};
 
 use super::{secret::SecretInner, Prompt, Secret, Session, Unlockable, DESTINATION};
 use crate::{
@@ -14,19 +17,29 @@ use crate::{
 #[doc(alias = "org.freedesktop.Secret.Item")]
 pub struct Item<'a>(zbus::Proxy<'a>);
 
+impl<'a> ProxyDefault for Item<'a> {
+    const INTERFACE: &'static str = "org.freedesktop.Secret.Item";
+    const DESTINATION: &'static str = DESTINATION;
+    const PATH: &'static str = "/";
+}
+
+impl<'a> From<zbus::Proxy<'a>> for Item<'a> {
+    fn from(value: zbus::Proxy<'a>) -> Self {
+        Self(value)
+    }
+}
+
 impl<'a> Item<'a> {
     pub async fn new<P>(connection: &zbus::Connection, object_path: P) -> Result<Item<'a>, Error>
     where
         P: TryInto<ObjectPath<'a>>,
         P::Error: Into<zbus::Error>,
     {
-        let inner = zbus::ProxyBuilder::new_bare(connection)
-            .interface("org.freedesktop.Secret.Item")?
+        zbus::ProxyBuilder::new(connection)
             .path(object_path)?
-            .destination(DESTINATION)?
             .build()
-            .await?;
-        Ok(Self(inner))
+            .await
+            .map_err(From::from)
     }
 
     pub(crate) async fn from_paths<P>(

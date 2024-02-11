@@ -12,7 +12,10 @@ use std::{
 
 use futures_util::StreamExt;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
-use zbus::zvariant::{Fd, ObjectPath, OwnedValue, SerializeDict, Type};
+use zbus::{
+    zvariant::{Fd, ObjectPath, OwnedValue, SerializeDict, Type},
+    ProxyDefault,
+};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use super::Error;
@@ -68,16 +71,25 @@ impl Default for RetrieveOptions {
 #[derive(Debug)]
 pub struct SecretProxy<'a>(zbus::Proxy<'a>);
 
+impl<'a> ProxyDefault for SecretProxy<'a> {
+    const INTERFACE: &'static str = "org.freedesktop.portal.Secret";
+    const DESTINATION: &'static str = "org.freedesktop.portal.Desktop";
+    const PATH: &'static str = "/org/freedesktop/portal/desktop";
+}
+
+impl<'a> From<zbus::Proxy<'a>> for SecretProxy<'a> {
+    fn from(value: zbus::Proxy<'a>) -> Self {
+        Self(value)
+    }
+}
+
 impl<'a> SecretProxy<'a> {
     /// Create a new instance of [`SecretProxy`].
     pub async fn new(connection: &zbus::Connection) -> Result<SecretProxy<'a>, zbus::Error> {
-        let proxy = zbus::ProxyBuilder::new_bare(connection)
-            .interface("org.freedesktop.portal.Secret")?
-            .path("/org/freedesktop/portal/desktop")?
-            .destination("org.freedesktop.portal.Desktop")?
+        zbus::ProxyBuilder::new(connection)
             .build()
-            .await?;
-        Ok(Self(proxy))
+            .await
+            .map_err(From::from)
     }
 
     /// Retrieves a master secret for a sandboxed application.
