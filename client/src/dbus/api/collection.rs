@@ -2,7 +2,10 @@ use std::{collections::HashMap, fmt, time::Duration};
 
 use futures_util::{Stream, StreamExt};
 use serde::Serialize;
-use zbus::zvariant::{ObjectPath, OwnedObjectPath, Type};
+use zbus::{
+    zvariant::{ObjectPath, OwnedObjectPath, Type},
+    ProxyDefault,
+};
 
 use super::{Item, Prompt, Properties, Secret, Unlockable, DESTINATION};
 use crate::{
@@ -15,6 +18,18 @@ use crate::{
 #[doc(alias = "org.freedesktop.Secret.Collection")]
 pub struct Collection<'a>(zbus::Proxy<'a>);
 
+impl<'a> ProxyDefault for Collection<'a> {
+    const INTERFACE: &'static str = "org.freedesktop.Secret.Collection";
+    const DESTINATION: &'static str = DESTINATION;
+    const PATH: &'static str = "/";
+}
+
+impl<'a> From<zbus::Proxy<'a>> for Collection<'a> {
+    fn from(value: zbus::Proxy<'a>) -> Self {
+        Self(value)
+    }
+}
+
 impl<'a> Collection<'a> {
     pub async fn new<P>(
         connection: &zbus::Connection,
@@ -24,14 +39,12 @@ impl<'a> Collection<'a> {
         P: TryInto<ObjectPath<'a>>,
         P::Error: Into<zbus::Error>,
     {
-        let inner = zbus::ProxyBuilder::new_bare(connection)
-            .interface("org.freedesktop.Secret.Collection")?
+        zbus::ProxyBuilder::new(connection)
             .path(object_path)?
             .cache_properties(zbus::CacheProperties::No)
-            .destination(DESTINATION)?
             .build()
-            .await?;
-        Ok(Self(inner))
+            .await
+            .map_err(From::from)
     }
 
     pub fn inner(&self) -> &zbus::Proxy {

@@ -2,7 +2,10 @@ use std::fmt;
 
 use futures_util::StreamExt;
 use serde::Serialize;
-use zbus::zvariant::{ObjectPath, OwnedValue, Type};
+use zbus::{
+    zvariant::{ObjectPath, OwnedValue, Type},
+    ProxyDefault,
+};
 
 use super::DESTINATION;
 use crate::dbus::{Error, ServiceError};
@@ -11,6 +14,18 @@ use crate::dbus::{Error, ServiceError};
 #[zvariant(signature = "o")]
 #[doc(alias = "org.freedesktop.Secret.Prompt")]
 pub struct Prompt<'a>(zbus::Proxy<'a>);
+
+impl<'a> ProxyDefault for Prompt<'a> {
+    const INTERFACE: &'static str = "org.freedesktop.Secret.Prompt";
+    const DESTINATION: &'static str = DESTINATION;
+    const PATH: &'static str = "/";
+}
+
+impl<'a> From<zbus::Proxy<'a>> for Prompt<'a> {
+    fn from(value: zbus::Proxy<'a>) -> Self {
+        Self(value)
+    }
+}
 
 impl<'a> Prompt<'a> {
     pub async fn new<P>(
@@ -23,13 +38,12 @@ impl<'a> Prompt<'a> {
     {
         let path = object_path.try_into().map_err(Into::into)?;
         if path != ObjectPath::default() {
-            let inner = zbus::ProxyBuilder::new_bare(connection)
-                .interface("org.freedesktop.Secret.Prompt")?
-                .path(path)?
-                .destination(DESTINATION)?
-                .build()
-                .await?;
-            Ok(Some(Self(inner)))
+            Ok(Some(
+                zbus::ProxyBuilder::new(connection)
+                    .path(path)?
+                    .build()
+                    .await?,
+            ))
         } else {
             Ok(None)
         }

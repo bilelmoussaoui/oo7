@@ -1,7 +1,10 @@
 use std::fmt;
 
 use serde::Serialize;
-use zbus::zvariant::{ObjectPath, Type};
+use zbus::{
+    zvariant::{ObjectPath, Type},
+    ProxyDefault,
+};
 
 use super::DESTINATION;
 use crate::dbus::{Error, ServiceError};
@@ -11,19 +14,29 @@ use crate::dbus::{Error, ServiceError};
 #[doc(alias = "org.freedesktop.Secret.Session")]
 pub struct Session<'a>(zbus::Proxy<'a>);
 
+impl<'a> ProxyDefault for Session<'a> {
+    const INTERFACE: &'static str = "org.freedesktop.Secret.Session";
+    const DESTINATION: &'static str = DESTINATION;
+    const PATH: &'static str = "/";
+}
+
+impl<'a> From<zbus::Proxy<'a>> for Session<'a> {
+    fn from(value: zbus::Proxy<'a>) -> Self {
+        Self(value)
+    }
+}
+
 impl<'a> Session<'a> {
     pub async fn new<P>(connection: &zbus::Connection, object_path: P) -> Result<Session<'a>, Error>
     where
         P: TryInto<ObjectPath<'a>>,
         P::Error: Into<zbus::Error>,
     {
-        let inner = zbus::ProxyBuilder::new_bare(connection)
-            .interface("org.freedesktop.Secret.Session")?
+        zbus::ProxyBuilder::new(connection)
             .path(object_path)?
-            .destination(DESTINATION)?
             .build()
-            .await?;
-        Ok(Self(inner))
+            .await
+            .map_err(From::from)
     }
 
     pub fn inner(&self) -> &zbus::Proxy {

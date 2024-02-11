@@ -1,7 +1,10 @@
 use std::{collections::HashMap, fmt};
 
 use futures_util::{Stream, StreamExt};
-use zbus::zvariant::{self, ObjectPath, OwnedObjectPath, OwnedValue, Type, Value};
+use zbus::{
+    zvariant::{self, ObjectPath, OwnedObjectPath, OwnedValue, Type, Value},
+    ProxyDefault,
+};
 
 use super::{
     secret::SecretInner, Collection, Item, Prompt, Properties, Secret, Session, Unlockable,
@@ -17,16 +20,25 @@ use crate::{
 #[doc(alias = "org.freedesktop.secrets")]
 pub struct Service<'a>(zbus::Proxy<'a>);
 
+impl<'a> ProxyDefault for Service<'a> {
+    const INTERFACE: &'static str = "org.freedesktop.Secret.Service";
+    const DESTINATION: &'static str = DESTINATION;
+    const PATH: &'static str = PATH;
+}
+
+impl<'a> From<zbus::Proxy<'a>> for Service<'a> {
+    fn from(value: zbus::Proxy<'a>) -> Self {
+        Self(value)
+    }
+}
+
 impl<'a> Service<'a> {
     pub async fn new(connection: &zbus::Connection) -> Result<Service<'a>, Error> {
-        let inner = zbus::ProxyBuilder::new_bare(connection)
-            .path(PATH)?
-            .destination(DESTINATION)?
-            .interface("org.freedesktop.Secret.Service")?
+        zbus::ProxyBuilder::new(connection)
             .cache_properties(zbus::CacheProperties::No)
             .build()
-            .await?;
-        Ok(Self(inner))
+            .await
+            .map_err(From::from)
     }
 
     pub fn inner(&self) -> &zbus::Proxy {
