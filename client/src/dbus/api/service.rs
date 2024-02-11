@@ -41,7 +41,7 @@ impl<'a> Service<'a> {
         let conn = self.inner().connection();
         Ok(stream.filter_map(move |message| async move {
             let path = message.body::<OwnedObjectPath>().ok()?;
-            Collection::new(&conn.clone(), path).await.ok()
+            Collection::new(conn, path).await.ok()
         }))
     }
 
@@ -53,7 +53,7 @@ impl<'a> Service<'a> {
         let conn = self.inner().connection();
         Ok(stream.filter_map(move |message| async move {
             let path = message.body::<OwnedObjectPath>().ok()?;
-            Collection::new(&conn.clone(), path).await.ok()
+            Collection::new(conn, path).await.ok()
         }))
     }
 
@@ -65,7 +65,7 @@ impl<'a> Service<'a> {
         let conn = self.inner().connection();
         Ok(stream.filter_map(move |message| async move {
             let path = message.body::<OwnedObjectPath>().ok()?;
-            Collection::new(&conn.clone(), path).await.ok()
+            Collection::new(conn, path).await.ok()
         }))
     }
 
