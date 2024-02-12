@@ -16,3 +16,15 @@ homepage = "https://github.com/bilelmoussaoui/oo7"
 license = "MIT"
 rust-version = "1.66"
 exclude = ["org.freedesktop.Secrets.xml"]
+
+[workspace.dependencies]
+futures-channel = "0.3"
+futures-lite = "2.1"
+futures-util = "0.3"
+oo7 = { path = "client"}
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "1.17", default-features = false }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+zbus = { version = "3.5.0", default-features = false }
+zeroize = { version = "1", features = ["zeroize_derive"] }

@@ -10,14 +10,14 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
-futures-channel = "0.3"
-futures-util = "0.3"
-oo7 = { path = "../client", features = ["unstable"]}
+futures-channel.workspace = true
+futures-util.workspace = true
+oo7 = { workspace = true, features = ["unstable"] }
 ring = "0.17.5"
 secrecy = { version = "0.8", features = ["alloc"] }
-serde = { version = "1.0", features = ["derive"] }
-tokio = { version = "1.17", features = ["io-util", "net", "macros", "rt-multi-thread"] }
+serde.workspace = true
+tokio = { workspace = true, features = ["io-util", "net", "macros", "rt-multi-thread"] }
 tracing = "0.1"
-tracing-subscriber = "0.3"
-zbus = "3.5.0"
-zeroize = { version = "1", features = ["zeroize_derive"] }
+tracing-subscriber.workspace = true
+zbus.workspace = true
+zeroize.workspace = true

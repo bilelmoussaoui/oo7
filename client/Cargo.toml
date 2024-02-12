@@ -13,40 +13,40 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
-zbus = { version = "3.5.0", default-features = false, features = ["gvariant"] }
-serde = "1.0"
-futures-lite = { version = "2.1", optional = true }
-futures-util = "0.3"
-rand = { version = "0.8", default-features = false }
-tokio = { version = "1.17", features = [
-    "sync",
-    "fs",
-    "io-util",
-], optional = true, default-features = false }
-byteorder = "1.0"
-num = "0.4.0"
-num-bigint-dig = { version = "0.8", features = ["zeroize"] }
-tracing = { version = "0.1", optional = true }
-zeroize = { version = "1", features = ["zeroize_derive"] }
 aes = { version = "0.8", features = ["zeroize"], optional = true }
+async-fs = { version = "2.1.0", optional = true }
+async-io = { version = "2.2.2", optional = true }
+async-lock = { version = "3.2.0", optional = true }
+blocking = { version = "1.5.1", optional = true }
+byteorder = "1.0"
 cbc = { version = "0.1", features = ["zeroize"], optional = true }
 cipher = { version = "0.4", features = [
     "rand_core",
     "zeroize",
 ], optional = true }
 digest = { version = "0.10", optional = true }
+futures-lite = { workspace = true, optional = true }
+futures-util.workspace = true
 hkdf = { version = "0.12", optional = true }
 hmac = { version = "0.12", optional = true }
-pbkdf2 = { version = "0.12", optional = true }
-sha2 = { version = "0.10", optional = true }
+num = "0.4.0"
+num-bigint-dig = { version = "0.8", features = ["zeroize"] }
 openssl = { version = "0.10", optional = true }
-async-fs = { version = "2.1.0", optional = true }
-async-lock = { version = "3.2.0", optional = true }
-async-io = { version = "2.2.2", optional = true }
-blocking = { version = "1.5.1", optional = true }
+pbkdf2 = { version = "0.12", optional = true }
+rand = { version = "0.8", default-features = false }
+serde.workspace = true
+sha2 = { version = "0.10", optional = true }
+tokio = { workspace = true, features = [
+    "sync",
+    "fs",
+    "io-util",
+], optional = true, default-features = false }
+tracing = { workspace = true, optional = true }
+zbus = { workspace = true, default-features = false, features = ["gvariant"] }
+zeroize.workspace = true
 
 [dev-dependencies]
-tokio = { version = "1.11", features = ["macros", "rt-multi-thread"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [features]
 default = ["local_tests", "async-std", "native_crypto"]
