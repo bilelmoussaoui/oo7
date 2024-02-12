@@ -162,7 +162,6 @@ async fn lookup(attributes: &impl AsAttributes) -> Result<(), Error> {
 }
 
 async fn search(attributes: &impl AsAttributes, all: bool) -> Result<(), Error> {
-    println!("{:#?}", attributes.as_attributes());
     let collection = collection().await?;
     let items = collection.search_items(attributes).await?;
 
