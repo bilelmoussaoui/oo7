@@ -146,6 +146,13 @@ fn parse_attributes(attributes: &[String]) -> Result<HashMap<String, String>, Er
             "Need to specify at least one attribute",
         )));
     }
+
+    if attributes.len() % 2 != 0 {
+        return Err(Error(String::from(
+            "Need to specify attributes and values in pairs",
+        )));
+    }
+
     let mut result = HashMap::new();
     while let (Some(k), Some(v)) = (attributes.next(), attributes.next()) {
         result.insert(k.to_owned(), v.to_owned());
