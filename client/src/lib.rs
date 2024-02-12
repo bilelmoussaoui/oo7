@@ -84,3 +84,23 @@ where
         self.iter().map(|(k, v)| (k.as_ref(), v.as_ref())).collect()
     }
 }
+
+impl<K, V> AsAttributes for Vec<(K, V)>
+where
+    K: AsRef<str>,
+    V: AsRef<str>,
+{
+    fn as_attributes(&self) -> HashMap<&str, &str> {
+        self.iter().map(|(k, v)| (k.as_ref(), v.as_ref())).collect()
+    }
+}
+
+impl<K, V> AsAttributes for &Vec<(K, V)>
+where
+    K: AsRef<str>,
+    V: AsRef<str>,
+{
+    fn as_attributes(&self) -> HashMap<&str, &str> {
+        self.iter().map(|(k, v)| (k.as_ref(), v.as_ref())).collect()
+    }
+}
