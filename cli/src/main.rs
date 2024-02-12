@@ -152,10 +152,7 @@ async fn lookup(attributes: &impl AsAttributes) -> Result<(), Error> {
     let items = collection.search_items(attributes).await?;
 
     if let Some(item) = items.first() {
-        let bytes = item.secret().await?;
-        let secret =
-            std::str::from_utf8(&bytes).map_err(|_| Error::new("Secret is not valid utf-8"))?;
-        println!("{secret}");
+        print_item(item).await?;
     }
 
     Ok(())
@@ -206,9 +203,6 @@ async fn print_item<'a>(item: &oo7::dbus::Item<'a>) -> Result<(), Error> {
 
     let label = item.label().await?;
     let bytes = item.secret().await?;
-    // TODO Maybe show bytes in hex instead of failing?
-    let secret =
-        std::str::from_utf8(&bytes).map_err(|_| Error::new("Secret is not valid utf-8"))?;
     let mut attributes = item.attributes().await?;
     let created = item.created().await?;
     let modified = item.modified().await?;
@@ -221,7 +215,15 @@ async fn print_item<'a>(item: &oo7::dbus::Item<'a>) -> Result<(), Error> {
         .with_timezone(&chrono::Local);
 
     let mut result = format!("[{label}]\n");
-    writeln!(&mut result, "secret = {secret}").unwrap();
+    match std::str::from_utf8(&bytes) {
+        Ok(secret) => {
+            writeln!(&mut result, "secret = {secret}").unwrap();
+        }
+        Err(_) => {
+            writeln!(&mut result, "secret = {:02X?}", bytes.as_slice()).unwrap();
+        }
+    }
+
     writeln!(
         &mut result,
         "created = {}",
