@@ -19,7 +19,7 @@ The library provides helper methods to store and retrieve secrets and uses eithe
 
 - Async only API
 - Ease to use
-- Integration with the [Secret portal](https://flatpak.github.io/xdg-desktop-portal/#gdbus-org.freedesktop.portal.Secret) if sandboxed
+- Integration with the [Secret portal](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.Secret.html) if sandboxed
 - Provide API to migrate from host secrets to sandboxed ones
 
 
@@ -124,7 +124,7 @@ it does assume things for you so it will either use the host or the sandbox file
 to inside the sandbox a probably impossible task. There are also issues like <https://gitlab.gnome.org/GNOME/libsecret/-/issues/58>
 that makes it not usable inside the Flatpak sandbox.
 
-- [secret-service-rs](https://github.com/hwchen/secret-service-rs/) uses [zbus](https://lib.rs/zbus) internally as well but does provide a sync only API, hasn't seen an update in a while, doesn't integrate with [Secret portal](https://flatpak.github.io/xdg-desktop-portal/#gdbus-org.freedesktop.portal.Secret) if sandboxed.
+- [secret-service-rs](https://github.com/hwchen/secret-service-rs/) uses [zbus](https://lib.rs/zbus) internally as well but does provide a sync only API, hasn't seen an update in a while, doesn't integrate with [Secret portal](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.Secret.html) if sandboxed.
 
 # License
 

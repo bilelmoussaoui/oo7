@@ -17,7 +17,7 @@ use crate::{
 /// It will automatically use the file backend if the application is sandboxed
 /// and otherwise falls back to the DBus service.
 ///
-/// The File backend requires a [`org.freedesktop.portal.Secret`](https://flatpak.github.io/xdg-desktop-portal/#gdbus-org.freedesktop.portal.Secret) implementation
+/// The File backend requires a [`org.freedesktop.portal.Secret`](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.Secret.html) implementation
 /// to retrieve the key that will be used to encrypt the backend file.
 #[derive(Debug)]
 pub enum Keyring {

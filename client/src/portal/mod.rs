@@ -1,4 +1,4 @@
-//! File backend implementation backed by the [Secret portal](https://flatpak.github.io/xdg-desktop-portal/#gdbus-org.freedesktop.portal.Secret).
+//! File backend implementation backed by the [Secret portal](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.Secret.html).
 //!
 //! ```no_run
 //! use std::collections::HashMap;
