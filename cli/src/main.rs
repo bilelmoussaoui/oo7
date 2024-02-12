@@ -1,11 +1,10 @@
 use std::{
-    collections::HashMap,
     fmt,
     io::Write,
     process::{ExitCode, Termination},
 };
 
-use clap::{Command, CommandFactory, FromArgMatches, Parser};
+use clap::{Parser, Subcommand};
 use oo7::{
     dbus::{Collection, Service},
     AsAttributes,
@@ -39,130 +38,97 @@ impl Termination for Error {
     }
 }
 
-#[derive(Parser)]
-#[command(
-    name = "store",
-    about = "Store a secret",
-    after_help = format!("The contents of the secret will be asked afterwards.\n\nExample:\n  {} store 'My Personal Mail' smtp-port 1025 imap-port 143", BINARY_NAME)
-)]
-struct StoreArgs {
-    #[clap(help = "Description for the secret")]
-    label: String,
-    #[clap(help = "List of attributes. This is a space separated list of pairs of key value")]
-    attributes: Vec<String>,
-}
-
-#[derive(Parser)]
-#[command(
-    name = "search",
-    about = "Search entries with matching attributes",
-    after_help = format!("Example:\n  {} search --all smtp-port 1025", BINARY_NAME)
-)]
-struct SearchArgs {
-    #[clap(help = "List of attributes. This is a space separated list of pairs of key value")]
-    attributes: Vec<String>,
-    #[clap(
-        short,
-        long,
-        help = "Whether to list all possible matches or only the first result"
+#[derive(Subcommand)]
+enum Commands {
+    #[command(
+        name = "delete",
+        about = "Delete a secret",
+        after_help = format!("Will delete all secrets with matching attributes.\n\nExample:\n  {} delete smtp-port=1025", BINARY_NAME)
     )]
-    all: bool,
+    Delete {
+        #[arg(help = "List of attributes. This is a space separated list of pairs of key value", value_parser = parse_key_val::<String, String>)]
+        attributes: Vec<(String, String)>,
+    },
+
+    #[command(
+        name = "lookup",
+        about = "Retrieve a secret",
+        after_help = format!("Example:\n  {} lookup smtp-port=1025", BINARY_NAME)
+    )]
+    Lookup {
+        #[arg(help = "List of attributes. This is a space separated list of pairs of key value", value_parser = parse_key_val::<String, String>)]
+        attributes: Vec<(String, String)>,
+    },
+
+    #[command(
+        name = "search",
+        about = "Search entries with matching attributes",
+        after_help = format!("Example:\n  {} search --all smtp-port=1025", BINARY_NAME)
+    )]
+    Search {
+        #[arg(
+            short,
+            long,
+            help = "Whether to list all possible matches or only the first result"
+        )]
+        all: bool,
+        #[arg(help = "List of attributes. This is a space separated list of pairs of key value", value_parser = parse_key_val::<String, String>)]
+        attributes: Vec<(String, String)>,
+    },
+
+    #[command(
+        name = "store",
+        about = "Store a secret",
+        after_help = format!("The contents of the secret will be asked afterwards.\n\nExample:\n  {} store 'My Personal Mail' smtp-port=1025 imap-port=143", BINARY_NAME)
+    )]
+    Store {
+        #[arg(help = "Description for the secret")]
+        label: String,
+        #[arg(help = "List of attributes. This is a space separated list of pairs of key value", value_parser = parse_key_val::<String, String>)]
+        attributes: Vec<(String, String)>,
+    },
+
+    #[command(name = "lock", about = "Lock the keyring")]
+    Lock,
+
+    #[command(name = "unlock", about = "Unlock the keyring")]
+    Unlock,
 }
 
 #[derive(Parser)]
-#[command(
-    name = "lookup",
-    about = "Retrieve a secret",
-    after_help = format!("Example:\n  {} lookup smtp-port 1025", BINARY_NAME)
-)]
-struct LookupArgs {
-    #[clap(help = "List of attributes. This is a space separated list of pairs of key value")]
-    attributes: Vec<String>,
-}
-
-#[derive(Parser)]
-#[command(
-    name = "delete",
-    about = "Delete a secret",
-    after_help = format!("Will delete all secrets with matching attributes.\n\nExample:\n  {} delete smtp-port 1025", BINARY_NAME)
-)]
-struct DeleteArgs {
-    #[clap(help = "List of attributes. This is a space separated list of pairs of key value")]
-    attributes: Vec<String>,
+#[clap(version, about, long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let cmd = Command::new(BINARY_NAME)
-        .bin_name(BINARY_NAME)
-        .subcommand_required(true)
-        .subcommand(StoreArgs::command())
-        .subcommand(LookupArgs::command())
-        .subcommand(DeleteArgs::command())
-        .subcommand(SearchArgs::command())
-        .subcommand(Command::new("lock").about("Lock the keyring"))
-        .subcommand(Command::new("unlock").about("Unlock the keyring"));
-    let matches = cmd.get_matches();
-    match matches.subcommand() {
-        Some(("store", matches)) => {
-            let args =
-                StoreArgs::from_arg_matches(matches).map_err(|e| Error::new(&e.to_string()))?;
-            let attributes = parse_attributes(&args.attributes)?;
-
-            store(&args.label, &attributes).await
-        }
-        Some(("lookup", matches)) => {
-            let args =
-                LookupArgs::from_arg_matches(matches).map_err(|e| Error::new(&e.to_string()))?;
-            let attributes = parse_attributes(&args.attributes)?;
-
-            lookup(&attributes).await
-        }
-        Some(("search", matches)) => {
-            let args =
-                SearchArgs::from_arg_matches(matches).map_err(|e| Error::new(&e.to_string()))?;
-            let attributes = parse_attributes(&args.attributes)?;
-
-            search(&attributes, args.all).await
-        }
-        Some(("delete", matches)) => {
-            let args =
-                LookupArgs::from_arg_matches(matches).map_err(|e| Error::new(&e.to_string()))?;
-            let attributes = parse_attributes(&args.attributes)?;
-
-            delete(&attributes).await
-        }
-        Some(("lock", _matches)) => lock().await,
-        Some(("unlock", _matches)) => unlock().await,
-        _ => unreachable!("clap should ensure we don't get here"),
+    let cli = Cli::parse();
+    match cli.command {
+        Commands::Store { label, attributes } => store(&label, &attributes).await,
+        Commands::Lookup { attributes } => lookup(&attributes).await,
+        Commands::Search { attributes, all } => search(&attributes, all).await,
+        Commands::Delete { attributes } => delete(&attributes).await,
+        Commands::Lock => lock().await,
+        Commands::Unlock => unlock().await,
     }
 }
 
-fn parse_attributes(attributes: &[String]) -> Result<HashMap<String, String>, Error> {
-    // Should this allow attribute-less secrets?
-    let mut attributes = attributes.iter();
-    if attributes.len() == 0 {
-        return Err(Error(String::from(
-            "Need to specify at least one attribute",
-        )));
-    }
-
-    if attributes.len() % 2 != 0 {
-        return Err(Error(String::from(
-            "Need to specify attributes and values in pairs",
-        )));
-    }
-
-    let mut result = HashMap::new();
-    while let (Some(k), Some(v)) = (attributes.next(), attributes.next()) {
-        result.insert(k.to_owned(), v.to_owned());
-    }
-    match attributes.next() {
-        None => Ok(result),
-        Some(k) => Err(Error(String::from(&format!(
-            "Key '{k}' is missing a value"
-        )))),
-    }
+// Source <https://github.com/clap-rs/clap/blob/master/examples/typed-derive.rs#L48>
+fn parse_key_val<T, U>(
+    s: &str,
+) -> Result<(T, U), Box<dyn std::error::Error + Send + Sync + 'static>>
+where
+    T: std::str::FromStr,
+    T::Err: std::error::Error + Send + Sync + 'static,
+    U: std::str::FromStr,
+    U::Err: std::error::Error + Send + Sync + 'static,
+{
+    let pos = s
+        .find('=')
+        .ok_or_else(|| format!("Invalid KEY=value: no `=` found in `{s}`"))?;
+    Ok((s[..pos].parse()?, s[pos + 1..].parse()?))
 }
 
 async fn store(label: &str, attributes: &impl AsAttributes) -> Result<(), Error> {
@@ -196,6 +162,7 @@ async fn lookup(attributes: &impl AsAttributes) -> Result<(), Error> {
 }
 
 async fn search(attributes: &impl AsAttributes, all: bool) -> Result<(), Error> {
+    println!("{:#?}", attributes.as_attributes());
     let collection = collection().await?;
     let items = collection.search_items(attributes).await?;
 
