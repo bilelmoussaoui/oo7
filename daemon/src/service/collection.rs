@@ -15,7 +15,7 @@ pub struct Collection {
     pub items: Vec<item::Item>,
     label: String,
     locked: bool,
-    created: u64, // how to represent date
+    created: u64,
     modified: u64,
     path: OwnedObjectPath,
 }
@@ -43,50 +43,22 @@ impl Collection {
         replace: bool,
     ) -> (ObjectPath, ObjectPath) {
         let label = properties.label();
-        let mut attributes: HashMap<&str, &str> = Default::default();
+        let attributes = properties.attributes().unwrap();
 
-        for (key, value) in properties.attributes().unwrap().into_iter() {
-            attributes.insert(key.as_str(), value.as_str());
-        }
-
-        match KEYRING
+        let item = KEYRING
             .get()
             .unwrap()
-            .create_item(label, attributes.clone(), secret, replace)
+            .create_item(label, &attributes, secret, replace)
             .await
-        {
-            Ok(_) => (),
-            Err(_) => (), // best approach to handle this error?
-        }
-
-        // lookup just created item
-        let lookup_item = KEYRING
-            .get()
-            .unwrap()
-            .lookup_item(&attributes)
-            .await
-            .unwrap()
             .unwrap();
+
         // make prompt to get the secret and set it with set_secret()
 
         let created_item_path = ObjectPath::default().into(); // how to get path from _collection
         let prompt = ObjectPath::default().into(); // temp Prompt
 
-        let mut attributes_for_new: HashMap<&str, &str> = Default::default();
-        for (key, value) in lookup_item.attributes() {
-            attributes_for_new.insert(key.as_str(), value);
-        }
-
-        // TODO map portal::Item to crate::Item and push it to items attribute
-        let item = item::Item::new(
-            &attributes_for_new,
-            lookup_item.secret().to_vec(),
-            lookup_item.label(),
-            lookup_item.created().as_secs(),
-            lookup_item.modified().as_secs(),
-            self.path().to_owned().into(),
-        )
-        .await;
+        // portal::Item mapping
+        let item = item::Item::new(item, self.path().into()).await;
         self.items.push(item);
 
         (created_item_path, prompt)
