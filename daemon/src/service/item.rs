@@ -2,88 +2,58 @@
 
 use std::collections::HashMap;
 
-use oo7::dbus::api::Properties;
+use oo7::{portal};
+use portal::api::AttributeValue;
 use zbus::{dbus_interface, fdo, zvariant, ObjectServer};
-use zeroize::Zeroize;
 use zvariant::{ObjectPath, OwnedObjectPath};
 
 use crate::KEYRING;
 
-#[derive(Debug, Zeroize)]
+#[derive(Debug)]
 pub struct Item {
-    #[zeroize(skip)]
-    locked: bool,
-    #[zeroize(skip)]
-    properties: Properties,
-    #[zeroize(skip)]
-    created: u64,
-    #[zeroize(skip)]
-    modified: u64,
-    secret: Vec<u8>,
-    #[zeroize(skip)]
+    inner: portal::Item,
     path: OwnedObjectPath,
 }
 
 #[dbus_interface(name = "org.freedesktop.Secret.Item")]
 impl Item {
     pub async fn delete(
-        &self,
+        &mut self,
         #[zbus(object_server)] object_server: &ObjectServer,
     ) -> fdo::Result<ObjectPath> {
-        let mut properties: HashMap<&str, &str> = Default::default();
-
-        for (key, value) in self.properties().attributes().unwrap().into_iter() {
-            properties.insert(key.as_str(), value.as_str());
-        }
-
-        let _ = KEYRING.get().unwrap().delete(&properties).await;
+        let attributes = self.inner().attributes();
+        let _ = KEYRING.get().unwrap().delete(attributes).await;
         let _ = object_server.remove::<Item, _>(self.path()).await;
         Ok(ObjectPath::default().into())
     }
 
-    pub async fn get_secret(&self /* session: Session */) -> fdo::Result<Vec<u8>> {
-        let item = KEYRING
-            .get()
-            .unwrap()
-            .lookup_item(&self.lookup_item_attributes().await)
-            .await
-            .unwrap()
-            .unwrap();
-        // do something with session parameter
-        Ok(item.secret().to_vec())
+    pub async fn secret(&mut self /* session: Session */) -> fdo::Result<Vec<u8>> {
+        let secret = self.inner().secret();
+        Ok(secret.to_vec())
     }
 
-    pub async fn set_secret(&self, secret: Vec<u8>) {
-        let mut item = KEYRING
-            .get()
-            .unwrap()
-            .lookup_item(&self.lookup_item_attributes().await)
-            .await
-            .unwrap()
-            .unwrap();
-
-        item.set_secret(secret)
+    pub async fn set_secret(&mut self, secret: Vec<u8>) {
+        self.inner().set_secret(secret);
     }
 
-    pub fn locked(&self) -> bool {
+    /*pub fn locked(&self) -> bool {
         self.locked
+    }*/
+
+    pub fn attributes(&mut self) -> &HashMap<String, AttributeValue> {
+        self.inner().attributes()
     }
 
-    pub fn properties(&self) -> &Properties {
-        &self.properties
+    pub fn label(&mut self) -> &str {
+        self.inner().label()
     }
 
-    pub fn label(&self) -> &str {
-        let attributes = self.properties();
-        attributes.label()
+    pub fn created(&mut self) -> u64 {
+        self.inner().created().as_secs()
     }
 
-    pub fn created(&self) -> u64 {
-        self.created
-    }
-
-    pub fn modified(&self) -> u64 {
-        self.created
+    pub fn modified(&mut self) -> u64 {
+        self.inner().modified().as_secs()
     }
 
     pub fn path(&self) -> ObjectPath {
@@ -93,37 +63,22 @@ impl Item {
 
 impl Item {
     pub async fn new(
-        attributes: &HashMap<&str, &str>,
-        secret: Vec<u8>,
-        label: &str,
-        created: u64,
-        modified: u64,
+        item: portal::Item,
         collection_path: OwnedObjectPath,
     ) -> Self {
-        // maps oo7::portal::Item to crate Item
-        let properties = Properties::for_item(label, attributes);
+        // maps oo7::portal::Item to crate::service::Item
         Self {
-            locked: true,
-            properties: properties,
-            created: created,
-            modified: modified,
-            secret: secret,
+            inner: item.to_owned(),
             path: OwnedObjectPath::try_from(format!(
                 "{}/items/{}",
                 collection_path.as_str(),
-                label
+                item.label(),
             ))
             .unwrap(),
         }
     }
 
-    pub async fn lookup_item_attributes(&self) -> HashMap<&str, &str> {
-        let mut attributes: HashMap<&str, &str> = Default::default();
-
-        for (key, value) in self.properties().attributes().unwrap().into_iter() {
-            attributes.insert(key.as_str(), value.as_str());
-        }
-
-        attributes
+    pub fn inner(&mut self) -> &mut portal::Item {
+        &mut self.inner
     }
 }
