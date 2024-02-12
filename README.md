@@ -32,24 +32,17 @@ use std::collections::HashMap;
 
 async fn run() -> oo7::Result<()> {
     let keyring = oo7::Keyring::new().await?;
+    let attributes = HashMap::from([("attribute", "attribute_value")]);
 
     // Store a secret
-    keyring.create_item(
-        "Item Label",
-        &HashMap::from([("attribute", "attribute_value")]),
-        b"secret",
-        true,
-    ).await?;
+    keyring
+        .create_item("Item Label", &attributes, b"secret", true).await?;
 
     // Find a stored secret
-    let items = keyring
-        .search_items(&HashMap::from([("attribute", "attribute_value")]))
-        .await?;
+    let items = keyring.search_items(&attributes).await?;
 
     // Delete a stored secret
-    keyring
-        .delete(&HashMap::from([("attribute", "attribute_value")]))
-        .await?;
+    keyring.delete(&attributes).await?;
 
     // Unlock the collection if the Secret Service is used
     keyring.unlock().await?;

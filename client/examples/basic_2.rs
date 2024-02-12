@@ -9,22 +9,15 @@ async fn main() -> oo7::Result<()> {
     let keyring = Keyring::new().await?;
     KEYRING.set(keyring).unwrap();
 
+    let attributes = HashMap::from([("attr", "value")]);
+
     KEYRING
         .get()
         .unwrap()
-        .create_item(
-            "Some Label",
-            &HashMap::from([("attr", "value")]),
-            b"secret",
-            true,
-        )
+        .create_item("Some Label", &attributes, b"secret", true)
         .await?;
 
-    let items = KEYRING
-        .get()
-        .unwrap()
-        .search_items(&HashMap::from([("attr", "value")]))
-        .await?;
+    let items = KEYRING.get().unwrap().search_items(&attributes).await?;
 
     for item in items {
         println!("{}", item.label().await?);

@@ -6,8 +6,7 @@ use oo7::dbus::Service;
 async fn main() -> oo7::Result<()> {
     let service = Service::new().await?;
 
-    let mut attributes = HashMap::new();
-    attributes.insert("type", "token");
+    let attributes = HashMap::from([("type", "token")]);
     let collection = service.default_collection().await?;
     let items = collection.search_items(&attributes).await?;
     for item in items {
