@@ -67,8 +67,8 @@ impl From<&Key> for zvariant::Value<'_> {
 impl From<zvariant::OwnedValue> for Key {
     fn from(value: zvariant::OwnedValue) -> Self {
         let mut key = zeroize::Zeroizing::new(vec![]);
-        for value in value.downcast_ref::<zvariant::Array>().unwrap().get() {
-            key.push(*value.downcast_ref::<u8>().unwrap());
+        for value in value.downcast_ref::<zvariant::Array>().unwrap().inner() {
+            key.push(value.downcast_ref::<u8>().unwrap());
         }
         Key::new(key.to_vec())
     }

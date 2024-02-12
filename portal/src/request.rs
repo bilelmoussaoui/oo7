@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 
 use oo7::zbus::{
-    self, dbus_interface,
+    self,
     zvariant::{self, ObjectPath, Type},
 };
 use serde::Serialize;
@@ -31,7 +31,7 @@ impl Request {
     }
 }
 
-#[dbus_interface(name = "org.freedesktop.impl.portal.Request")]
+#[zbus::interface(name = "org.freedesktop.impl.portal.Request")]
 impl Request {
     async fn close(
         &self,

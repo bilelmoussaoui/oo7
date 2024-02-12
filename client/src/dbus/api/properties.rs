@@ -89,7 +89,10 @@ impl<'de> Deserialize<'de> for Properties {
         } else {
             let label = zvariant::Str::try_from(map.get(ITEM_PROPERTY_LABEL).unwrap()).unwrap();
             let attributes = HashMap::<String, String>::try_from(
-                map.get(ITEM_PROPERTY_ATTRIBUTES).unwrap().clone(),
+                map.get(ITEM_PROPERTY_ATTRIBUTES)
+                    .unwrap()
+                    .try_clone()
+                    .unwrap(),
             )
             .unwrap();
             Ok(Self::for_item(&label, &attributes))
@@ -99,8 +102,7 @@ impl<'de> Deserialize<'de> for Properties {
 
 #[cfg(test)]
 mod tests {
-    use byteorder::LE;
-    use zbus::zvariant::{self, from_slice, to_bytes, EncodingContext as Context, Type};
+    use zbus::zvariant::{self, serialized::Context, to_bytes, Endian, Type};
 
     use super::*;
 
@@ -108,9 +110,9 @@ mod tests {
     fn serialize_label() {
         let properties = Properties::for_collection("some_label");
 
-        let ctxt = Context::<LE>::new_dbus(0);
+        let ctxt = Context::new_dbus(Endian::Little, 0);
         let encoded = to_bytes(ctxt, &properties).unwrap();
-        let decoded: HashMap<&str, Value<'_>> = from_slice(&encoded, ctxt).unwrap();
+        let decoded: HashMap<&str, Value<'_>> = encoded.deserialize().unwrap().0;
 
         assert_eq!(
             decoded[COLLECTION_PROPERTY_LABEL],
@@ -126,9 +128,9 @@ mod tests {
         attributes.insert("some", "attribute");
         let properties = Properties::for_item("some_label", &attributes);
 
-        let ctxt = Context::<LE>::new_dbus(0);
+        let ctxt = Context::new_dbus(Endian::Little, 0);
         let encoded = to_bytes(ctxt, &properties).unwrap();
-        let decoded: HashMap<&str, Value<'_>> = from_slice(&encoded, ctxt).unwrap();
+        let decoded: HashMap<&str, Value<'_>> = encoded.deserialize().unwrap().0;
 
         assert_eq!(decoded[ITEM_PROPERTY_LABEL], Value::from("some_label"));
         assert!(!decoded.contains_key(COLLECTION_PROPERTY_LABEL));

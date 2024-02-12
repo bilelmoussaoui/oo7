@@ -105,7 +105,7 @@ impl Item {
     pub(crate) fn encrypt(&self, key: &Key) -> Result<EncryptedItem, Error> {
         key.check_strength()?;
 
-        let decrypted = Zeroizing::new(zvariant::to_bytes(*gvariant_encoding(), &self)?);
+        let decrypted = Zeroizing::new(zvariant::to_bytes(*gvariant_encoding(), &self)?.to_vec());
 
         let iv = crypto::generate_iv();
 
@@ -131,6 +131,8 @@ impl TryFrom<&[u8]> for Item {
     type Error = Error;
 
     fn try_from(value: &[u8]) -> Result<Self, Error> {
-        Ok(zvariant::from_slice(value, *gvariant_encoding())?)
+        Ok(zvariant::serialized::Data::new(value, *gvariant_encoding())
+            .deserialize()?
+            .0)
     }
 }

@@ -22,7 +22,7 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "tokio")]
 use tokio::{fs, io, io::AsyncWriteExt};
-use zbus::zvariant::{self, Type};
+use zbus::zvariant::{self, serialized::Context, Endian, Type};
 
 /// Used for newly created [`Keyring`]s
 const DEFAULT_ITERATION_COUNT: u32 = 100000;
@@ -52,9 +52,9 @@ use crate::{
     AsAttributes, Key,
 };
 
-pub(super) fn gvariant_encoding() -> &'static zvariant::EncodingContext<byteorder::LE> {
-    static ENCODING: OnceLock<zvariant::EncodingContext<byteorder::LE>> = OnceLock::new();
-    ENCODING.get_or_init(|| zvariant::EncodingContext::<byteorder::LE>::new_gvariant(0))
+pub(super) fn gvariant_encoding() -> &'static Context {
+    static ENCODING: OnceLock<Context> = OnceLock::new();
+    ENCODING.get_or_init(|| Context::new_gvariant(Endian::Little, 0))
 }
 
 /// Logical contents of a keyring file
@@ -219,7 +219,7 @@ impl Keyring {
 
         blob.push(MAJOR_VERSION);
         blob.push(MINOR_VERSION);
-        blob.append(&mut zvariant::to_bytes(*gvariant_encoding(), &self)?);
+        blob.append(&mut zvariant::to_bytes(*gvariant_encoding(), &self)?.to_vec());
 
         Ok(blob)
     }
@@ -261,7 +261,9 @@ impl TryFrom<&[u8]> for Keyring {
         }
 
         if let Some(data) = value.get((FILE_HEADER_LEN + 2)..) {
-            let keyring: Self = zvariant::from_slice(data, *gvariant_encoding())?;
+            let keyring: Self = zvariant::serialized::Data::new(data, *gvariant_encoding())
+                .deserialize()?
+                .0;
 
             if keyring.salt.len() != keyring.salt_size as usize {
                 Err(Error::SaltSizeMismatch(

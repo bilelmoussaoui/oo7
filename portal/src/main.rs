@@ -1,23 +1,19 @@
 mod error;
 mod request;
 
-use std::{
-    collections::HashMap,
-    future::pending,
-    os::{
-        fd::{AsRawFd, FromRawFd},
-        unix::net::UnixStream,
-    },
-};
+use std::{collections::HashMap, future::pending, os::unix::net::UnixStream};
 
 use futures_util::FutureExt;
 use oo7::{
     dbus::Service,
-    zbus::{self, dbus_interface, zvariant, ProxyDefault},
+    zbus::{
+        self,
+        zvariant::{self, OwnedObjectPath},
+        ProxyDefault,
+    },
 };
 use ring::rand::SecureRandom;
 use tokio::io::AsyncWriteExt;
-use zvariant::OwnedObjectPath;
 
 use crate::{
     error::Error,
@@ -30,7 +26,7 @@ const PORTAL_NAME: &str = "org.freedesktop.impl.portal.desktop.oo7";
 
 struct Secret;
 
-#[dbus_interface(name = "org.freedesktop.impl.portal.Secret")]
+#[zbus::interface(name = "org.freedesktop.impl.portal.Secret")]
 impl Secret {
     #[dbus_interface(property, name = "version")]
     fn version(&self) -> u32 {
@@ -43,7 +39,7 @@ impl Secret {
         #[zbus(object_server)] object_server: &zbus::ObjectServer,
         handle: OwnedObjectPath,
         app_id: &str,
-        fd: zvariant::Fd,
+        fd: zvariant::OwnedFd,
         options: HashMap<&str, zvariant::Value<'_>>,
     ) -> Result<(ResponseType, HashMap<&str, zvariant::OwnedValue>), Error> {
         tracing::debug!("Request from app: {app_id} with options: {options:?}");
@@ -93,7 +89,7 @@ fn generate_secret() -> Result<zeroize::Zeroizing<Vec<u8>>, Error> {
 }
 
 /// Generates, stores and send the secret back to the fd stream
-async fn send_secret_to_app(app_id: &str, fd: zvariant::Fd) -> Result<(), Error> {
+async fn send_secret_to_app(app_id: &str, fd: zvariant::OwnedFd) -> Result<(), Error> {
     let service = Service::new().await?;
     let collection = match service.default_collection().await {
         Err(oo7::dbus::Error::NotFound(_)) => {
@@ -125,8 +121,8 @@ async fn send_secret_to_app(app_id: &str, fd: zvariant::Fd) -> Result<(), Error>
     };
 
     // Write the secret to the FD.
-    let raw_fd = fd.as_raw_fd();
-    let mut stream = unsafe { tokio::net::UnixStream::from_std(UnixStream::from_raw_fd(raw_fd)) }?;
+    let mut stream =
+        tokio::net::UnixStream::from_std(UnixStream::from(std::os::fd::OwnedFd::from(fd)))?;
     stream.write_all(&secret).await?;
 
     Ok(())
@@ -138,7 +134,7 @@ async fn main() -> Result<(), zbus::Error> {
 
     let backend = Secret;
     let cnx = zbus::ConnectionBuilder::session()?
-        .serve_at(oo7::portal::SecretProxy::PATH, backend)?
+        .serve_at(oo7::portal::SecretProxy::PATH.unwrap(), backend)?
         .build()
         .await?;
     // NOTE For debugging.
