@@ -60,7 +60,7 @@ async fn run() -> oo7::Result<()> {
 }
 ```
 
-If your application makes heavy usage of the keyring like a password manager. You could store an instance of the `Keyring` in a `OnceCell`
+If your application makes heavy usage of the keyring like a password manager. You could store an instance of the `Keyring` in a `OnceCell` / `OnceLock` / `Lazy`
 
 ```rust,ignore
 use std::sync::OnceLock;
