@@ -18,9 +18,9 @@ use crate::{
 pub struct Item<'a>(zbus::Proxy<'a>);
 
 impl<'a> ProxyDefault for Item<'a> {
-    const INTERFACE: &'static str = "org.freedesktop.Secret.Item";
-    const DESTINATION: &'static str = DESTINATION;
-    const PATH: &'static str = "/";
+    const INTERFACE: Option<&'static str> = Some("org.freedesktop.Secret.Item");
+    const DESTINATION: Option<&'static str> = Some(DESTINATION);
+    const PATH: Option<&'static str> = None;
 }
 
 impl<'a> From<zbus::Proxy<'a>> for Item<'a> {
@@ -112,7 +112,8 @@ impl<'a> Item<'a> {
             .call_method("Delete", &())
             .await
             .map_err::<ServiceError, _>(From::from)?
-            .body::<OwnedObjectPath>()?;
+            .body()
+            .deserialize::<OwnedObjectPath>()?;
         if let Some(prompt) = Prompt::new(self.inner().connection(), prompt_path).await? {
             let _ = prompt.receive_completed().await?;
         }
@@ -126,7 +127,8 @@ impl<'a> Item<'a> {
             .call_method("GetSecret", &(session))
             .await
             .map_err::<ServiceError, _>(From::from)?
-            .body::<SecretInner>()?;
+            .body()
+            .deserialize::<SecretInner>()?;
         Secret::from_inner(self.inner().connection(), inner).await
     }
 

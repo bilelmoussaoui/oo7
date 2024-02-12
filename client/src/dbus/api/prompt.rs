@@ -16,9 +16,9 @@ use crate::dbus::{Error, ServiceError};
 pub struct Prompt<'a>(zbus::Proxy<'a>);
 
 impl<'a> ProxyDefault for Prompt<'a> {
-    const INTERFACE: &'static str = "org.freedesktop.Secret.Prompt";
-    const DESTINATION: &'static str = DESTINATION;
-    const PATH: &'static str = "/";
+    const INTERFACE: Option<&'static str> = Some("org.freedesktop.Secret.Prompt");
+    const DESTINATION: Option<&'static str> = Some(DESTINATION);
+    const PATH: Option<&'static str> = None;
 }
 
 impl<'a> From<zbus::Proxy<'a>> for Prompt<'a> {
@@ -77,7 +77,7 @@ impl<'a> Prompt<'a> {
         let (value, _) = futures_util::try_join!(
             async {
                 let message = stream.next().await.unwrap();
-                let (dismissed, result) = message.body::<(bool, OwnedValue)>()?;
+                let (dismissed, result) = message.body().deserialize::<(bool, OwnedValue)>()?;
                 if dismissed {
                     Err(Error::Dismissed)
                 } else {

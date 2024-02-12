@@ -3,9 +3,9 @@ use std::fmt;
 /// DBus Secret Service specific errors.
 /// <https://specifications.freedesktop.org/secret-service/latest/ch15.html>
 #[derive(zbus::DBusError, Debug)]
-#[dbus_error(prefix = "org.freedesktop.Secret.Error")]
+#[zbus(prefix = "org.freedesktop.Secret.Error")]
 pub enum ServiceError {
-    #[dbus_error(zbus_error)]
+    #[zbus(error)]
     /// ZBus specific error.
     ZBus(zbus::Error),
     /// Collection/Item is locked.

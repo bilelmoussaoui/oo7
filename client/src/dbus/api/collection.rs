@@ -19,9 +19,9 @@ use crate::{
 pub struct Collection<'a>(zbus::Proxy<'a>);
 
 impl<'a> ProxyDefault for Collection<'a> {
-    const INTERFACE: &'static str = "org.freedesktop.Secret.Collection";
-    const DESTINATION: &'static str = DESTINATION;
-    const PATH: &'static str = "/";
+    const INTERFACE: Option<&'static str> = Some("org.freedesktop.Secret.Collection");
+    const DESTINATION: Option<&'static str> = Some(DESTINATION);
+    const PATH: Option<&'static str> = None;
 }
 
 impl<'a> From<zbus::Proxy<'a>> for Collection<'a> {
@@ -71,7 +71,7 @@ impl<'a> Collection<'a> {
         let stream = self.inner().receive_signal("ItemCreated").await?;
         let conn = self.inner().connection();
         Ok(stream.filter_map(move |message| async move {
-            let path = message.body::<OwnedObjectPath>().ok()?;
+            let path = message.body().deserialize::<OwnedObjectPath>().ok()?;
             Item::new(conn, path).await.ok()
         }))
     }
@@ -79,7 +79,9 @@ impl<'a> Collection<'a> {
     #[doc(alias = "ItemDeleted")]
     pub async fn receive_item_deleted(&self) -> Result<impl Stream<Item = OwnedObjectPath>, Error> {
         let stream = self.inner().receive_signal("ItemDeleted").await?;
-        Ok(stream.filter_map(move |message| async move { message.body::<OwnedObjectPath>().ok() }))
+        Ok(stream.filter_map(move |message| async move {
+            message.body().deserialize::<OwnedObjectPath>().ok()
+        }))
     }
 
     #[doc(alias = "ItemChanged")]
@@ -87,7 +89,7 @@ impl<'a> Collection<'a> {
         let stream = self.inner().receive_signal("ItemChanged").await?;
         let conn = self.inner().connection();
         Ok(stream.filter_map(move |message| async move {
-            let path = message.body::<OwnedObjectPath>().ok()?;
+            let path = message.body().deserialize::<OwnedObjectPath>().ok()?;
             Item::new(conn, path).await.ok()
         }))
     }
@@ -136,7 +138,8 @@ impl<'a> Collection<'a> {
             .call_method("Delete", &())
             .await
             .map_err::<ServiceError, _>(From::from)?
-            .body::<OwnedObjectPath>()?;
+            .body()
+            .deserialize::<OwnedObjectPath>()?;
         if let Some(prompt) = Prompt::new(self.inner().connection(), prompt_path).await? {
             let _ = prompt.receive_completed().await?;
         }
@@ -154,7 +157,7 @@ impl<'a> Collection<'a> {
             .await
             .map_err::<ServiceError, _>(From::from)?;
 
-        let item_paths = msg.body::<Vec<OwnedObjectPath>>()?;
+        let item_paths = msg.body().deserialize::<Vec<OwnedObjectPath>>()?;
         Item::from_paths(self.inner().connection(), item_paths).await
     }
 
@@ -172,7 +175,8 @@ impl<'a> Collection<'a> {
             .call_method("CreateItem", &(properties, secret, replace))
             .await
             .map_err::<ServiceError, _>(From::from)?
-            .body::<(OwnedObjectPath, OwnedObjectPath)>()?;
+            .body()
+            .deserialize::<(OwnedObjectPath, OwnedObjectPath)>()?;
         let cnx = self.inner().connection();
         let item_path = if let Some(prompt) = Prompt::new(cnx, prompt_path).await? {
             let response = prompt.receive_completed().await?;

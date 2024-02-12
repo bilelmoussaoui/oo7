@@ -15,9 +15,9 @@ use crate::dbus::{Error, ServiceError};
 pub struct Session<'a>(zbus::Proxy<'a>);
 
 impl<'a> ProxyDefault for Session<'a> {
-    const INTERFACE: &'static str = "org.freedesktop.Secret.Session";
-    const DESTINATION: &'static str = DESTINATION;
-    const PATH: &'static str = "/";
+    const INTERFACE: Option<&'static str> = Some("org.freedesktop.Secret.Session");
+    const DESTINATION: Option<&'static str> = Some(DESTINATION);
+    const PATH: Option<&'static str> = None;
 }
 
 impl<'a> From<zbus::Proxy<'a>> for Session<'a> {

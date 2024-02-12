@@ -21,9 +21,9 @@ use crate::{
 pub struct Service<'a>(zbus::Proxy<'a>);
 
 impl<'a> ProxyDefault for Service<'a> {
-    const INTERFACE: &'static str = "org.freedesktop.Secret.Service";
-    const DESTINATION: &'static str = DESTINATION;
-    const PATH: &'static str = PATH;
+    const INTERFACE: Option<&'static str> = Some("org.freedesktop.Secret.Service");
+    const DESTINATION: Option<&'static str> = Some(DESTINATION);
+    const PATH: Option<&'static str> = Some(PATH);
 }
 
 impl<'a> From<zbus::Proxy<'a>> for Service<'a> {
@@ -52,7 +52,7 @@ impl<'a> Service<'a> {
         let stream = self.inner().receive_signal("CollectionCreated").await?;
         let conn = self.inner().connection();
         Ok(stream.filter_map(move |message| async move {
-            let path = message.body::<OwnedObjectPath>().ok()?;
+            let path = message.body().deserialize::<OwnedObjectPath>().ok()?;
             Collection::new(conn, path).await.ok()
         }))
     }
@@ -64,7 +64,7 @@ impl<'a> Service<'a> {
         let stream = self.inner().receive_signal("CollectionDeleted").await?;
         let conn = self.inner().connection();
         Ok(stream.filter_map(move |message| async move {
-            let path = message.body::<OwnedObjectPath>().ok()?;
+            let path = message.body().deserialize::<OwnedObjectPath>().ok()?;
             Collection::new(conn, path).await.ok()
         }))
     }
@@ -76,7 +76,7 @@ impl<'a> Service<'a> {
         let stream = self.inner().receive_signal("CollectionChanged").await?;
         let conn = self.inner().connection();
         Ok(stream.filter_map(move |message| async move {
-            let path = message.body::<OwnedObjectPath>().ok()?;
+            let path = message.body().deserialize::<OwnedObjectPath>().ok()?;
             Collection::new(conn, path).await.ok()
         }))
     }
@@ -103,7 +103,8 @@ impl<'a> Service<'a> {
             .call_method("OpenSession", &(&algorithm, key))
             .await
             .map_err::<ServiceError, _>(From::from)?
-            .body::<(OwnedValue, OwnedObjectPath)>()?;
+            .body()
+            .deserialize::<(OwnedValue, OwnedObjectPath)>()?;
         let session = Session::new(self.inner().connection(), session_path).await?;
 
         let key = match algorithm {
@@ -126,7 +127,8 @@ impl<'a> Service<'a> {
             .call_method("CreateCollection", &(properties, alias.unwrap_or_default()))
             .await
             .map_err::<ServiceError, _>(From::from)?
-            .body::<(OwnedObjectPath, OwnedObjectPath)>()?;
+            .body()
+            .deserialize::<(OwnedObjectPath, OwnedObjectPath)>()?;
 
         let collection_path = if let Some(prompt) =
             Prompt::new(self.inner().connection(), prompt_path).await?
@@ -149,7 +151,8 @@ impl<'a> Service<'a> {
             .call_method("SearchItems", &(attributes.as_attributes()))
             .await
             .map_err::<ServiceError, _>(From::from)?
-            .body::<(Vec<OwnedObjectPath>, Vec<OwnedObjectPath>)>()?;
+            .body()
+            .deserialize::<(Vec<OwnedObjectPath>, Vec<OwnedObjectPath>)>()?;
         let cnx = self.inner().connection();
 
         let unlocked_items = Item::from_paths(cnx, unlocked_item_paths).await?;
@@ -164,7 +167,8 @@ impl<'a> Service<'a> {
             .call_method("Unlock", &(items))
             .await
             .map_err::<ServiceError, _>(From::from)?
-            .body::<(Vec<OwnedObjectPath>, OwnedObjectPath)>()?;
+            .body()
+            .deserialize::<(Vec<OwnedObjectPath>, OwnedObjectPath)>()?;
         let cnx = self.inner().connection();
 
         if let Some(prompt) = Prompt::new(cnx, prompt_path).await? {
@@ -182,7 +186,8 @@ impl<'a> Service<'a> {
             .call_method("Lock", &(items))
             .await
             .map_err::<ServiceError, _>(From::from)?
-            .body::<(Vec<OwnedObjectPath>, OwnedObjectPath)>()?;
+            .body()
+            .deserialize::<(Vec<OwnedObjectPath>, OwnedObjectPath)>()?;
         let cnx = self.inner().connection();
 
         if let Some(prompt) = Prompt::new(cnx, prompt_path).await? {
@@ -206,7 +211,8 @@ impl<'a> Service<'a> {
             .call_method("GetSecrets", &(items, session))
             .await
             .map_err::<ServiceError, _>(From::from)?
-            .body::<HashMap<OwnedObjectPath, SecretInner>>()?;
+            .body()
+            .deserialize::<HashMap<OwnedObjectPath, SecretInner>>()?;
 
         let cnx = self.inner().connection();
         let mut output = HashMap::with_capacity(secrets.capacity());
@@ -227,7 +233,8 @@ impl<'a> Service<'a> {
             .call_method("ReadAlias", &(name))
             .await
             .map_err::<ServiceError, _>(From::from)?
-            .body::<OwnedObjectPath>()?;
+            .body()
+            .deserialize::<OwnedObjectPath>()?;
 
         if collection_path != OwnedObjectPath::default() {
             let collection = Collection::new(self.inner().connection(), collection_path).await?;

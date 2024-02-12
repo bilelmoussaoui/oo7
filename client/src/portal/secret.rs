@@ -4,10 +4,7 @@
 use std::{
     collections::HashMap,
     io::Read,
-    os::{
-        fd::{AsFd, AsRawFd},
-        unix::net::UnixStream,
-    },
+    os::{fd::AsFd, unix::net::UnixStream},
 };
 
 use futures_util::StreamExt;
@@ -70,9 +67,9 @@ impl Default for RetrieveOptions {
 pub struct SecretProxy<'a>(zbus::Proxy<'a>);
 
 impl<'a> ProxyDefault for SecretProxy<'a> {
-    const INTERFACE: &'static str = "org.freedesktop.portal.Secret";
-    const DESTINATION: &'static str = "org.freedesktop.portal.Desktop";
-    const PATH: &'static str = "/org/freedesktop/portal/desktop";
+    const INTERFACE: Option<&'static str> = Some("org.freedesktop.portal.Secret");
+    const DESTINATION: Option<&'static str> = Some("org.freedesktop.portal.Desktop");
+    const PATH: Option<&'static str> = Some("/org/freedesktop/portal/desktop");
 }
 
 impl<'a> From<zbus::Proxy<'a>> for SecretProxy<'a> {
@@ -113,7 +110,7 @@ impl<'a> SecretProxy<'a> {
             "Creating a '{}' proxy and listening for a response",
             path.as_str()
         );
-        let request_proxy: zbus::Proxy = zbus::ProxyBuilder::new_bare(cnx)
+        let request_proxy: zbus::Proxy = zbus::ProxyBuilder::new(cnx)
             .interface("org.freedesktop.portal.Request")?
             .destination("org.freedesktop.portal.Desktop")?
             .path(path)?
@@ -125,7 +122,9 @@ impl<'a> SecretProxy<'a> {
         futures_util::try_join!(
             async {
                 let message = signal_stream.next().await.unwrap();
-                let (response, _details) = message.body::<(u32, HashMap<String, OwnedValue>)>()?;
+                let (response, _details) = message
+                    .body()
+                    .deserialize::<(u32, HashMap<String, OwnedValue>)>()?;
                 if response == 0 {
                     Ok(())
                 } else {
@@ -135,10 +134,7 @@ impl<'a> SecretProxy<'a> {
             async {
                 match self
                     .0
-                    .call_method(
-                        "RetrieveSecret",
-                        &(Fd::from(fd.as_fd().as_raw_fd()), &options),
-                    )
+                    .call_method("RetrieveSecret", &(Fd::from(fd), &options))
                     .await
                 {
                     Ok(_) => Ok(()),
