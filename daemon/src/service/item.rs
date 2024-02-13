@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use oo7::{portal};
+use oo7::portal;
 use portal::api::AttributeValue;
 use zbus::{dbus_interface, fdo, zvariant, ObjectServer};
 use zvariant::{ObjectPath, OwnedObjectPath};
@@ -36,9 +36,9 @@ impl Item {
         self.inner().set_secret(secret);
     }
 
-    /*pub fn locked(&self) -> bool {
-        self.locked
-    }*/
+    // pub fn locked(&self) -> bool {
+    // self.locked
+    // }
 
     pub fn attributes(&mut self) -> &HashMap<String, AttributeValue> {
         self.inner().attributes()
@@ -62,10 +62,7 @@ impl Item {
 }
 
 impl Item {
-    pub async fn new(
-        item: portal::Item,
-        collection_path: OwnedObjectPath,
-    ) -> Self {
+    pub async fn new(item: portal::Item, collection_path: OwnedObjectPath) -> Self {
         // maps oo7::portal::Item to crate::service::Item
         Self {
             inner: item.to_owned(),

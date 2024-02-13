@@ -1,20 +1,25 @@
 //  org.freedesOnceCellktop.Secret.Service
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
-use oo7::{dbus::api::Properties, portal::Item};
+use oo7::{
+    dbus::api::Properties,
+    portal::{Item, Keyring},
+};
 use serde::Serialize;
 use zbus::{dbus_interface, fdo, zvariant, Error, ObjectServer, SignalContext};
-use zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Type, Value};
+use zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Value};
 
 use crate::{
     service::{collection::Collection, session::Session},
     KEYRING,
 };
 
-#[derive(Serialize, Type, Debug)]
+#[derive(Serialize, Debug)]
 pub struct Service {
-    pub collections: Vec<Collection>,
+    collections: Vec<Collection>,
+    #[serde(skip_serializing)]
+    keyring: Arc<Keyring>,
 }
 
 #[dbus_interface(name = "org.freedesktop.Secret.Service")]
@@ -188,4 +193,17 @@ impl Service {
 
     #[dbus_interface(signal)]
     pub async fn collection_changed(ctxt: &SignalContext<'_>) -> Result<(), Error>;
+}
+
+impl Service {
+    pub async fn new() -> Self {
+        Self {
+            collections: Vec::new(),
+            keyring: Arc::new(Keyring::load_default().await.unwrap()),
+        }
+    }
+
+    pub fn keyring(&self) -> &Keyring {
+        &self.keyring
+    }
 }
