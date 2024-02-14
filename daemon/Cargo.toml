@@ -11,4 +11,4 @@ version.workspace = true
 oo7 = { path = "../client", features = ["unstable"] }
 serde = "1.0"
 tokio = { version = "1", features = ["full"] } # look for specific features
-zbus = "3.14.1"
+zbus = "4.0.0"

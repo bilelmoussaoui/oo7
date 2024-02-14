@@ -7,7 +7,7 @@ use oo7::{
     portal::{Item, Keyring},
 };
 use serde::Serialize;
-use zbus::{dbus_interface, fdo, zvariant, Error, ObjectServer, SignalContext};
+use zbus::{fdo, interface, zvariant, Error, ObjectServer, SignalContext};
 use zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Value};
 
 use crate::{
@@ -22,7 +22,7 @@ pub struct Service {
     keyring: Arc<Keyring>,
 }
 
-#[dbus_interface(name = "org.freedesktop.Secret.Service")]
+#[interface(name = "org.freedesktop.Secret.Service")]
 impl Service {
     pub async fn open_session(
         &self,
@@ -37,7 +37,7 @@ impl Service {
         ))
     }
 
-    #[dbus_interface(out_args("collection", "prompt"))]
+    #[zbus(out_args("collection", "prompt"))]
     pub async fn create_collection(
         &self,
         properties: Properties,
@@ -55,7 +55,7 @@ impl Service {
         Ok((new_collection_path, prompt))
     }
 
-    #[dbus_interface(out_args("unlocked", "locked"))]
+    #[zbus(out_args("unlocked", "locked"))]
     pub async fn search_items(
         &self,
         attributes: HashMap<&str, &str>,
@@ -82,7 +82,7 @@ impl Service {
         Ok((unlocked, locked))
     }
 
-    #[dbus_interface(out_args("unlocked", "prompt"))]
+    #[zbus(out_args("unlocked", "prompt"))]
     pub async fn unlock(
         &mut self,
         objects: Vec<OwnedObjectPath>,
@@ -113,7 +113,7 @@ impl Service {
         Ok((unlocked, prompt))
     }
 
-    #[dbus_interface(out_args("locked", "prompt"))]
+    #[zbus(out_args("locked", "prompt"))]
     pub async fn lock(
         &mut self,
         objects: Vec<OwnedObjectPath>,
@@ -177,7 +177,7 @@ impl Service {
         }
     }
 
-    #[dbus_interface(property, name = "Collections")]
+    #[zbus(property, name = "Collections")]
     pub fn collections(&self) -> Vec<ObjectPath> {
         self.collections
             .iter()
@@ -185,13 +185,13 @@ impl Service {
             .collect()
     }
 
-    #[dbus_interface(signal)]
+    #[zbus(signal)]
     pub async fn collection_created(ctxt: &SignalContext<'_>) -> Result<(), Error>;
 
-    #[dbus_interface(signal)]
+    #[zbus(signal)]
     pub async fn collection_deleted(ctxt: &SignalContext<'_>) -> Result<(), Error>;
 
-    #[dbus_interface(signal)]
+    #[zbus(signal)]
     pub async fn collection_changed(ctxt: &SignalContext<'_>) -> Result<(), Error>;
 }
 

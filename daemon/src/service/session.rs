@@ -1,6 +1,6 @@
 // org.freedesktop.Secret.Session
 
-use zbus::{dbus_interface, fdo, zvariant};
+use zbus::{fdo, interface, zvariant};
 use zvariant::OwnedObjectPath;
 
 #[derive(Debug)]
@@ -8,7 +8,7 @@ pub struct Session {
     pub path: OwnedObjectPath,
 }
 
-#[dbus_interface(name = "org.freedesktop.Secret.Service")]
+#[interface(name = "org.freedesktop.Secret.Service")]
 impl Session {
     pub async fn close(
         &mut self,

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use oo7::portal;
 use portal::api::AttributeValue;
-use zbus::{dbus_interface, fdo, zvariant, ObjectServer};
+use zbus::{fdo, interface, zvariant, ObjectServer};
 use zvariant::{ObjectPath, OwnedObjectPath};
 
 use crate::KEYRING;
@@ -15,7 +15,7 @@ pub struct Item {
     path: OwnedObjectPath,
 }
 
-#[dbus_interface(name = "org.freedesktop.Secret.Item")]
+#[interface(name = "org.freedesktop.Secret.Item")]
 impl Item {
     pub async fn delete(
         &mut self,

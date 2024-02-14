@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use oo7::{dbus::api::Properties, portal::Item};
 use serde::{Serialize, Serializer};
-use zbus::{dbus_interface, zvariant, Error, ObjectServer, SignalContext};
+use zbus::{interface, zvariant, Error, ObjectServer, SignalContext};
 use zvariant::{ObjectPath, OwnedObjectPath, Type};
 
 use crate::{service::item, KEYRING};
@@ -20,7 +20,7 @@ pub struct Collection {
     path: OwnedObjectPath,
 }
 
-#[dbus_interface(name = "org.freedesktop.Secret.Collection")]
+#[interface(name = "org.freedesktop.Secret.Collection")]
 impl Collection {
     pub async fn delete(&self, #[zbus(object_server)] object_server: &ObjectServer) -> ObjectPath {
         let _ = object_server.remove::<Collection, _>(&self.path).await;
@@ -64,38 +64,38 @@ impl Collection {
         (created_item_path, prompt)
     }
 
-    #[dbus_interface(property, name = "Items")]
+    #[zbus(property, name = "Items")]
     pub fn items(&self) -> Vec<ObjectPath> {
         self.items.iter().map(|item| item.path()).collect()
     }
 
-    #[dbus_interface(property, name = "Label")]
+    #[zbus(property, name = "Label")]
     pub fn label(&self) -> &str {
         &self.label
     }
 
-    #[dbus_interface(property, name = "Locked")]
+    #[zbus(property, name = "Locked")]
     pub fn locked(&self) -> bool {
         self.locked
     }
 
-    #[dbus_interface(property, name = "Created")]
+    #[zbus(property, name = "Created")]
     pub fn created(&self) -> u64 {
         self.created
     }
 
-    #[dbus_interface(property, name = "Modified")]
+    #[zbus(property, name = "Modified")]
     pub fn modified(&self) -> u64 {
         self.modified
     }
 
-    #[dbus_interface(signal)]
+    #[zbus(signal)]
     pub async fn item_created(ctxt: &SignalContext<'_>) -> Result<(), Error>;
 
-    #[dbus_interface(signal)]
+    #[zbus(signal)]
     pub async fn item_deleted(ctxt: &SignalContext<'_>) -> Result<(), Error>;
 
-    #[dbus_interface(signal)]
+    #[zbus(signal)]
     pub async fn item_changed(ctxt: &SignalContext<'_>) -> Result<(), Error>;
 }
 
