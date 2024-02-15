@@ -55,7 +55,11 @@ pub mod api;
 mod api;
 
 mod algorithm;
+#[cfg(not(feature = "unstable"))]
 pub(crate) use algorithm::Algorithm;
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+pub use algorithm::Algorithm;
 mod item;
 pub use item::Item;
 mod error;
