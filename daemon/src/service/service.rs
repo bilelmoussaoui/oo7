@@ -7,13 +7,15 @@ use oo7::{
     portal::{Item, Keyring},
 };
 use serde::Serialize;
-use zbus::{fdo, interface, zvariant, Error, ObjectServer, SignalContext};
+use zbus::{connection, fdo, interface, zvariant, Error, ObjectServer, SignalContext};
 use zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Value};
 
 use crate::{
     service::{collection::Collection, session::Session},
     KEYRING,
 };
+
+const SECRET_SERVICE_OBJECTPATH: &str = "/org/freedesktop/secrets_";
 
 #[derive(Serialize, Debug)]
 pub struct Service {
@@ -205,5 +207,17 @@ impl Service {
 
     pub fn keyring(&self) -> &Keyring {
         &self.keyring
+    }
+
+    pub async fn run(self) -> Result<(), Error> {
+        match connection::Builder::session()?
+            .name("org.freedesktop.secrets_")?
+            .serve_at(SECRET_SERVICE_OBJECTPATH, self)?
+            .build()
+            .await // .await.map_err(From::from)
+        {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
+        }
     }
 }

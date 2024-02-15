@@ -12,7 +12,7 @@ use crate::{service::item, KEYRING};
 #[derive(Default, Debug, Type)]
 #[zvariant(signature = "o")]
 pub struct Collection {
-    pub items: Vec<item::Item>,
+    items: Vec<item::Item>,
     label: String,
     locked: bool,
     created: u64,
