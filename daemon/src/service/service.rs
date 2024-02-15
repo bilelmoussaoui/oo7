@@ -63,9 +63,6 @@ impl Service {
         Ok((path, prompt))
     }
 
-    // I have updated the collection interface impl. So, I need to re check everything starting
-    // here
-    /*
     #[zbus(out_args("unlocked", "locked"))]
     pub async fn search_items(
         &self,
@@ -93,6 +90,7 @@ impl Service {
         Ok((unlocked, locked))
     }
 
+    /*
     #[zbus(out_args("unlocked", "prompt"))]
     pub async fn unlock(
         &mut self,
@@ -167,28 +165,36 @@ impl Service {
                 if in_collection.path().as_str() == item.as_str() {}
             }
         }
-    }
+    }*/
 
     pub async fn read_alias(&self, name: &str) -> ObjectPath {
-        let mut ret = ObjectPath::default();
+        let mut path = ObjectPath::default();
         for collection in &self.collections {
-            if collection.label() == name {
-                ret = collection.path().into();
+            if collection.alias() == name {
+                path = collection.path().into();
             }
         }
 
-        ret
+        path
     }
 
-    pub async fn set_alias(&mut self, name: String, collection: OwnedObjectPath) {
-        // WIP: not complete:: handle alias
-        for in_collection in &mut self.collections {
-            if in_collection.path().as_str() == collection.as_str() {
-                in_collection.set_label(name.clone()).await;
+    pub async fn set_alias(&mut self, name: String, collection_path: OwnedObjectPath) {
+        // handle "default" aliais
+        if name == "default" {
+            return; // return Err
+        }
+
+        // handle "/" ObjectPath
+        if collection_path.as_str() == "/" {
+            return; // return Err
+        }
+
+        for collection in &mut self.collections {
+            if collection.path() == collection_path.as_str() {
+                collection.set_alias(name.clone());
             }
         }
     }
-    */
 
     #[zbus(property, name = "Collections")]
     pub fn collections(&self) -> Vec<ObjectPath> {

@@ -100,6 +100,10 @@ impl Collection {
         &self.alias
     }
 
+    pub fn set_alias(&mut self, alias: String) {
+        self.alias = alias;
+    }
+
     #[zbus(signal)]
     pub async fn item_created(ctxt: &SignalContext<'_>) -> Result<(), Error>;
 
