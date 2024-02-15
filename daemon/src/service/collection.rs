@@ -9,7 +9,9 @@ use zvariant::{ObjectPath, OwnedObjectPath, Type};
 
 use crate::{service::item, KEYRING};
 
-#[derive(Default, Debug, Type)]
+const SECRET_COLLECTION_OBJECTPATH: &str = "/org/freedesktop/secrets_/collection/";
+
+#[derive(Debug, Type)]
 #[zvariant(signature = "o")]
 pub struct Collection {
     items: Vec<item::Item>,
@@ -17,6 +19,7 @@ pub struct Collection {
     locked: bool,
     created: u64,
     modified: u64,
+    alias: String,
     path: OwnedObjectPath,
 }
 
@@ -74,6 +77,10 @@ impl Collection {
         &self.label
     }
 
+    pub fn set_label(&mut self, label: String) {
+        self.label = label;
+    }
+
     #[zbus(property, name = "Locked")]
     pub fn locked(&self) -> bool {
         self.locked
@@ -87,6 +94,10 @@ impl Collection {
     #[zbus(property, name = "Modified")]
     pub fn modified(&self) -> u64 {
         self.modified
+    }
+
+    pub fn alias(&self) -> &str {
+        &self.alias
     }
 
     #[zbus(signal)]
@@ -109,31 +120,20 @@ impl Serialize for Collection {
 }
 
 impl Collection {
-    // temporarily creates a generic Collection object
-    pub fn new(label: &str) -> Self {
+    pub fn new(properties: Properties, alias: String, created: u64) -> Self {
         Self {
             items: Vec::new(),
-            label: label.to_owned(),
-            locked: false,
-            created: 23123,
-            modified: 23123,
-            path: OwnedObjectPath::try_from(format!(
-                "/org/freedesktop/secrets/collection/{}",
-                label
-            ))
-            .unwrap(),
+            label: properties.label().to_string(),
+            locked: false, // should we set the initial locked state to true?
+            created: created,
+            modified: created,
+            alias: alias.clone(),
+            path: OwnedObjectPath::try_from(format!("{}{}", SECRET_COLLECTION_OBJECTPATH, alias))
+                .unwrap(),
         }
     }
 
     pub fn path(&self) -> ObjectPath {
-        self.path.to_owned().into()
-    }
-
-    pub async fn set_label(&mut self, label: String) {
-        self.label = label;
-    }
-
-    pub async fn set_locked(&mut self, locked: bool) {
-        self.locked = locked;
+        self.path.clone().into()
     }
 }

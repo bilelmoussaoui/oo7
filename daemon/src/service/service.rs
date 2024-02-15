@@ -1,6 +1,6 @@
-//  org.freedesOnceCellktop.Secret.Service
+// org.freedesOnceCellktop.Secret.Service
 
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::SystemTime};
 
 use oo7::{
     dbus::api::Properties,
@@ -46,17 +46,26 @@ impl Service {
         alias: String,
         #[zbus(object_server)] object_server: &ObjectServer,
     ) -> fdo::Result<(ObjectPath, ObjectPath)> {
-        let _attributes = properties.attributes(); // expand and pass these to Collection:new
-        let collection = Collection::new("temp"); // temporarily
-        let path = format!("/org/freedesktop/secrets_/collection/{}", &alias);
+        let collection = Collection::new(
+            properties,
+            alias,
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+        );
+
+        let path = collection.path().to_owned();
 
         let _ = object_server.at(path.clone(), collection).await;
-        let new_collection_path = ObjectPath::try_from(path).unwrap(); // temporarily
         let prompt = ObjectPath::default().into(); // temp Prompt
 
-        Ok((new_collection_path, prompt))
+        Ok((path, prompt))
     }
 
+    // I have updated the collection interface impl. So, I need to re check everything starting
+    // here
+    /*
     #[zbus(out_args("unlocked", "locked"))]
     pub async fn search_items(
         &self,
@@ -122,13 +131,14 @@ impl Service {
     ) -> fdo::Result<(Vec<OwnedObjectPath>, OwnedObjectPath)> {
         // manage lock state in memory
         // when do we need to prompt?
+        // WIP
         let mut locked: Vec<OwnedObjectPath> = Vec::new();
 
         for object in objects {
             for collection in &mut self.collections {
                 if collection.path().as_str() == object.as_str() {
                     if !collection.locked() {
-                        collection.set_locked(true).await;
+                        //collection.set_locked(true).await;
                         locked.push(object.clone());
                     }
                 }
@@ -178,6 +188,7 @@ impl Service {
             }
         }
     }
+    */
 
     #[zbus(property, name = "Collections")]
     pub fn collections(&self) -> Vec<ObjectPath> {
