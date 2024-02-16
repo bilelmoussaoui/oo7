@@ -14,6 +14,7 @@ use oo7::{
     portal::{Item, Keyring},
     Key,
 };
+use tokio::sync::RwLock;
 use zbus::{
     proxy::ProxyDefault,
     zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Value},
@@ -26,7 +27,7 @@ use super::{
 
 #[derive(Debug)]
 pub struct Service {
-    collections: Vec<Collection>,
+    collections: RwLock<Vec<Collection>>,
     keyring: Arc<Keyring>,
     cnx: Mutex<Option<zbus::Connection>>,
 }
@@ -66,6 +67,13 @@ impl Service {
                 .unwrap(),
             Arc::clone(&self.keyring),
         );
+        self.collections.write().await.push(Collection::new(
+            collection.label(),
+            alias,
+            *collection.created(),
+            Arc::clone(&self.keyring),
+        ));
+
         let path = OwnedObjectPath::from(collection.path());
         object_server.at(&path, collection).await?;
         let prompt = Prompt::default(); // temp Prompt
@@ -113,7 +121,7 @@ impl Service {
         let mut unlocked: Vec<OwnedObjectPath> = Vec::new();
 
         'main: for object in objects {
-            for collection in self.collections.iter() {
+            for collection in self.collections.read().await.iter() {
                 if collection.path() == *object {
                     if collection.locked() {
                         collection.set_locked(false).await;
@@ -144,7 +152,7 @@ impl Service {
         let mut locked: Vec<OwnedObjectPath> = Vec::new();
 
         for object in objects {
-            for collection in self.collections.iter() {
+            for collection in self.collections.read().await.iter() {
                 if collection.path() == *object && !collection.locked() {
                     collection.set_locked(true).await;
                     locked.push(object.clone());
@@ -167,7 +175,7 @@ impl Service {
         session: ObjectPath<'_>,
     ) -> Result<HashMap<OwnedObjectPath, SecretInner>> {
         let mut secrets = HashMap::with_capacity(paths.len());
-        for collection in &self.collections {
+        for collection in self.collections.read().await.iter() {
             let items = collection.items.read().await;
             for item in items.iter() {
                 for path in paths.iter() {
@@ -194,13 +202,12 @@ impl Service {
             .unwrap_or_default()
     }
 
-    pub async fn set_alias(
+    pub fn set_alias(
         &self,
         #[zbus(signal_context)] ctxt: SignalContext<'_>,
         alias: &str,
         path: ObjectPath<'_>,
     ) -> Result<()> {
-        // WIP: not complete:: handle alias & default path '/' to remove the alias
         match self.collections.iter().find(|c| c.path() == path) {
             Some(collection) => {
                 collection.set_alias(&ctxt, alias).await?;
@@ -214,8 +221,10 @@ impl Service {
     }
 
     #[zbus(property, name = "Collections")]
-    pub fn collections(&self) -> Vec<ObjectPath> {
+    pub async fn collections(&self) -> Vec<ObjectPath> {
         self.collections
+            .read()
+            .await
             .iter()
             .map(|collection| collection.path())
             .collect()
@@ -243,7 +252,7 @@ impl Service {
 impl Service {
     pub async fn new() -> Self {
         Self {
-            collections: Vec::new(),
+            collections: RwLock::new(Vec::new()),
             keyring: Arc::new(Keyring::load_default().await.unwrap()),
             cnx: Default::default(),
         }
