@@ -3,6 +3,7 @@
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
+    time::SystemTime,
 };
 
 use oo7::{
@@ -57,7 +58,14 @@ impl Service {
         alias: &str,
         #[zbus(object_server)] object_server: &ObjectServer,
     ) -> Result<(OwnedObjectPath, Prompt)> {
-        let collection = Collection::new(properties.label(), alias, Arc::clone(&self.keyring)); // temporarily
+        let collection = Collection::new(
+            properties.label(),
+            alias,
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap(),
+            Arc::clone(&self.keyring),
+        );
         let path = OwnedObjectPath::from(collection.path());
         object_server.at(&path, collection).await?;
         let prompt = Prompt::default(); // temp Prompt
