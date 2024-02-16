@@ -16,6 +16,8 @@ use zvariant::{ObjectPath, OwnedObjectPath};
 
 use super::{error::ServiceError, prompt::Prompt, Result, Service};
 
+const SECRET_COLLECTION_OBJECTPATH: &str = "/org/freedesktop/secrets.Devel/collection/";
+
 #[derive(Debug)]
 pub struct Collection {
     keyring: Arc<Keyring>,
@@ -123,20 +125,16 @@ impl Collection {
 }
 
 impl Collection {
-    // temporarily creates a generic Collection object
-    pub fn new(label: &str, alias: &str, keyring: Arc<Keyring>) -> Self {
+    pub fn new(label: &str, alias: &str, created: Duration, keyring: Arc<Keyring>) -> Self {
         Self {
             items: Default::default(),
             label: label.to_owned(),
             alias: RwLock::new(alias.to_owned()),
             locked: AtomicBool::new(false),
-            created: Duration::from_secs(23123),
-            modified: Duration::from_secs(23123),
-            path: OwnedObjectPath::try_from(format!(
-                "/org/freedesktop/secrets/collection/{}",
-                label
-            ))
-            .unwrap(),
+            created: created,
+            modified: created,
+            path: OwnedObjectPath::try_from(format!("{}{}", SECRET_COLLECTION_OBJECTPATH, alias))
+                .unwrap(),
             keyring,
         }
     }
