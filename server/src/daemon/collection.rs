@@ -105,12 +105,12 @@ impl Collection {
     }
 
     #[zbus(property, name = "Created")]
-    pub fn created(&self) -> u64 {
+    pub fn created_as_secs(&self) -> u64 {
         self.created.as_secs()
     }
 
     #[zbus(property, name = "Modified")]
-    pub fn modified(&self) -> u64 {
+    pub fn modified_as_secs(&self) -> u64 {
         self.modified.as_secs()
     }
 
@@ -152,5 +152,13 @@ impl Collection {
     pub async fn set_locked(&self, locked: bool) {
         self.locked
             .store(locked, std::sync::atomic::Ordering::Relaxed)
+    }
+
+    pub fn created(&self) -> &Duration {
+        &self.created
+    }
+
+    pub fn modified(&self) -> &Duration {
+        &self.modified
     }
 }
