@@ -1,6 +1,8 @@
 [package]
 name = "oo7-portal"
 authors.workspace = true
+categories.workspace = true
+keywords.workspace = true
 edition.workspace = true
 exclude.workspace = true
 homepage.workspace = true

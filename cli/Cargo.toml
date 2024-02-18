@@ -1,6 +1,9 @@
 [package]
 name = "oo7-cli"
+description = "System keyring access from the terminal"
 authors.workspace = true
+categories.workspace = true
+keywords.workspace = true
 edition.workspace = true
 exclude.workspace = true
 homepage.workspace = true
