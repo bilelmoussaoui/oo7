@@ -22,7 +22,8 @@ use zbus::{
 };
 
 use super::{
-    collection::Collection, error::ServiceError, prompt::Prompt, session::Session, Result,
+    collection::Collection, error::ServiceError, prompt::Prompt, service_manager::ServiceManager,
+    session::Session, Result,
 };
 
 #[derive(Debug)]
@@ -30,6 +31,7 @@ pub struct Service {
     collections: RwLock<Vec<Collection>>,
     keyring: Arc<Keyring>,
     cnx: Mutex<Option<zbus::Connection>>,
+    manager: Arc<ServiceManager>,
 }
 
 #[zbus::interface(name = "org.freedesktop.Secret.Service")]
@@ -45,6 +47,7 @@ impl Service {
         };
         let (session, key) = Session::new(client_public_key);
         // TODO: clean up the default generated key
+        // TODO call self.manager.set_sessions();
         let key = key
             .map(|k| OwnedValue::from(&k))
             .unwrap_or_else(|| Value::new::<Vec<u8>>(vec![]).try_to_owned().unwrap());
@@ -66,12 +69,14 @@ impl Service {
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap(),
             Arc::clone(&self.keyring),
+            Arc::clone(&self.manager),
         );
         self.collections.write().await.push(Collection::new(
             collection.label(),
             alias,
             *collection.created(),
             Arc::clone(&self.keyring),
+            Arc::clone(&self.manager),
         ));
 
         let path = OwnedObjectPath::from(collection.path());
@@ -255,6 +260,7 @@ impl Service {
             collections: RwLock::new(Vec::new()),
             keyring: Arc::new(Keyring::load_default().await.unwrap()),
             cnx: Default::default(),
+            manager: Arc::new(ServiceManager::new()),
         }
     }
 
