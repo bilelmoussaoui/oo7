@@ -14,7 +14,9 @@ use tokio::sync::RwLock;
 use zbus::{interface, zvariant, ObjectServer, SignalContext};
 use zvariant::{ObjectPath, OwnedObjectPath};
 
-use super::{error::ServiceError, prompt::Prompt, Result, Service};
+use super::{
+    error::ServiceError, prompt::Prompt, service_manager::ServiceManager, Result, Service,
+};
 
 const SECRET_COLLECTION_OBJECTPATH: &str = "/org/freedesktop/secrets.Devel/collection/";
 
@@ -27,6 +29,7 @@ pub struct Collection {
     locked: AtomicBool,
     created: Duration,
     modified: Duration,
+    manager: Arc<ServiceManager>,
     path: OwnedObjectPath,
 }
 
@@ -76,7 +79,13 @@ impl Collection {
 
         let prompt = Prompt::default(); // temp Prompt
 
-        let item = super::item::Item::new(item, self.path(), Arc::clone(&self.keyring)).await;
+        let item = super::item::Item::new(
+            item,
+            self.path(),
+            Arc::clone(&self.keyring),
+            Arc::clone(&self.manager),
+        )
+        .await;
         let path = OwnedObjectPath::from(item.path());
         self.items.write().await.push(item);
 
@@ -125,7 +134,13 @@ impl Collection {
 }
 
 impl Collection {
-    pub fn new(label: &str, alias: &str, created: Duration, keyring: Arc<Keyring>) -> Self {
+    pub fn new(
+        label: &str,
+        alias: &str,
+        created: Duration,
+        keyring: Arc<Keyring>,
+        manager: Arc<ServiceManager>,
+    ) -> Self {
         Self {
             items: Default::default(),
             label: label.to_owned(),
@@ -136,6 +151,7 @@ impl Collection {
             path: OwnedObjectPath::try_from(format!("{}{}", SECRET_COLLECTION_OBJECTPATH, alias))
                 .unwrap(),
             keyring,
+            manager,
         }
     }
 
