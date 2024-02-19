@@ -3,6 +3,7 @@ mod error;
 mod item;
 mod prompt;
 mod service;
+mod service_manager;
 mod session;
 
 pub use self::service::Service;

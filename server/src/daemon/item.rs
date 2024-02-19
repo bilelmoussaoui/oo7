@@ -13,7 +13,10 @@ use zbus::{
     ObjectServer,
 };
 
-use super::{collection::Collection, error::ServiceError, prompt::Prompt, Result};
+use super::{
+    collection::Collection, error::ServiceError, prompt::Prompt, service_manager::ServiceManager,
+    Result,
+};
 
 #[derive(Debug)]
 pub struct Item {
@@ -21,6 +24,7 @@ pub struct Item {
     path: OwnedObjectPath,
     keyring: Arc<Keyring>,
     locked: bool,
+    manager: Arc<ServiceManager>,
 }
 
 #[zbus::interface(name = "org.freedesktop.Secret.Item")]
@@ -106,12 +110,14 @@ impl Item {
         item: portal::Item,
         collection_path: ObjectPath<'_>,
         keyring: Arc<Keyring>,
+        manager: Arc<ServiceManager>,
     ) -> Self {
         Self {
             path: OwnedObjectPath::try_from(format!("{}/items/{}", collection_path, item.label(),))
                 .unwrap(),
             inner: RwLock::new(item),
             keyring,
+            manager,
             locked: true,
         }
     }
