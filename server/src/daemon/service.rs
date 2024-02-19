@@ -194,12 +194,14 @@ impl Service {
         Ok(secrets)
     }
 
-    pub fn read_alias(&self, name: &str) -> ObjectPath {
+    pub async fn read_alias(&self, name: &str) -> ObjectPath {
         self.collections
+            .read()
+            .await
             .iter()
             .find_map(|c| {
                 if c.label() == name {
-                    Some(c.path())
+                    Some(c.path().to_owned())
                 } else {
                     None
                 }
@@ -207,13 +209,19 @@ impl Service {
             .unwrap_or_default()
     }
 
-    pub fn set_alias(
+    pub async fn set_alias(
         &self,
         #[zbus(signal_context)] ctxt: SignalContext<'_>,
         alias: &str,
         path: ObjectPath<'_>,
     ) -> Result<()> {
-        match self.collections.iter().find(|c| c.path() == path) {
+        match self
+            .collections
+            .read()
+            .await
+            .iter()
+            .find(|c| c.path() == path)
+        {
             Some(collection) => {
                 collection.set_alias(&ctxt, alias).await?;
                 Ok(())
@@ -231,7 +239,7 @@ impl Service {
             .read()
             .await
             .iter()
-            .map(|collection| collection.path())
+            .map(|collection| collection.path().to_owned())
             .collect()
     }
 
