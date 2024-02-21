@@ -32,6 +32,7 @@ pub struct Service {
     keyring: Arc<Keyring>,
     cnx: Mutex<Option<zbus::Connection>>,
     manager: Arc<Mutex<ServiceManager>>,
+    sessions_counter: RwLock<i32>,
 }
 
 #[zbus::interface(name = "org.freedesktop.Secret.Service")]
@@ -40,18 +41,28 @@ impl Service {
         &self,
         algorithm: Algorithm,
         input: Value<'_>,
+        #[zbus(object_server)] object_server: &zbus::ObjectServer,
     ) -> Result<(OwnedValue, OwnedObjectPath)> {
         let client_public_key = match algorithm {
             Algorithm::Plain => None,
             Algorithm::Encrypted => Some(Key::from(input)),
         };
-        let (session, key) = Session::new(client_public_key, Arc::clone(&self.manager));
+        *self.sessions_counter.write().await += 1;
+        let (session, key) = Session::new(
+            client_public_key,
+            Arc::clone(&self.manager),
+            *self.sessions_counter.read().await,
+        );
         // TODO: clean up the default generated key
-        // TODO call self.manager.set_sessions();
         self.manager
             .lock()
             .unwrap()
             .insert_session(session.path().to_owned(), session.to_owned());
+
+        object_server
+            .at(session.path().to_owned(), session.to_owned())
+            .await?;
+
         let key = key
             .map(|k| OwnedValue::from(&k))
             .unwrap_or_else(|| Value::new::<Vec<u8>>(vec![]).try_to_owned().unwrap());
@@ -273,6 +284,7 @@ impl Service {
             keyring: Arc::new(Keyring::load_default().await.unwrap()),
             cnx: Default::default(),
             manager: Arc::new(Mutex::new(ServiceManager::new())),
+            sessions_counter: RwLock::new(0),
         }
     }
 
