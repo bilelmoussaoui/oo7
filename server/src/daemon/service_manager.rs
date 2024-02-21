@@ -17,11 +17,20 @@ impl ServiceManager {
         }
     }
 
-    pub async fn session(&self, path: ObjectPath<'_>) -> Option<&Session> {
-        self.sessions.read().await.get(&path.into())
+    pub async fn session(&self, path: ObjectPath<'_>) -> Option<Session> {
+        self.sessions
+            .read()
+            .await
+            .get(&path.into())
+            .to_owned()
+            .cloned()
     }
 
-    pub async fn insert_session(&mut self, path: OwnedObjectPath, session: Session) {
-        self.sessions.write().await.insert(path, session);
+    pub async fn insert_session(&mut self, path: ObjectPath<'_>, session: Session) {
+        self.sessions.write().await.insert(path.into(), session);
+    }
+
+    pub async fn remove_session(&mut self, path: ObjectPath<'_>) {
+        self.sessions.write().await.remove(&path.into());
     }
 }
