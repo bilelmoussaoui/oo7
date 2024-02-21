@@ -45,7 +45,7 @@ impl Service {
             Algorithm::Plain => None,
             Algorithm::Encrypted => Some(Key::from(input)),
         };
-        let (session, key) = Session::new(client_public_key);
+        let (session, key) = Session::new(client_public_key, Arc::clone(&self.manager));
         // TODO: clean up the default generated key
         // TODO call self.manager.set_sessions();
         let key = key
