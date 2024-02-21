@@ -1,6 +1,6 @@
 // org.freedesktop.Secret.Session
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use oo7::Key;
 use zbus::{fdo, interface, zvariant};
@@ -11,7 +11,7 @@ use super::service_manager::ServiceManager;
 #[derive(Debug, Clone)]
 pub struct Session {
     client_public_key: Arc<Option<Key>>,
-    manager: Arc<ServiceManager>,
+    manager: Arc<Mutex<ServiceManager>>,
     pub path: OwnedObjectPath,
 }
 
@@ -29,7 +29,7 @@ impl Session {
 impl Session {
     pub fn new(
         client_public_key: Option<Key>,
-        manager: Arc<ServiceManager>,
+        manager: Arc<Mutex<ServiceManager>>,
     ) -> (Self, Option<Key>) {
         // make use of the keys
         let service_key = vec![0];
