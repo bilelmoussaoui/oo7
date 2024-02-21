@@ -1,6 +1,9 @@
 // org.freedesktop.Secret.Item
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use oo7::{
     dbus::api::SecretInner,
@@ -24,7 +27,7 @@ pub struct Item {
     path: OwnedObjectPath,
     keyring: Arc<Keyring>,
     locked: bool,
-    manager: Arc<ServiceManager>,
+    manager: Arc<Mutex<ServiceManager>>,
 }
 
 #[zbus::interface(name = "org.freedesktop.Secret.Item")]
@@ -110,7 +113,7 @@ impl Item {
         item: portal::Item,
         collection_path: ObjectPath<'_>,
         keyring: Arc<Keyring>,
-        manager: Arc<ServiceManager>,
+        manager: Arc<Mutex<ServiceManager>>,
     ) -> Self {
         Self {
             path: OwnedObjectPath::try_from(format!("{}/items/{}", collection_path, item.label(),))
