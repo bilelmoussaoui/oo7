@@ -31,7 +31,7 @@ pub struct Service {
     collections: RwLock<Vec<Collection>>,
     keyring: Arc<Keyring>,
     cnx: Mutex<Option<zbus::Connection>>,
-    manager: Arc<ServiceManager>,
+    manager: Arc<Mutex<ServiceManager>>,
 }
 
 #[zbus::interface(name = "org.freedesktop.Secret.Service")]
@@ -48,6 +48,10 @@ impl Service {
         let (session, key) = Session::new(client_public_key, Arc::clone(&self.manager));
         // TODO: clean up the default generated key
         // TODO call self.manager.set_sessions();
+        self.manager
+            .lock()
+            .unwrap()
+            .insert_session(session.path().to_owned(), session.to_owned());
         let key = key
             .map(|k| OwnedValue::from(&k))
             .unwrap_or_else(|| Value::new::<Vec<u8>>(vec![]).try_to_owned().unwrap());
@@ -268,7 +272,7 @@ impl Service {
             collections: RwLock::new(Vec::new()),
             keyring: Arc::new(Keyring::load_default().await.unwrap()),
             cnx: Default::default(),
-            manager: Arc::new(ServiceManager::new()),
+            manager: Arc::new(Mutex::new(ServiceManager::new())),
         }
     }
 
