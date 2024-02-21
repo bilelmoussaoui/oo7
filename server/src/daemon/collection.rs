@@ -2,7 +2,7 @@
 
 use std::{
     collections::HashMap,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{atomic::AtomicBool, Arc, Mutex},
     time::Duration,
 };
 
@@ -29,7 +29,7 @@ pub struct Collection {
     locked: AtomicBool,
     created: Duration,
     modified: Duration,
-    manager: Arc<ServiceManager>,
+    manager: Arc<Mutex<ServiceManager>>,
     path: OwnedObjectPath,
 }
 
@@ -139,7 +139,7 @@ impl Collection {
         alias: &str,
         created: Duration,
         keyring: Arc<Keyring>,
-        manager: Arc<ServiceManager>,
+        manager: Arc<Mutex<ServiceManager>>,
     ) -> Self {
         Self {
             items: Default::default(),
