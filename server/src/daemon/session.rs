@@ -8,7 +8,7 @@ use zvariant::{ObjectPath, OwnedObjectPath};
 
 use super::service_manager::ServiceManager;
 
-const SECRET_SESSION_OBJECTPATH: &str = "/org/freedesktop/secrets.Devel/session/";
+const SECRET_SESSION_PREFIX: &str = "/org/freedesktop/secrets.Devel/session/";
 
 #[derive(Debug, Clone)]
 pub struct Session {
@@ -40,8 +40,8 @@ impl Session {
         let instance = Self {
             client_public_key: Arc::new(client_public_key),
             path: OwnedObjectPath::try_from(format!(
-                "{}{}{}",
-                SECRET_SESSION_OBJECTPATH, "s", sessions_counter
+                "{}s{}",
+                SECRET_SESSION_PREFIX, sessions_counter
             ))
             .unwrap(),
             manager,
