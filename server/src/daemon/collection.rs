@@ -18,7 +18,7 @@ use super::{
     error::ServiceError, prompt::Prompt, service_manager::ServiceManager, Result, Service,
 };
 
-const SECRET_COLLECTION_OBJECTPATH: &str = "/org/freedesktop/secrets.Devel/collection/";
+const SECRET_COLLECTION_PREFIX: &str = "/org/freedesktop/secrets.Devel/collection/";
 
 #[derive(Debug)]
 pub struct Collection {
@@ -148,7 +148,7 @@ impl Collection {
             locked: AtomicBool::new(false),
             created: created,
             modified: created,
-            path: OwnedObjectPath::try_from(format!("{}{}", SECRET_COLLECTION_OBJECTPATH, alias))
+            path: OwnedObjectPath::try_from(format!("{}{}", SECRET_COLLECTION_PREFIX, alias))
                 .unwrap(),
             keyring,
             manager,
