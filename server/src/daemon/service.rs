@@ -43,17 +43,24 @@ impl Service {
         input: Value<'_>,
         #[zbus(object_server)] object_server: &zbus::ObjectServer,
     ) -> Result<(OwnedValue, OwnedObjectPath)> {
-        let client_public_key = match algorithm {
-            Algorithm::Plain => None,
-            Algorithm::Encrypted => Some(Key::from(input)),
+        let (service_public_key, aes_key) = match algorithm {
+            Algorithm::Plain => (None, None),
+            Algorithm::Encrypted => {
+                let private_key = Key::generate_private_key();
+                let client_public_key = Key::from(input);
+                (
+                    Some(Key::generate_public_key(&private_key)),
+                    Some(Key::generate_aes_key(&private_key, &client_public_key)),
+                )
+            }
         };
+
         *self.sessions_counter.write().await += 1;
-        let (session, key) = Session::new(
-            client_public_key,
+        let session = Session::new(
+            aes_key,
             Arc::clone(&self.manager),
             *self.sessions_counter.read().await,
         );
-        // TODO: clean up the default generated key
         self.manager
             .lock()
             .unwrap()
@@ -63,9 +70,10 @@ impl Service {
             .at(session.path().to_owned(), session.to_owned())
             .await?;
 
-        let key = key
+        let key = service_public_key
             .map(|k| OwnedValue::from(&k))
             .unwrap_or_else(|| Value::new::<Vec<u8>>(vec![]).try_to_owned().unwrap());
+
         Ok((key, session.path().into()))
     }
 
