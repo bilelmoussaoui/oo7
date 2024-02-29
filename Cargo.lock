@@ -1019,6 +1019,7 @@ version = "0.3.0"
 dependencies = [
  "chrono",
  "clap",
+ "hex",
  "oo7",
  "rpassword",
  "tokio",
