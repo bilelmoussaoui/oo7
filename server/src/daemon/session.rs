@@ -12,7 +12,7 @@ const SECRET_SESSION_PREFIX: &str = "/org/freedesktop/secrets.Devel/session/";
 
 #[derive(Debug, Clone)]
 pub struct Session {
-    client_public_key: Arc<Option<Key>>,
+    aes_key: Arc<Option<Key>>,
     manager: Arc<Mutex<ServiceManager>>,
     pub path: OwnedObjectPath,
 }
@@ -31,23 +31,23 @@ impl Session {
 
 impl Session {
     pub fn new(
-        client_public_key: Option<Key>,
+        aes_key: Option<Key>,
         manager: Arc<Mutex<ServiceManager>>,
         sessions_counter: i32,
-    ) -> (Self, Option<Key>) {
-        // make use of the keys
-        let service_key = vec![0];
-        let instance = Self {
-            client_public_key: Arc::new(client_public_key),
+    ) -> Self {
+        Self {
+            aes_key: Arc::new(aes_key),
             path: OwnedObjectPath::try_from(format!(
                 "{}s{}",
                 SECRET_SESSION_PREFIX, sessions_counter
             ))
             .unwrap(),
             manager,
-        };
+        }
+    }
 
-        (instance, Some(Key::new(service_key)))
+    pub fn aes_key(&self) -> &Option<Key> {
+        self.aes_key.as_ref()
     }
 
     pub fn path(&self) -> ObjectPath<'_> {
