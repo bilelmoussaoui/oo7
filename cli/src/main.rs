@@ -1,6 +1,6 @@
 use std::{
     fmt,
-    io::Write,
+    io::{IsTerminal, Write},
     process::{ExitCode, Termination},
 };
 
@@ -17,6 +17,12 @@ struct Error(String);
 impl fmt::Debug for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+impl From<std::io::Error> for Error {
+    fn from(err: std::io::Error) -> Error {
+        Error(err.to_string())
     }
 }
 
@@ -152,7 +158,13 @@ async fn lookup(attributes: &impl AsAttributes) -> Result<(), Error> {
     let items = collection.search_items(attributes).await?;
 
     if let Some(item) = items.first() {
-        print_item(item).await?;
+        let bytes = item.secret().await?;
+        let mut stdout = std::io::stdout().lock();
+        stdout.write_all(&bytes)?;
+        // Add a new line if we are writing to a tty
+        if stdout.is_terminal() {
+            stdout.write_all(b"\n")?;
+        }
     }
 
     Ok(())
