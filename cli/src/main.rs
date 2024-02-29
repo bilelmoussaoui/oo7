@@ -1,6 +1,6 @@
 use std::{
     fmt,
-    io::Write,
+    io::{IsTerminal, Write},
     process::{ExitCode, Termination},
 };
 
@@ -17,6 +17,12 @@ struct Error(String);
 impl fmt::Debug for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+impl From<std::io::Error> for Error {
+    fn from(err: std::io::Error) -> Error {
+        Error(err.to_string())
     }
 }
 
@@ -58,6 +64,8 @@ enum Commands {
     Lookup {
         #[arg(help = "List of attributes. This is a space separated list of pairs of key value", value_parser = parse_key_val::<String, String>)]
         attributes: Vec<(String, String)>,
+        #[arg(long, help = "Whether to print the secret in hex.")]
+        hex: bool,
     },
 
     #[command(
@@ -107,7 +115,7 @@ async fn main() -> Result<(), Error> {
     let cli = Cli::parse();
     match cli.command {
         Commands::Store { label, attributes } => store(&label, &attributes).await,
-        Commands::Lookup { attributes } => lookup(&attributes).await,
+        Commands::Lookup { attributes, hex } => lookup(&attributes, hex).await,
         Commands::Search { attributes, all } => search(&attributes, all).await,
         Commands::Delete { attributes } => delete(&attributes).await,
         Commands::Lock => lock().await,
@@ -147,12 +155,23 @@ async fn store(label: &str, attributes: &impl AsAttributes) -> Result<(), Error>
     Ok(())
 }
 
-async fn lookup(attributes: &impl AsAttributes) -> Result<(), Error> {
+async fn lookup(attributes: &impl AsAttributes, as_hex: bool) -> Result<(), Error> {
     let collection = collection().await?;
     let items = collection.search_items(attributes).await?;
 
     if let Some(item) = items.first() {
-        print_item(item).await?;
+        let bytes = item.secret().await?;
+        let mut stdout = std::io::stdout().lock();
+        if as_hex {
+            let hex = hex::encode(&bytes);
+            stdout.write_all(hex.as_bytes())?;
+        } else {
+            stdout.write_all(&bytes)?;
+        }
+        // Add a new line if we are writing to a tty
+        if stdout.is_terminal() {
+            stdout.write_all(b"\n")?;
+        }
     }
 
     Ok(())
@@ -220,7 +239,8 @@ async fn print_item<'a>(item: &oo7::dbus::Item<'a>) -> Result<(), Error> {
             writeln!(&mut result, "secret = {secret}").unwrap();
         }
         Err(_) => {
-            writeln!(&mut result, "secret = {:02X?}", bytes.as_slice()).unwrap();
+            let hex = hex::encode(&bytes);
+            writeln!(&mut result, "secret = {hex}").unwrap();
         }
     }
 
