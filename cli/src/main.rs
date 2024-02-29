@@ -66,6 +66,8 @@ enum Commands {
         attributes: Vec<(String, String)>,
         #[arg(long, help = "Print only the secret.")]
         secret_only: bool,
+        #[arg(long, help = "Print the secret in hexadecimal.")]
+        hex: bool,
     },
 
     #[command(
@@ -84,6 +86,8 @@ enum Commands {
         attributes: Vec<(String, String)>,
         #[arg(long, help = "Print only the secret.")]
         secret_only: bool,
+        #[arg(long, help = "Print the secret in hexadecimal.")]
+        hex: bool,
     },
 
     #[command(
@@ -120,12 +124,14 @@ async fn main() -> Result<(), Error> {
         Commands::Lookup {
             attributes,
             secret_only,
-        } => lookup(&attributes, secret_only).await,
+            hex,
+        } => lookup(&attributes, secret_only, hex).await,
         Commands::Search {
             attributes,
             all,
             secret_only,
-        } => search(&attributes, all, secret_only).await,
+            hex,
+        } => search(&attributes, all, secret_only, hex).await,
         Commands::Delete { attributes } => delete(&attributes).await,
         Commands::Lock => lock().await,
         Commands::Unlock => unlock().await,
@@ -164,27 +170,36 @@ async fn store(label: &str, attributes: &impl AsAttributes) -> Result<(), Error>
     Ok(())
 }
 
-async fn lookup(attributes: &impl AsAttributes, secret_only: bool) -> Result<(), Error> {
+async fn lookup(
+    attributes: &impl AsAttributes,
+    secret_only: bool,
+    as_hex: bool,
+) -> Result<(), Error> {
     let collection = collection().await?;
     let items = collection.search_items(attributes).await?;
 
     if let Some(item) = items.first() {
-        print_item(item, secret_only).await?;
+        print_item(item, secret_only, as_hex).await?;
     }
 
     Ok(())
 }
 
-async fn search(attributes: &impl AsAttributes, all: bool, secret_only: bool) -> Result<(), Error> {
+async fn search(
+    attributes: &impl AsAttributes,
+    all: bool,
+    secret_only: bool,
+    as_hex: bool,
+) -> Result<(), Error> {
     let collection = collection().await?;
     let items = collection.search_items(attributes).await?;
 
     if all {
         for item in items {
-            print_item(&item, secret_only).await?;
+            print_item(&item, secret_only, as_hex).await?;
         }
     } else if let Some(item) = items.first() {
-        print_item(item, secret_only).await?;
+        print_item(item, secret_only, as_hex).await?;
     }
 
     Ok(())
@@ -215,12 +230,21 @@ async fn unlock() -> Result<(), Error> {
     Ok(())
 }
 
-async fn print_item<'a>(item: &oo7::dbus::Item<'a>, secret_only: bool) -> Result<(), Error> {
+async fn print_item<'a>(
+    item: &oo7::dbus::Item<'a>,
+    secret_only: bool,
+    as_hex: bool,
+) -> Result<(), Error> {
     use std::fmt::Write;
     if secret_only {
         let bytes = item.secret().await?;
         let mut stdout = std::io::stdout().lock();
-        stdout.write_all(&bytes)?;
+        if as_hex {
+            let hex = hex::encode(&bytes);
+            stdout.write_all(hex.as_bytes())?;
+        } else {
+            stdout.write_all(&bytes)?;
+        }
         // Add a new line if we are writing to a tty
         if stdout.is_terminal() {
             stdout.write_all(b"\n")?;
@@ -241,12 +265,20 @@ async fn print_item<'a>(item: &oo7::dbus::Item<'a>, secret_only: bool) -> Result
                 .with_timezone(&chrono::Local);
 
         let mut result = format!("[{label}]\n");
-        match std::str::from_utf8(&bytes) {
-            Ok(secret) => {
-                writeln!(&mut result, "secret = {secret}").unwrap();
-            }
-            Err(_) => {
-                writeln!(&mut result, "secret = {:02X?}", bytes.as_slice()).unwrap();
+
+        // we still fallback to hex if it is not a string
+        if as_hex {
+            let hex = hex::encode(&bytes);
+            writeln!(&mut result, "secret = {hex}").unwrap();
+        } else {
+            match std::str::from_utf8(&bytes) {
+                Ok(secret) => {
+                    writeln!(&mut result, "secret = {secret}").unwrap();
+                }
+                Err(_) => {
+                    let hex = hex::encode(&bytes);
+                    writeln!(&mut result, "secret = {hex}").unwrap();
+                }
             }
         }
 
