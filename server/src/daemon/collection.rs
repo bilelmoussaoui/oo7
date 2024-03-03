@@ -15,7 +15,8 @@ use zbus::{interface, zvariant, ObjectServer, SignalContext};
 use zvariant::{ObjectPath, OwnedObjectPath};
 
 use super::{
-    error::ServiceError, prompt::Prompt, service_manager::ServiceManager, Result, Service,
+    error::ServiceError, prompt::Prompt, secret::Secret, service_manager::ServiceManager, Result,
+    Service,
 };
 
 const SECRET_COLLECTION_PREFIX: &str = "/org/freedesktop/secrets.Devel/collection/";
@@ -68,12 +69,28 @@ impl Collection {
         let value = secret.2;
         let content_type = secret.3;
 
-        // TODO: Use the session to encrypt the data
-        // TODO: figure out what should be done regarding the content type
+        let session = self
+            .manager
+            .lock()
+            .unwrap()
+            .session(session.into())
+            .unwrap();
+        let aes_key = session.aes_key();
+
+        let secret = if aes_key.is_none() {
+            Secret::new(session.clone(), value, content_type.as_str())
+        } else {
+            Secret::new_encrypted(
+                session.clone(),
+                value,
+                content_type.as_str(),
+                &aes_key.as_ref().unwrap(),
+            )
+        };
 
         let item = self
             .keyring
-            .create_item(label, &attributes, value, replace)
+            .create_item(label, &attributes, secret.value(), replace)
             .await
             .map_err::<ServiceError, _>(From::from)?;
 
