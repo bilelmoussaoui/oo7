@@ -54,7 +54,9 @@ impl Item {
     pub async fn secret(&self, session: ObjectPath<'_>) -> Result<SecretInner> {
         let inner = self.inner.read().await;
         let secret = inner.secret();
-        // TODO: get the session based on it object path and figure out the parameters
+        // TODO: get the session based on it object path and figure out the parameters -
+        // done
+        let session = self.manager.lock().unwrap().session(session);
         // to pass, also, what we should do about the content-type?
         // Ok(SecretInner(session, parameters, secret.to_vec(), content_type))
         todo!()
