@@ -24,6 +24,8 @@ use super::{
 #[derive(Debug)]
 pub struct Item {
     inner: RwLock<portal::Item>,
+    parameters: Vec<u8>,
+    content_type: String,
     path: OwnedObjectPath,
     keyring: Arc<Keyring>,
     locked: bool,
@@ -111,6 +113,8 @@ impl Item {
 impl Item {
     pub async fn new(
         item: portal::Item,
+        parameters: Vec<u8>,
+        content_type: String,
         collection_path: ObjectPath<'_>,
         keyring: Arc<Keyring>,
         manager: Arc<Mutex<ServiceManager>>,
@@ -119,6 +123,8 @@ impl Item {
             path: OwnedObjectPath::try_from(format!("{}/items/{}", collection_path, item.label(),))
                 .unwrap(),
             inner: RwLock::new(item),
+            parameters,
+            content_type,
             keyring,
             manager,
             locked: true,
@@ -127,5 +133,13 @@ impl Item {
 
     pub(crate) fn path(&self) -> ObjectPath {
         self.path.as_ref()
+    }
+
+    pub(crate) fn parameters(&self) -> &[u8] {
+        &self.parameters
+    }
+
+    pub(crate) fn content_type(&self) -> &str {
+        &self.content_type
     }
 }
