@@ -81,6 +81,8 @@ impl Collection {
 
         let item = super::item::Item::new(
             item,
+            parameters,
+            content_type,
             self.path(),
             Arc::clone(&self.keyring),
             Arc::clone(&self.manager),
