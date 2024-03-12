@@ -192,8 +192,4 @@ impl Collection {
     pub fn created(&self) -> &Duration {
         &self.created
     }
-
-    pub fn modified(&self) -> &Duration {
-        &self.modified
-    }
 }
