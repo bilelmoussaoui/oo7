@@ -4,18 +4,12 @@ use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 
 use super::session::Session;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ServiceManager {
     sessions: HashMap<OwnedObjectPath, Session>,
 }
 
 impl ServiceManager {
-    pub fn new() -> Self {
-        Self {
-            sessions: HashMap::new(),
-        }
-    }
-
     pub fn session(&self, path: ObjectPath<'_>) -> Option<Session> {
         self.sessions.get(&path.into()).to_owned().cloned()
     }
