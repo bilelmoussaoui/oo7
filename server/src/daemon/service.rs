@@ -291,7 +291,7 @@ impl Service {
             collections: RwLock::new(Vec::new()),
             keyring: Arc::new(Keyring::load_default().await.unwrap()),
             cnx: Default::default(),
-            manager: Arc::new(Mutex::new(ServiceManager::new())),
+            manager: Arc::new(Mutex::new(ServiceManager::default())),
             sessions_counter: RwLock::new(0),
         }
     }
