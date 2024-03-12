@@ -71,10 +71,12 @@ impl Item {
         inner.set_secret(secret);
     }
 
+    #[zbus(property, name = "Locked")]
     pub fn locked(&self) -> bool {
         self.locked
     }
 
+    // #[zbus(property, name = "Attributes")] Error
     pub async fn attributes(&self) -> HashMap<String, AttributeValue> {
         let inner = self.inner.read().await;
         inner.attributes().clone()
@@ -91,6 +93,7 @@ impl Item {
         Ok(())
     }
 
+    #[zbus(property, name = "Label")]
     pub async fn label(&self) -> String {
         let inner = self.inner.read().await;
         inner.label().to_owned()
@@ -107,10 +110,12 @@ impl Item {
         Ok(())
     }
 
+    #[zbus(property, name = "Created")]
     pub async fn created(&self) -> u64 {
         self.inner.read().await.created().as_secs()
     }
 
+    #[zbus(property, name = "Modified")]
     pub async fn modified(&self) -> u64 {
         self.inner.read().await.modified().as_secs()
     }
