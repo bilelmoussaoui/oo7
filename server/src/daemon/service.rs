@@ -25,6 +25,8 @@ use super::{
     collection::Collection, error::ServiceError, prompt::Prompt, service_manager::ServiceManager,
     session::Session, Result,
 };
+#[cfg(debug_assertions)]
+use crate::SERVICE_NAME;
 
 #[derive(Debug)]
 pub struct Service {
@@ -291,9 +293,12 @@ impl Service {
     }
 
     pub async fn run(self) -> Result<()> {
+        #[cfg(debug_assertions)]
+        let service_name = SERVICE_NAME;
+        #[cfg(not(debug_assertions))]
+        let service_name = oo7::dbus::api::Service::DESTINATION.unwrap();
         let cnx = zbus::connection::Builder::session()?
-            //.name(oo7::dbus::api::Service::DESTINATION.unwrap())?
-            .name("org.freedesktop.secrets.Devel")?
+            .name(service_name)?
             .build()
             .await?;
         *self.cnx.lock().unwrap() = Some(cnx.clone());
