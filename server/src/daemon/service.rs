@@ -138,6 +138,7 @@ impl Service {
     #[zbus(out_args("unlocked", "prompt"))]
     pub async fn unlock(
         &mut self,
+        #[zbus(signal_context)] ctxt: SignalContext<'_>,
         objects: Vec<OwnedObjectPath>,
     ) -> Result<(Vec<OwnedObjectPath>, Prompt)> {
         // manage unlock state in memory
@@ -148,7 +149,7 @@ impl Service {
             for collection in self.collections.read().await.iter() {
                 if collection.path() == *object {
                     if collection.locked() {
-                        collection.set_locked(false).await;
+                        collection.set_locked(&ctxt, false).await;
                         unlocked.push(object.clone());
                     } else {
                         break 'main;
@@ -169,6 +170,7 @@ impl Service {
     #[zbus(out_args("locked", "prompt"))]
     pub async fn lock(
         &mut self,
+        #[zbus(signal_context)] ctxt: SignalContext<'_>,
         objects: Vec<OwnedObjectPath>,
     ) -> Result<(Vec<OwnedObjectPath>, Prompt)> {
         // manage lock state in memory
@@ -178,7 +180,7 @@ impl Service {
         for object in objects {
             for collection in self.collections.read().await.iter() {
                 if collection.path() == *object && !collection.locked() {
-                    collection.set_locked(true).await;
+                    collection.set_locked(&ctxt, true).await;
                     locked.push(object.clone());
                 }
             }
