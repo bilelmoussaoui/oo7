@@ -18,8 +18,7 @@ use super::{
     error::ServiceError, prompt::Prompt, secret::Secret, service_manager::ServiceManager, Result,
     Service,
 };
-
-const SECRET_COLLECTION_PREFIX: &str = "/org/freedesktop/secrets.Devel/collection/";
+use crate::SECRET_COLLECTION_PREFIX;
 
 #[derive(Clone, Debug)]
 pub struct Collection {

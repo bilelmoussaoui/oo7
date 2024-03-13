@@ -7,8 +7,7 @@ use zbus::{fdo, interface, zvariant};
 use zvariant::{ObjectPath, OwnedObjectPath};
 
 use super::service_manager::ServiceManager;
-
-const SECRET_SESSION_PREFIX: &str = "/org/freedesktop/secrets.Devel/session/";
+use crate::SECRET_SESSION_PREFIX;
 
 #[derive(Debug, Clone)]
 pub struct Session {
