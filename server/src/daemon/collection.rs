@@ -21,13 +21,13 @@ use super::{
 
 const SECRET_COLLECTION_PREFIX: &str = "/org/freedesktop/secrets.Devel/collection/";
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Collection {
     keyring: Arc<Keyring>,
-    pub(crate) items: RwLock<Vec<super::item::Item>>,
-    alias: RwLock<String>,
+    pub(crate) items: Arc<RwLock<Vec<super::item::Item>>>,
+    alias: Arc<RwLock<String>>,
     label: String,
-    locked: AtomicBool,
+    locked: Arc<AtomicBool>,
     created: Duration,
     modified: Duration,
     manager: Arc<Mutex<ServiceManager>>,
@@ -163,8 +163,8 @@ impl Collection {
         Self {
             items: Default::default(),
             label: label.to_owned(),
-            alias: RwLock::new(alias.to_owned()),
-            locked: AtomicBool::new(false),
+            alias: Arc::new(RwLock::new(alias.to_owned())),
+            locked: Arc::new(AtomicBool::new(false)),
             created: created,
             modified: created,
             path: OwnedObjectPath::try_from(format!("{}{}", SECRET_COLLECTION_PREFIX, alias))
@@ -187,9 +187,5 @@ impl Collection {
     pub async fn set_locked(&self, locked: bool) {
         self.locked
             .store(locked, std::sync::atomic::Ordering::Relaxed)
-    }
-
-    pub fn created(&self) -> &Duration {
-        &self.created
     }
 }
