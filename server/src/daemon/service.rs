@@ -94,13 +94,7 @@ impl Service {
             Arc::clone(&self.keyring),
             Arc::clone(&self.manager),
         );
-        self.collections.write().await.push(Collection::new(
-            collection.label(),
-            alias,
-            *collection.created(),
-            Arc::clone(&self.keyring),
-            Arc::clone(&self.manager),
-        ));
+        self.collections.write().await.push(collection.clone());
 
         let path = OwnedObjectPath::from(collection.path());
         object_server.at(&path, collection).await?;
