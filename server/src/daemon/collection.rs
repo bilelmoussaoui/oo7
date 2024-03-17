@@ -30,6 +30,7 @@ pub struct Collection {
     created: Duration,
     modified: Duration,
     manager: Arc<Mutex<ServiceManager>>,
+    item_counter: Arc<RwLock<i32>>,
     path: OwnedObjectPath,
 }
 
@@ -46,7 +47,6 @@ impl Collection {
     }
 
     pub async fn search_items(&self, attributes: HashMap<&str, &str>) -> Result<Vec<Item>> {
-        // TODO currently returns Vec<oo7::portal::Item>, this should be a path
         self.keyring
             .search_items(&attributes)
             .await
@@ -92,6 +92,7 @@ impl Collection {
             .create_item(label, &attributes, secret.value(), replace)
             .await
             .map_err::<ServiceError, _>(From::from)?;
+        *self.item_counter.write().await += 1;
 
         let prompt = Prompt::default(); // temp Prompt
 
@@ -99,6 +100,7 @@ impl Collection {
             item,
             parameters,
             content_type,
+            *self.item_counter.read().await,
             self.path(),
             Arc::clone(&self.keyring),
             Arc::clone(&self.manager),
@@ -166,6 +168,7 @@ impl Collection {
             locked: Arc::new(AtomicBool::new(false)),
             created: created,
             modified: created,
+            item_counter: Arc::new(RwLock::new(0)),
             path: OwnedObjectPath::try_from(format!("{}{}", SECRET_COLLECTION_PREFIX, alias))
                 .unwrap(),
             keyring,
