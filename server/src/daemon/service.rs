@@ -2,6 +2,7 @@
 
 use std::{
     collections::HashMap,
+    env,
     sync::{Arc, Mutex},
     time::SystemTime,
 };
@@ -11,7 +12,7 @@ use oo7::{
         api::{Properties, SecretInner},
         Algorithm,
     },
-    portal::{Item, Keyring},
+    portal::{Item, Keyring, Secret},
     Key,
 };
 use tokio::sync::RwLock;
@@ -284,10 +285,16 @@ impl Service {
 }
 
 impl Service {
-    pub async fn new() -> Self {
+    pub async fn new(password: String) -> Self {
+        let path = format!(
+            "{}/{}",
+            env::var("HOME").unwrap(),
+            ".local/share/keyrings/login.keyring"
+        );
+        let secret = Secret::from(password.into_bytes());
         Self {
             collections: RwLock::new(Vec::new()),
-            keyring: Arc::new(Keyring::load_default().await.unwrap()),
+            keyring: Arc::new(Keyring::load(path, secret).await.unwrap()),
             cnx: Default::default(),
             manager: Arc::new(Mutex::new(ServiceManager::default())),
             sessions_counter: RwLock::new(0),
