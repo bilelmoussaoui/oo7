@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 mod collection;
 mod error;
 mod item;
@@ -11,6 +12,11 @@ use oo7::portal::Secret;
 use service::Service;
 
 use crate::error::Error;
+=======
+use clap::Parser;
+
+mod daemon;
+>>>>>>> a718499 (Adds --login option to pass the login keyring password to the daemon)
 
 const BINARY_NAME: &str = env!("CARGO_BIN_NAME");
 #[cfg(debug_assertions)]
@@ -58,9 +64,18 @@ async fn main() -> Result<(), Error> {
         flags |= zbus::fdo::RequestNameFlags::ReplaceExisting;
     }
 
+    if args.login {
+        password = rpassword::prompt_password("Enter the login password: ").unwrap();
+    }
+
     tracing::info!("Starting {}", BINARY_NAME);
 
+<<<<<<< HEAD
     Service::run(secret, flags).await?;
+=======
+    let service = daemon::Service::new(password).await;
+    service.run().await?;
+>>>>>>> a718499 (Adds --login option to pass the login keyring password to the daemon)
 
     std::future::pending::<()>().await;
 
