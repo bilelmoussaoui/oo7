@@ -8,7 +8,9 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
+clap = { version = "4.4.6", features = [ "cargo", "derive" ] }
 oo7 = { workspace = true, features = ["unstable"] }
+rpassword = "7.2.0"
 serde.workspace = true
 tokio = { workspace = true, features = ["full"] } # look for specific features
 tracing = "0.1"
