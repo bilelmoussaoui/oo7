@@ -130,12 +130,13 @@ impl Item {
         item: portal::Item,
         parameters: Vec<u8>,
         content_type: String,
+        item_counter: i32,
         collection_path: ObjectPath<'_>,
         keyring: Arc<Keyring>,
         manager: Arc<Mutex<ServiceManager>>,
     ) -> Self {
         Self {
-            path: OwnedObjectPath::try_from(format!("{}/items/{}", collection_path, item.label(),))
+            path: OwnedObjectPath::try_from(format!("{}/{}", collection_path, item_counter))
                 .unwrap(),
             inner: RwLock::new(item),
             parameters,
