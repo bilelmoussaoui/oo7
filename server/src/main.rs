@@ -1,3 +1,5 @@
+use clap::Parser;
+
 mod daemon;
 
 const BINARY_NAME: &str = env!("CARGO_BIN_NAME");
@@ -12,13 +14,26 @@ const SECRET_COLLECTION_PREFIX: &str = "/org/freedesktop/secrets.Devel/collectio
 #[cfg(not(debug_assertions))]
 const SECRET_COLLECTION_PREFIX: &str = "/org/freedesktop/secrets/collection/";
 
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    #[arg(short = 'l', long, default_value_t = false)]
+    login: bool,
+}
+
 #[tokio::main]
 async fn main() -> daemon::Result<()> {
+    let args = Args::parse();
+    let mut password = String::new();
     tracing_subscriber::fmt::init();
+
+    if args.login {
+        password = rpassword::prompt_password("Enter the login password: ").unwrap();
+    }
 
     tracing::info!("Starting {}", BINARY_NAME);
 
-    let service = daemon::Service::new().await;
+    let service = daemon::Service::new(password).await;
     service.run().await?;
 
     std::future::pending::<()>().await;
