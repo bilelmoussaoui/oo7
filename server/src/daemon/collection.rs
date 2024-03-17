@@ -169,7 +169,7 @@ impl Collection {
             created: created,
             modified: created,
             item_counter: Arc::new(RwLock::new(0)),
-            path: OwnedObjectPath::try_from(format!("{}{}", SECRET_COLLECTION_PREFIX, alias))
+            path: OwnedObjectPath::try_from(format!("{}{}", SECRET_COLLECTION_PREFIX, label))
                 .unwrap(),
             keyring,
             manager,
