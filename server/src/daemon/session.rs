@@ -16,7 +16,7 @@ pub struct Session {
     pub path: OwnedObjectPath,
 }
 
-#[interface(name = "org.freedesktop.Secret.Service")]
+#[interface(name = "org.freedesktop.Secret.Session")]
 impl Session {
     pub async fn close(
         &mut self,
