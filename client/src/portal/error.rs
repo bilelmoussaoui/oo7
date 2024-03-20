@@ -19,6 +19,8 @@ pub enum Error {
     Io(std::io::Error),
     /// Unexpected MAC digest value.
     MacError,
+    /// Mismatch of checksum calculated over data.
+    ChecksumMismatch,
     /// Failure to validate the attributes.
     HashedAttributeMac(String),
     /// XDG_DATA_HOME required for reading from default location.
@@ -35,6 +37,10 @@ pub enum Error {
     PortalNotAvailable,
     /// The addressed index does not exist.
     InvalidItemIndex(usize),
+    /// UTF-8 encoding error.
+    Utf8(std::str::Utf8Error),
+    /// Mismatch of algorithms used in legacy keyring file.
+    AlgorithmMismatch(u8),
 }
 
 impl From<zvariant::Error> for Error {
@@ -61,6 +67,12 @@ impl From<zbus::Error> for Error {
     }
 }
 
+impl From<std::str::Utf8Error> for Error {
+    fn from(value: std::str::Utf8Error) -> Self {
+        Self::Utf8(value)
+    }
+}
+
 impl std::error::Error for Error {}
 
 impl std::fmt::Display for Error {
@@ -83,6 +95,7 @@ impl std::fmt::Display for Error {
             Error::WeakKey(err) => write!(f, "{err}"),
             Error::Io(e) => write!(f, "IO error {e}"),
             Error::MacError => write!(f, "Mac digest is not equal to the expected value"),
+            Error::ChecksumMismatch => write!(f, "Checksum is not equal to the expected value"),
             Error::HashedAttributeMac(e) => write!(f, "Failed to validate hashed attribute {e}"),
             Error::NoDataDir => write!(f, "Couldn't retrieve XDG_DATA_DIR"),
             Error::TargetFileChanged(e) => write!(f, "The target file has changed {e}"),
@@ -90,6 +103,8 @@ impl std::fmt::Display for Error {
             Error::CancelledPortalRequest => write!(f, "Portal request was cancelled"),
             Error::PortalNotAvailable => write!(f, "xdg-desktop-portal is too old on the host or secret service not available to store the secret"),
             Error::InvalidItemIndex(index) => write!(f, "The addressed item index {index} does not exist"),
+            Error::Utf8(e) => write!(f, "UTF-8 encoding error {e}"),
+            Error::AlgorithmMismatch(e) => write!(f, "Unknown algorithm {e}"),
         }
     }
 }

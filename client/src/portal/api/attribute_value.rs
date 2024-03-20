@@ -5,7 +5,7 @@ use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 use crate::{crypto, Key};
 
 /// An encrypted attribute value.
-#[derive(Deserialize, Serialize, Type, Clone, Debug, Zeroize, ZeroizeOnDrop)]
+#[derive(Deserialize, Serialize, Type, Clone, Debug, Eq, PartialEq, Zeroize, ZeroizeOnDrop)]
 pub struct AttributeValue(String);
 
 impl AttributeValue {

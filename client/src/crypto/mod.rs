@@ -32,4 +32,22 @@ mod test {
         let decrypted = decrypt(&encrypted, &aes_key, aes_iv);
         assert_eq!(decrypted.to_vec(), data);
     }
+
+    #[test]
+    fn test_legacy_derive_key_and_iv() {
+        let expected_key = &[
+            0x1f, 0x35, 0x38, 0x40, 0xf2, 0x95, 0x73, 0x30, 0xa6, 0xcb, 0x01, 0xf9, 0x53, 0xba,
+            0x22, 0x12,
+        ];
+        let expected_iv = &[
+            0x7f, 0xf5, 0x65, 0xb2, 0x31, 0xa5, 0x77, 0x32, 0xf8, 0xd3, 0xd0, 0xa6, 0x45, 0x1c,
+            0x39, 0x97,
+        ];
+        let salt = &[0x92, 0xf4, 0xc0, 0x34, 0x0f, 0x5f, 0x36, 0xf9];
+        let iteration_count = 1782;
+        let password = b"test";
+        let (key, iv) = legacy_derive_key_and_iv(&password, Ok(()), &salt, iteration_count);
+        assert_eq!(key.as_ref(), &expected_key[..]);
+        assert_eq!(iv, &expected_iv[..]);
+    }
 }
