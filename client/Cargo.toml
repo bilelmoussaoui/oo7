@@ -24,10 +24,12 @@ cipher = { version = "0.4", features = [
     "zeroize",
 ], optional = true }
 digest = { version = "0.10", optional = true }
+endi.workspace = true
 futures-lite = { workspace = true, optional = true }
 futures-util.workspace = true
 hkdf = { version = "0.12", optional = true }
 hmac = { version = "0.12", optional = true }
+md-5 = { version = "0.10", optional = true }
 num = "0.4.0"
 num-bigint-dig = { version = "0.8", features = ["zeroize"] }
 openssl = { version = "0.10", optional = true }
@@ -35,6 +37,7 @@ pbkdf2 = { version = "0.12", optional = true }
 rand = { version = "0.8", default-features = false }
 serde.workspace = true
 sha2 = { version = "0.10", optional = true }
+subtle = { version = "2.5", optional = true }
 tokio = { workspace = true, features = [
     "sync",
     "fs",
@@ -46,6 +49,7 @@ zvariant.workspace = true
 zeroize.workspace = true
 
 [dev-dependencies]
+tempfile.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [features]
@@ -71,8 +75,10 @@ native_crypto = [
     "digest",
     "hkdf",
     "hmac",
+    "md-5",
     "pbkdf2",
     "sha2",
+    "subtle",
 ]
 openssl_crypto = ["openssl"]
 

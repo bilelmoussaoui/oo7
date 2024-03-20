@@ -31,19 +31,22 @@ const DEFAULT_SALT_SIZE: usize = 32;
 
 const MIN_ITERATION_COUNT: u32 = 100000;
 const MIN_SALT_SIZE: usize = 32;
-const MIN_PASSWORD_LENGTH: usize = 64;
+// FIXME: choose a reasonable value
+const MIN_PASSWORD_LENGTH: usize = 4;
 
 const FILE_HEADER: &[u8] = b"GnomeKeyring\n\r\0\n";
 const FILE_HEADER_LEN: usize = FILE_HEADER.len();
 
-const MAJOR_VERSION: u8 = 1;
+pub(super) const MAJOR_VERSION: u8 = 1;
 const MINOR_VERSION: u8 = 0;
 
 mod attribute_value;
 mod encrypted_item;
+mod legacy_keyring;
 
 pub use attribute_value::AttributeValue;
 pub(super) use encrypted_item::EncryptedItem;
+pub(super) use legacy_keyring::{Keyring as LegacyKeyring, MAJOR_VERSION as LEGACY_MAJOR_VERSION};
 
 use super::{Item, Secret};
 use crate::{
@@ -224,14 +227,21 @@ impl Keyring {
         Ok(blob)
     }
 
-    pub fn default_path() -> Result<PathBuf, Error> {
+    pub(crate) fn path(name: &str, version: u8) -> Result<PathBuf, Error> {
         if let Some(mut path) = crate::helpers::data_dir() {
             path.push("keyrings");
-            path.push("default.keyring");
+            if version > 0 {
+                path.push(format!("v{}", version));
+            }
+            path.push(format!("{}.keyring", name));
             Ok(path)
         } else {
             Err(Error::NoDataDir)
         }
+    }
+
+    pub fn default_path() -> Result<PathBuf, Error> {
+        Self::path("default", LEGACY_MAJOR_VERSION)
     }
 
     pub fn derive_key(&self, secret: &Secret) -> Key {

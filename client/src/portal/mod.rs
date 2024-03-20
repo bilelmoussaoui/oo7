@@ -133,6 +133,83 @@ impl Keyring {
         })
     }
 
+    async fn migrate(
+        file: &mut fs::File,
+        path: impl AsRef<Path>,
+        secret: Secret,
+    ) -> Result<Self, Error> {
+        let mut content = Vec::new();
+        file.read_to_end(&mut content).await?;
+
+        match api::Keyring::try_from(content.as_slice()) {
+            Ok(keyring) => Ok(Self {
+                keyring: Arc::new(RwLock::new(keyring)),
+                path: path.as_ref().to_path_buf(),
+                mtime: Default::default(),
+                key: Default::default(),
+                secret: Arc::new(secret),
+            }),
+            Err(Error::VersionMismatch(Some(version)))
+                if version[0] == api::LEGACY_MAJOR_VERSION =>
+            {
+                #[cfg(feature = "tracing")]
+                tracing::debug!("Migrating from legacy keyring format");
+
+                let legacy_keyring = api::LegacyKeyring::try_from(content.as_slice())?;
+                let mut keyring = api::Keyring::new();
+                let key = keyring.derive_key(&secret);
+
+                for item in legacy_keyring.decrypt_items(&secret)? {
+                    let encrypted_item = item.encrypt(&key)?;
+                    keyring.items.push(encrypted_item);
+                }
+
+                Ok(Self {
+                    keyring: Arc::new(RwLock::new(keyring)),
+                    path: path.as_ref().to_path_buf(),
+                    mtime: Default::default(),
+                    key: Default::default(),
+                    secret: Arc::new(secret),
+                })
+            }
+            Err(err) => Err(err),
+        }
+    }
+
+    /// Open a keyring with given name from the default directory.
+    ///
+    /// This function will automatically migrate the keyring to the
+    /// latest format.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the keyring.
+    /// * `secret` - The service key, usually retrieved from the Secrets portal.
+    pub async fn open(name: &str, secret: Secret) -> Result<Self, Error> {
+        let v1_path = api::Keyring::path(name, api::MAJOR_VERSION)?;
+        if v1_path.exists() {
+            return Keyring::load(v1_path, secret).await;
+        }
+
+        let v0_path = api::Keyring::path(name, api::LEGACY_MAJOR_VERSION)?;
+        if v0_path.exists() {
+            #[cfg(feature = "tracing")]
+            tracing::debug!("Trying to load keyring file at {:?}", v0_path.as_ref());
+            match fs::File::open(&v0_path).await {
+                Err(err) => Err(err.into()),
+                Ok(mut file) => Self::migrate(&mut file, v1_path, secret).await,
+            }
+        } else {
+            Ok(Self {
+                keyring: Arc::new(RwLock::new(api::Keyring::new())),
+                path: v1_path,
+                mtime: Default::default(),
+                key: Default::default(),
+                secret: Arc::new(secret),
+            })
+        }
+    }
+
     /// Retrieve the number of items
     ///
     /// This function will not trigger a key derivation and can therefore be
@@ -311,6 +388,8 @@ impl Keyring {
 mod tests {
     use std::{collections::HashMap, path::PathBuf};
 
+    use tempfile::tempdir;
+
     use super::*;
 
     #[tokio::test]
@@ -396,6 +475,137 @@ mod tests {
         let (res_1, res_2) = futures_util::future::join(handle_1, handle_2).await;
         res_1.unwrap()?;
         res_2.unwrap()?;
+
+        Ok(())
+    }
+
+    async fn check_items(keyring: &Keyring) -> Result<(), Error> {
+        assert_eq!(keyring.n_items().await, 1);
+        let items: Result<Vec<_>, _> = keyring.items().await.into_iter().collect();
+        let items = items.expect("unable to retrieve items");
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].label(), "foo");
+        assert_eq!(items[0].secret().as_ref(), b"foo".to_vec());
+        let attributes = items[0].attributes();
+        assert_eq!(attributes.len(), 1);
+        assert_eq!(
+            attributes.get("xdg:schema").map(|v| v.as_ref()),
+            Some("org.gnome.keyring.Note")
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn migrate_from_legacy() -> Result<(), Error> {
+        let data_dir = tempdir()?;
+        let v0_dir = data_dir.path().join("keyrings");
+        let v1_dir = v0_dir.join("v1");
+        fs::create_dir_all(&v1_dir).await?;
+
+        let fixture_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("fixtures")
+            .join("legacy.keyring");
+        fs::copy(&fixture_path, &v0_dir.join("default.keyring")).await?;
+
+        std::env::set_var("XDG_DATA_HOME", &data_dir.path());
+
+        assert!(!v1_dir.join("default.keyring").exists());
+
+        let password = b"test";
+        let secret = Secret::from(password.to_vec());
+        let keyring = Keyring::open("default", secret).await?;
+
+        check_items(&keyring).await?;
+
+        keyring.write().await?;
+        assert!(v1_dir.join("default.keyring").exists());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn migrate() -> Result<(), Error> {
+        let data_dir = tempdir()?;
+        let v0_dir = data_dir.path().join("keyrings");
+        let v1_dir = v0_dir.join("v1");
+        fs::create_dir_all(&v1_dir).await?;
+
+        let fixture_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("fixtures")
+            .join("default.keyring");
+        fs::copy(&fixture_path, &v0_dir.join("default.keyring")).await?;
+
+        std::env::set_var("XDG_DATA_HOME", &data_dir.path());
+
+        let password = b"test";
+        let secret = Secret::from(password.to_vec());
+        let keyring = Keyring::open("default", secret).await?;
+
+        assert!(!v1_dir.join("default.keyring").exists());
+
+        check_items(&keyring).await?;
+
+        keyring.write().await?;
+        assert!(v1_dir.join("default.keyring").exists());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn open() -> Result<(), Error> {
+        let data_dir = tempdir()?;
+        let v0_dir = data_dir.path().join("keyrings");
+        let v1_dir = v0_dir.join("v1");
+        fs::create_dir_all(&v1_dir).await?;
+
+        let fixture_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("fixtures")
+            .join("default.keyring");
+        fs::copy(&fixture_path, &v1_dir.join("default.keyring")).await?;
+
+        std::env::set_var("XDG_DATA_HOME", &data_dir.path());
+
+        let password = b"test";
+        let secret = Secret::from(password.to_vec());
+        let keyring = Keyring::open("default", secret).await?;
+
+        assert!(v1_dir.join("default.keyring").exists());
+
+        check_items(&keyring).await?;
+
+        keyring.write().await?;
+        assert!(v1_dir.join("default.keyring").exists());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn open_nonexistent() -> Result<(), Error> {
+        let data_dir = tempdir()?;
+        let v0_dir = data_dir.path().join("keyrings");
+        let v1_dir = v0_dir.join("v1");
+        fs::create_dir_all(&v1_dir).await?;
+
+        std::env::set_var("XDG_DATA_HOME", &data_dir.path());
+
+        let password = b"test";
+        let secret = Secret::from(password.to_vec());
+        let keyring = Keyring::open("default", secret).await?;
+
+        assert!(!v1_dir.join("default.keyring").exists());
+
+        keyring
+            .create_item(
+                "foo",
+                &HashMap::from([("xdg:schema", "org.gnome.keyring.Note")]),
+                b"foo",
+                false,
+            )
+            .await?;
+        keyring.write().await?;
+
+        assert!(v1_dir.join("default.keyring").exists());
 
         Ok(())
     }

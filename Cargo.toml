@@ -20,12 +20,14 @@ rust-version = "1.75"
 exclude = ["org.freedesktop.Secrets.xml"]
 
 [workspace.dependencies]
+endi = "1.1"
 futures-channel = "0.3"
 futures-lite = "2.1"
 futures-util = "0.3"
 oo7 = { path = "client", version = "0.3"}
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1.17", default-features = false }
+tempfile = "3.10"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 zbus = { version = "4.0", default-features = false }
