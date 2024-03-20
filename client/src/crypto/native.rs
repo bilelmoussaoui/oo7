@@ -4,13 +4,16 @@ use std::{
 };
 
 use cipher::{
-    block_padding::Pkcs7, BlockDecryptMut, BlockEncryptMut, BlockSizeUser, IvSizeUser, KeyIvInit,
+    block_padding::{NoPadding, Pkcs7},
+    BlockDecryptMut, BlockEncryptMut, BlockSizeUser, IvSizeUser, KeyIvInit, KeySizeUser,
 };
-use digest::{Mac, OutputSizeUser};
+use digest::{Digest, FixedOutput, Mac, Output, OutputSizeUser};
 use hkdf::Hkdf;
+use md5::Md5;
 use num::{FromPrimitive, Integer, One, Zero};
 use num_bigint_dig::BigUint;
 use sha2::Sha256;
+use subtle::ConstantTimeEq;
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::{portal, Key};
@@ -45,6 +48,21 @@ pub(crate) fn decrypt(
     DecAlg::new_from_slices(key.as_ref(), iv.as_ref())
         .expect("Invalid key length")
         .decrypt_padded_mut::<Pkcs7>(&mut data)
+        .unwrap()
+        .to_vec()
+        .into()
+}
+
+pub(crate) fn decrypt_no_padding(
+    blob: impl AsRef<[u8]>,
+    key: &Key,
+    iv: impl AsRef<[u8]>,
+) -> Zeroizing<Vec<u8>> {
+    let mut data = blob.as_ref().to_vec();
+
+    DecAlg::new_from_slices(key.as_ref(), iv.as_ref())
+        .expect("Invalid key length")
+        .decrypt_padded_mut::<NoPadding>(&mut data)
         .unwrap()
         .to_vec()
         .into()
@@ -119,6 +137,12 @@ pub(crate) fn verify_mac(data: impl AsRef<[u8]>, key: &Key, expected: impl AsRef
     mac.verify_slice(expected.as_ref()).is_ok()
 }
 
+pub(crate) fn verify_checksum_md5(digest: impl AsRef<[u8]>, content: impl AsRef<[u8]>) -> bool {
+    let mut hasher = Md5::new();
+    hasher.update(content.as_ref());
+    hasher.finalize_fixed().ct_eq(digest.as_ref()).into()
+}
+
 pub(crate) fn derive_key(
     secret: impl AsRef<[u8]>,
     key_strength: Result<(), portal::WeakKeyError>,
@@ -136,6 +160,44 @@ pub(crate) fn derive_key(
     .expect("HMAC can be initialized with any key length");
 
     key
+}
+
+pub(crate) fn legacy_derive_key_and_iv(
+    secret: impl AsRef<[u8]>,
+    key_strength: Result<(), portal::WeakKeyError>,
+    salt: impl AsRef<[u8]>,
+    iteration_count: usize,
+) -> (Key, Vec<u8>) {
+    let mut buffer = vec![0; EncAlg::key_size() + EncAlg::iv_size()];
+    let mut hasher = Sha256::new();
+    let mut digest_buffer = vec![0; <Sha256 as Digest>::output_size()];
+    let digest = Output::<Sha256>::from_mut_slice(digest_buffer.as_mut_slice());
+
+    let mut pos = 0usize;
+
+    loop {
+        hasher.update(secret.as_ref());
+        hasher.update(salt.as_ref());
+        hasher.finalize_into_reset(digest);
+
+        for _ in 1..iteration_count {
+            hasher.update(&digest);
+            hasher.finalize_into_reset(digest);
+        }
+
+        let to_read = usize::min(digest.len(), buffer.len() - pos);
+        buffer[pos..].copy_from_slice(&digest[..to_read]);
+        pos += to_read;
+
+        if pos == buffer.len() {
+            break;
+        }
+
+        hasher.update(&digest);
+    }
+
+    let iv = buffer.split_off(EncAlg::key_size());
+    (Key::new_with_strength(buffer, key_strength), iv)
 }
 
 /// from https://github.com/plietar/librespot/blob/master/core/src/util/mod.rs#L53

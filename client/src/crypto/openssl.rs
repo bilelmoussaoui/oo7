@@ -1,7 +1,7 @@
 use openssl::{
     bn::BigNum,
     dh::Dh,
-    hash::MessageDigest,
+    hash::{hash, Hasher, MessageDigest},
     md::Md,
     memcmp,
     nid::Nid,
@@ -36,15 +36,16 @@ pub(crate) fn encrypt(data: impl AsRef<[u8]>, key: &Key, iv: impl AsRef<[u8]>) -
     blob
 }
 
-pub(crate) fn decrypt(
+fn decrypt_with_padding(
     blob: impl AsRef<[u8]>,
     key: &Key,
     iv: impl AsRef<[u8]>,
+    pad: bool,
 ) -> Zeroizing<Vec<u8>> {
     let cipher = Cipher::from_nid(ENC_ALG).unwrap();
     let mut decrypter = Crypter::new(cipher, Mode::Decrypt, key.as_ref(), Some(iv.as_ref()))
         .expect("Invalid key or IV length");
-    decrypter.pad(true);
+    decrypter.pad(pad);
 
     let mut data = Zeroizing::new(vec![0; blob.as_ref().len() + cipher.block_size()]);
     let mut decrypted_len = decrypter.update(blob.as_ref(), &mut data).unwrap();
@@ -53,6 +54,22 @@ pub(crate) fn decrypt(
     data.truncate(decrypted_len);
 
     data
+}
+
+pub(crate) fn decrypt(
+    blob: impl AsRef<[u8]>,
+    key: &Key,
+    iv: impl AsRef<[u8]>,
+) -> Zeroizing<Vec<u8>> {
+    decrypt_with_padding(blob, key, iv, true)
+}
+
+pub(crate) fn decrypt_no_padding(
+    blob: impl AsRef<[u8]>,
+    key: &Key,
+    iv: impl AsRef<[u8]>,
+) -> Zeroizing<Vec<u8>> {
+    decrypt_with_padding(blob, key, iv, false)
 }
 
 pub(crate) fn iv_len() -> usize {
@@ -138,6 +155,13 @@ pub(crate) fn verify_mac(data: impl AsRef<[u8]>, key: &Key, expected: impl AsRef
     memcmp::eq(compute_mac(&data, key).as_slice(), expected.as_ref())
 }
 
+pub(crate) fn verify_checksum_md5(digest: impl AsRef<[u8]>, content: impl AsRef<[u8]>) -> bool {
+    memcmp::eq(
+        &*hash(MessageDigest::md5(), content.as_ref()).unwrap(),
+        digest.as_ref(),
+    )
+}
+
 pub(crate) fn derive_key(
     secret: impl AsRef<[u8]>,
     key_strength: Result<(), portal::WeakKeyError>,
@@ -158,4 +182,40 @@ pub(crate) fn derive_key(
     .unwrap();
 
     key
+}
+
+pub(crate) fn legacy_derive_key_and_iv(
+    secret: impl AsRef<[u8]>,
+    key_strength: Result<(), portal::WeakKeyError>,
+    salt: impl AsRef<[u8]>,
+    iteration_count: usize,
+) -> (Key, Vec<u8>) {
+    let cipher = Cipher::from_nid(ENC_ALG).unwrap();
+    let mut buffer = vec![0; cipher.key_len() + cipher.iv_len().unwrap()];
+    let mut hasher = Hasher::new(MessageDigest::sha256()).unwrap();
+    let mut pos = 0usize;
+
+    loop {
+        hasher.update(secret.as_ref()).unwrap();
+        hasher.update(salt.as_ref()).unwrap();
+        let mut digest = hasher.finish().unwrap();
+
+        for _ in 1..iteration_count {
+            hasher.update(&*digest).unwrap();
+            digest = hasher.finish().unwrap();
+        }
+
+        let to_read = usize::min(digest.len(), buffer.len() - pos);
+        buffer[pos..].copy_from_slice(&(&*digest)[..to_read]);
+        pos += to_read;
+
+        if pos == buffer.len() {
+            break;
+        }
+
+        hasher.update(&*digest).unwrap();
+    }
+
+    let iv = buffer.split_off(cipher.key_len());
+    (Key::new_with_strength(buffer, key_strength), iv)
 }
