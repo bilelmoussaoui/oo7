@@ -103,11 +103,11 @@ impl Keyring {
     pub async fn load(path: impl AsRef<Path>, secret: Secret) -> Result<Self, Error> {
         #[cfg(feature = "tracing")]
         tracing::debug!("Trying to load keyring file at {:?}", path.as_ref());
-        let (mtime, keyring) = match fs::File::open(path.as_ref()).await {
+        let (mtime, mut keyring, legacy) = match fs::File::open(path.as_ref()).await {
             Err(err) if err.kind() == io::ErrorKind::NotFound => {
                 #[cfg(feature = "tracing")]
                 tracing::debug!("Keyring file not found, creating a new one");
-                (None, api::Keyring::new())
+                (None, api::Keyring::new(), None)
             }
             Err(err) => return Err(err.into()),
             Ok(mut file) => {
@@ -118,17 +118,44 @@ impl Keyring {
                 let mut content = Vec::new();
                 file.read_to_end(&mut content).await?;
 
-                let keyring = api::Keyring::try_from(content.as_slice())?;
-
-                (mtime, keyring)
+                match api::Keyring::try_from(content.as_slice()) {
+                    Ok(keyring) => (mtime, keyring, None),
+                    Err(Error::VersionMismatch(Some(version)))
+                        if version[0] == api::LEGACY_MAJOR_VERSION
+                            && version[1] == api::LEGACY_MINOR_VERSION =>
+                    {
+                        (
+                            mtime,
+                            api::Keyring::new(),
+                            Some(api::LegacyKeyring::try_from(content.as_slice())?),
+                        )
+                    }
+                    Err(err) => return Err(err),
+                }
             }
         };
+
+        let key_once = OnceLock::new();
+
+        if let Some(legacy) = legacy {
+            #[cfg(feature = "tracing")]
+            tracing::debug!("Migrating from legacy keyring format");
+
+            let key = keyring.derive_key(&secret);
+
+            for item in legacy.decrypt_items(&secret)? {
+                let encrypted_item = item.encrypt(&key)?;
+                keyring.items.push(encrypted_item);
+            }
+
+            key_once.set(key).unwrap();
+        }
 
         Ok(Self {
             keyring: Arc::new(RwLock::new(keyring)),
             path: path.as_ref().to_path_buf(),
             mtime: Mutex::new(mtime),
-            key: Default::default(),
+            key: key_once,
             secret: Arc::new(secret),
         })
     }
@@ -396,6 +423,33 @@ mod tests {
         let (res_1, res_2) = futures_util::future::join(handle_1, handle_2).await;
         res_1.unwrap()?;
         res_2.unwrap()?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn migrate_from_legacy() -> Result<(), Error> {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("fixtures")
+            .join("legacy.keyring");
+
+        let password = b"test";
+        let secret = Secret::from(password.to_vec());
+        let keyring = Keyring::load(&path, secret).await?;
+
+        assert_eq!(keyring.n_items().await, 1);
+        let items: Result<Vec<_>, _> = keyring.items().await.into_iter().collect();
+        assert!(items.is_ok());
+        let items = items.unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].label(), "foo");
+        assert_eq!(items[0].secret().as_ref(), b"foo".to_vec());
+        let attributes = items[0].attributes();
+        assert_eq!(attributes.len(), 1);
+        assert_eq!(
+            attributes.get("xdg:schema"),
+            Some(&AttributeValue::from("org.gnome.keyring.Note"))
+        );
 
         Ok(())
     }
