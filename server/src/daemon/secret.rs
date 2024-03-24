@@ -2,6 +2,7 @@ use oo7::{crypto, Key};
 
 use super::session::Session;
 
+#[allow(dead_code)]
 pub struct Secret {
     session: Session,
     parameters: Vec<u8>,
