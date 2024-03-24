@@ -33,7 +33,7 @@ use std::io;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
-    sync::{Arc, OnceLock},
+    sync::Arc,
 };
 
 #[cfg(feature = "async-std")]
@@ -81,8 +81,8 @@ pub struct Keyring {
     /// Times are stored before reading the file to detect
     /// file changes before writing
     mtime: Mutex<Option<std::time::SystemTime>>,
-    key: OnceLock<Key>,
-    secret: Arc<Secret>,
+    key: Mutex<Option<Arc<Key>>>,
+    secret: Mutex<Arc<Secret>>,
 }
 
 impl Keyring {
@@ -129,7 +129,7 @@ impl Keyring {
             path: path.as_ref().to_path_buf(),
             mtime: Mutex::new(mtime),
             key: Default::default(),
-            secret: Arc::new(secret),
+            secret: Mutex::new(Arc::new(secret)),
         })
     }
 
@@ -147,7 +147,7 @@ impl Keyring {
                 path: path.as_ref().to_path_buf(),
                 mtime: Default::default(),
                 key: Default::default(),
-                secret: Arc::new(secret),
+                secret: Mutex::new(Arc::new(secret)),
             }),
             Err(Error::VersionMismatch(Some(version)))
                 if version[0] == api::LEGACY_MAJOR_VERSION =>
@@ -169,7 +169,7 @@ impl Keyring {
                     path: path.as_ref().to_path_buf(),
                     mtime: Default::default(),
                     key: Default::default(),
-                    secret: Arc::new(secret),
+                    secret: Mutex::new(Arc::new(secret)),
                 })
             }
             Err(err) => Err(err),
@@ -205,7 +205,7 @@ impl Keyring {
                 path: v1_path,
                 mtime: Default::default(),
                 key: Default::default(),
-                secret: Arc::new(secret),
+                secret: Mutex::new(Arc::new(secret)),
             })
         }
     }
@@ -229,7 +229,7 @@ impl Keyring {
             .items
             .iter()
             .map(|e| {
-                (*e).clone().decrypt(key).map_err(|err| {
+                (*e).clone().decrypt(&key).map_err(|err| {
                     InvalidItemError::new(
                         err,
                         e.hashed_attributes.keys().map(|x| x.to_string()).collect(),
@@ -243,14 +243,14 @@ impl Keyring {
     pub async fn search_items(&self, attributes: &impl AsAttributes) -> Result<Vec<Item>, Error> {
         let key = self.derive_key().await;
         let keyring = self.keyring.read().await;
-        keyring.search_items(attributes, key)
+        keyring.search_items(attributes, &key)
     }
 
     /// Find the first item matching the attributes.
     pub async fn lookup_item(&self, attributes: &impl AsAttributes) -> Result<Option<Item>, Error> {
         let key = self.derive_key().await;
         let keyring = self.keyring.read().await;
-        keyring.lookup_item(attributes, key)
+        keyring.lookup_item(attributes, &key)
     }
 
     /// Delete an item.
@@ -258,7 +258,7 @@ impl Keyring {
         {
             let key = self.derive_key().await;
             let mut keyring = self.keyring.write().await;
-            keyring.remove_items(attributes, key)?;
+            keyring.remove_items(attributes, &key)?;
         };
         self.write().await
     }
@@ -284,10 +284,10 @@ impl Keyring {
             let key = self.derive_key().await;
             let mut keyring = self.keyring.write().await;
             if replace {
-                keyring.remove_items(attributes, key)?;
+                keyring.remove_items(attributes, &key)?;
             }
             let item = Item::new(label, attributes, secret);
-            let encrypted_item = item.encrypt(key)?;
+            let encrypted_item = item.encrypt(&key)?;
             keyring.items.push(encrypted_item);
             item
         };
@@ -308,7 +308,7 @@ impl Keyring {
             let mut keyring = self.keyring.write().await;
 
             if let Some(item_store) = keyring.items.get_mut(index) {
-                *item_store = item.encrypt(key)?;
+                *item_store = item.encrypt(&key)?;
             } else {
                 return Err(Error::InvalidItemIndex(index));
             }
@@ -340,10 +340,10 @@ impl Keyring {
         let mut keyring = self.keyring.write().await;
         for (label, attributes, secret, replace) in items {
             if replace {
-                keyring.remove_items(&attributes, key)?;
+                keyring.remove_items(&attributes, &key)?;
             }
             let item = Item::new(label, &attributes, &*secret);
-            let encrypted_item = item.encrypt(key)?;
+            let encrypted_item = item.encrypt(&key)?;
             keyring.items.push(encrypted_item);
         }
 
@@ -374,12 +374,52 @@ impl Keyring {
     }
 
     /// Return key, derive and store it first if not initialized
-    async fn derive_key(&self) -> &Key {
-        if self.key.get().is_none() {
+    async fn derive_key(&self) -> Arc<Key> {
+        if self.key.lock().await.is_none() {
             let key = self.keyring.read().await.derive_key(&self.secret);
-            self.key.set(key).unwrap();
+            *self.key.lock().await = Some(Arc::new(key));
         }
-        self.key.get().unwrap()
+
+        Arc::clone(self.key.lock().await.as_ref().unwrap())
+    }
+
+    /// Change keyring secret
+    ///
+    /// # Arguments
+    ///
+    /// * `secret` - The new secret to store.
+    pub async fn change_secret(&self, secret: Secret) -> Result<(), Error> {
+        #[cfg(feature = "tracing")]
+        tracing::debug!("Changing keyring secret and key");
+
+        let keyring = self.keyring.read().await;
+        let key = self.derive_key().await;
+
+        let mut items = Vec::with_capacity(keyring.items.len());
+        for item in &keyring.items {
+            items.push(item.clone().decrypt(&key)?);
+        }
+        drop(keyring);
+
+        let mut secret_lock = self.secret.lock().await;
+        *secret_lock = Arc::new(secret);
+        drop(secret_lock);
+
+        let mut key_lock = self.key.lock().await;
+        // Unset the old key
+        *key_lock = None;
+        drop(key_lock);
+        let key = self.derive_key().await;
+
+        let mut keyring = self.keyring.write().await;
+
+        for item in items {
+            let encrypted_item = item.encrypt(&key)?;
+            keyring.items.push(encrypted_item);
+        }
+        drop(keyring);
+
+        self.write().await
     }
 }
 
@@ -606,6 +646,32 @@ mod tests {
         keyring.write().await?;
 
         assert!(v1_dir.join("default.keyring").exists());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn change_secret() -> Result<(), Error> {
+        let path = PathBuf::from("../../tests/test_rekeying.keyring");
+
+        let keyring = Keyring::load(&path, strong_key()).await?;
+        let attributes = HashMap::from([("attr", "value")]);
+        let item_before = keyring
+            .create_item("test", &attributes, "password", false)
+            .await?;
+
+        let new_secret = Secret::from(b"password".to_vec());
+        keyring.change_secret(new_secret).await?;
+
+        let new_secret = Secret::from(b"password".to_vec());
+        let keyring = Keyring::load(&path, new_secret).await?;
+        let item_now = keyring.lookup_item(&attributes).await?.unwrap();
+
+        assert_eq!(item_before.label(), item_now.label());
+        assert_eq!(item_before.secret(), item_now.secret());
+        assert_eq!(item_before.attributes(), item_now.attributes());
+
+        fs::remove_file(path).await?;
 
         Ok(())
     }
