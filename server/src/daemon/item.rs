@@ -21,9 +21,9 @@ use super::{
     Result,
 };
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Item {
-    inner: RwLock<portal::Item>,
+    inner: Arc<RwLock<portal::Item>>,
     parameters: Vec<u8>,
     content_type: String,
     path: OwnedObjectPath,
@@ -138,7 +138,7 @@ impl Item {
         Self {
             path: OwnedObjectPath::try_from(format!("{}/{}", collection_path, item_counter))
                 .unwrap(),
-            inner: RwLock::new(item),
+            inner: Arc::new(RwLock::new(item)),
             parameters,
             content_type,
             keyring,
