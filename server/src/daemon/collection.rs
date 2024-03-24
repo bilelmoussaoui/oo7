@@ -59,6 +59,7 @@ impl Collection {
         properties: Properties,
         secret: SecretInner,
         replace: bool,
+        #[zbus(object_server)] object_server: &ObjectServer,
     ) -> Result<(OwnedObjectPath, Prompt)> {
         let label = properties.label();
         let attributes = properties.attributes().unwrap();
@@ -83,7 +84,7 @@ impl Collection {
                 session.clone(),
                 value,
                 content_type.as_str(),
-                &aes_key.as_ref().unwrap(),
+                aes_key.as_ref().unwrap(),
             )
         };
 
@@ -107,7 +108,8 @@ impl Collection {
         )
         .await;
         let path = OwnedObjectPath::from(item.path());
-        self.items.write().await.push(item);
+        self.items.write().await.push(item.clone());
+        object_server.at(&path, item).await.unwrap();
 
         Self::item_created(&ctxt, path.as_ref()).await?;
         Ok((path, prompt))
@@ -166,11 +168,11 @@ impl Collection {
             label: label.to_owned(),
             alias: Arc::new(RwLock::new(alias.to_owned())),
             locked: Arc::new(AtomicBool::new(false)),
-            created: created,
             modified: created,
             item_counter: Arc::new(RwLock::new(0)),
             path: OwnedObjectPath::try_from(format!("{}{}", SECRET_COLLECTION_PREFIX, label))
                 .unwrap(),
+            created,
             keyring,
             manager,
         }
@@ -192,5 +194,13 @@ impl Collection {
         Service::collection_changed(ctxt, self.path.as_ref())
             .await
             .unwrap();
+    }
+
+    pub async fn item_counter(&self) -> i32 {
+        *self.item_counter.read().await
+    }
+
+    pub async fn set_item_counter(&self) {
+        *self.item_counter.write().await += 1;
     }
 }

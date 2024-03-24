@@ -3,6 +3,9 @@ use clap::Parser;
 mod daemon;
 
 const BINARY_NAME: &str = env!("CARGO_BIN_NAME");
+const LOGIN_KEYRING: &str = "login";
+const LOGIN_KEYRING_PATH: &str = "Downloads/default.keyring";
+// const LOGIN_KEYRING_PATH: &str = ".local/share/keyrings/login.keyring";
 #[cfg(debug_assertions)]
 const SERVICE_NAME: &str = "org.freedesktop.secrets.Devel";
 #[cfg(debug_assertions)]
