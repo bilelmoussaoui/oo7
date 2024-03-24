@@ -2,6 +2,9 @@
 mod native;
 #[cfg(feature = "native_crypto")]
 pub(crate) use native::*;
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+pub use native::*;
 
 #[cfg(feature = "openssl_crypto")]
 mod openssl;

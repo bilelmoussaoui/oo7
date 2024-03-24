@@ -39,15 +39,15 @@ impl Key {
         Self { key, strength }
     }
 
-    pub(crate) fn generate_private_key() -> Self {
+    pub fn generate_private_key() -> Self {
         Self::new(crypto::generate_private_key().to_vec())
     }
 
-    pub(crate) fn generate_public_key(private_key: &Self) -> Self {
+    pub fn generate_public_key(private_key: &Self) -> Self {
         Self::new(crypto::generate_public_key(private_key))
     }
 
-    pub(crate) fn generate_aes_key(private_key: &Self, server_public_key: &Self) -> Self {
+    pub fn generate_aes_key(private_key: &Self, server_public_key: &Self) -> Self {
         Self::new(crypto::generate_aes_key(private_key, server_public_key).to_vec())
     }
 }
@@ -64,8 +64,20 @@ impl From<&Key> for zvariant::Value<'_> {
     }
 }
 
+impl From<&Key> for zvariant::OwnedValue {
+    fn from(key: &Key) -> Self {
+        zvariant::Value::from(key).try_to_owned().unwrap()
+    }
+}
+
 impl From<zvariant::OwnedValue> for Key {
     fn from(value: zvariant::OwnedValue) -> Self {
+        Self::from(zvariant::Value::from(value))
+    }
+}
+
+impl From<zvariant::Value<'_>> for Key {
+    fn from(value: zvariant::Value<'_>) -> Self {
         let mut key = zeroize::Zeroizing::new(vec![]);
         for value in value.downcast_ref::<zvariant::Array>().unwrap().inner() {
             key.push(value.downcast_ref::<u8>().unwrap());

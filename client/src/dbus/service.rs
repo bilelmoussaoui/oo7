@@ -103,7 +103,7 @@ impl<'a> Service<'a> {
                 Arc::clone(&self.session),
                 self.algorithm,
                 collection,
-                self.aes_key.as_ref().map(Arc::clone),
+                self.aes_key.clone(),
             )
         }))
     }
@@ -121,7 +121,7 @@ impl<'a> Service<'a> {
                     Arc::clone(&self.session),
                     self.algorithm,
                     collection,
-                    self.aes_key.as_ref().map(Arc::clone),
+                    self.aes_key.clone(),
                 )
             })
             .collect::<Vec<_>>())
@@ -136,7 +136,7 @@ impl<'a> Service<'a> {
         label: &str,
         alias: Option<&str>,
     ) -> Result<Collection<'a>, Error> {
-        let aes_key = self.aes_key.as_ref().map(Arc::clone);
+        let aes_key = self.aes_key.clone();
         self.inner
             .create_collection(label, alias)
             .await
