@@ -2,7 +2,7 @@
 
 use std::{
     collections::HashMap,
-    env,
+    env, fs,
     sync::{Arc, Mutex},
     time::SystemTime,
 };
@@ -23,19 +23,20 @@ use zbus::{
 };
 
 use super::{
-    collection::Collection, error::ServiceError, prompt::Prompt, service_manager::ServiceManager,
-    session::Session, Result,
+    collection::Collection, error::ServiceError, item, prompt::Prompt,
+    service_manager::ServiceManager, session::Session, Result,
 };
 #[cfg(debug_assertions)]
 use crate::SERVICE_NAME;
+use crate::{LOGIN_KEYRING, LOGIN_KEYRING_PATH};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Service {
-    collections: RwLock<Vec<Collection>>,
+    collections: Arc<RwLock<Vec<Collection>>>,
     keyring: Arc<Keyring>,
-    cnx: Mutex<Option<zbus::Connection>>,
+    cnx: Arc<Mutex<Option<zbus::Connection>>>,
     manager: Arc<Mutex<ServiceManager>>,
-    sessions_counter: RwLock<i32>,
+    sessions_counter: Arc<RwLock<i32>>,
 }
 
 #[zbus::interface(name = "org.freedesktop.Secret.Service")]
@@ -286,18 +287,14 @@ impl Service {
 
 impl Service {
     pub async fn new(password: String) -> Self {
-        let path = format!(
-            "{}/{}",
-            env::var("HOME").unwrap(),
-            ".local/share/keyrings/login.keyring"
-        );
+        let path = format!("{}/{}", env::var("HOME").unwrap(), LOGIN_KEYRING_PATH);
         let secret = Secret::from(password.into_bytes());
         Self {
-            collections: RwLock::new(Vec::new()),
+            collections: Arc::new(RwLock::new(Vec::new())),
             keyring: Arc::new(Keyring::load(path, secret).await.unwrap()),
             cnx: Default::default(),
             manager: Arc::new(Mutex::new(ServiceManager::default())),
-            sessions_counter: RwLock::new(0),
+            sessions_counter: Arc::new(RwLock::new(0)),
         }
     }
 
@@ -311,9 +308,61 @@ impl Service {
             .build()
             .await?;
         *self.cnx.lock().unwrap() = Some(cnx.clone());
-        cnx.object_server()
-            .at(oo7::dbus::api::Service::PATH.unwrap(), self)
+        let object_server = cnx.object_server();
+        object_server
+            .at(oo7::dbus::api::Service::PATH.unwrap(), self.clone())
             .await?;
+
+        // loading login.keyring into the objects tree
+        Service::init_login(&object_server, self).await;
+
         Ok(())
+    }
+
+    pub async fn init_login(object_server: &ObjectServer, service: Service) {
+        let path = format!("{}/{}", env::var("HOME").unwrap(), LOGIN_KEYRING_PATH);
+        let created = fs::metadata(path)
+            .unwrap()
+            .created()
+            .unwrap()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap();
+        let login = Collection::new(
+            LOGIN_KEYRING,
+            "login",
+            created,
+            service.keyring.clone(),
+            service.manager.clone(),
+        );
+        service.collections.write().await.push(login.clone());
+        let path = OwnedObjectPath::from(login.path());
+        object_server.at(&path, login.clone()).await.unwrap();
+
+        let n_items = service.keyring.n_items().await;
+        if n_items > 0 {
+            let items: Vec<Item> = service
+                .keyring
+                .items()
+                .await
+                .into_iter()
+                .map(|item| item.unwrap())
+                .collect();
+            for item in items {
+                let item = item::Item::new(
+                    item.clone(),
+                    item.secret().to_vec(),
+                    "text/plain".to_string(),
+                    login.item_counter().await,
+                    login.path(),
+                    service.keyring.clone(),
+                    service.manager.clone(),
+                )
+                .await;
+                login.set_item_counter().await;
+                let path = OwnedObjectPath::from(item.path());
+                login.items.write().await.push(item.clone());
+                object_server.at(&path, item).await.unwrap();
+            }
+        }
     }
 }
