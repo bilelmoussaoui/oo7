@@ -31,7 +31,8 @@ const DEFAULT_SALT_SIZE: usize = 32;
 
 const MIN_ITERATION_COUNT: u32 = 100000;
 const MIN_SALT_SIZE: usize = 32;
-const MIN_PASSWORD_LENGTH: usize = 64;
+// FIXME: choose a reasonable value
+const MIN_PASSWORD_LENGTH: usize = 4;
 
 const FILE_HEADER: &[u8] = b"GnomeKeyring\n\r\0\n";
 const FILE_HEADER_LEN: usize = FILE_HEADER.len();
@@ -41,9 +42,14 @@ const MINOR_VERSION: u8 = 0;
 
 mod attribute_value;
 mod encrypted_item;
+mod legacy_keyring;
 
 pub use attribute_value::AttributeValue;
 pub(super) use encrypted_item::EncryptedItem;
+pub(super) use legacy_keyring::{
+    Keyring as LegacyKeyring, MAJOR_VERSION as LEGACY_MAJOR_VERSION,
+    MINOR_VERSION as LEGACY_MINOR_VERSION,
+};
 
 use super::{Item, Secret};
 use crate::{
