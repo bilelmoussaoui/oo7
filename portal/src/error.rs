@@ -1,5 +1,3 @@
-use oo7::zbus;
-
 #[derive(zbus::DBusError, Debug)]
 pub enum Error {
     Owned(String),

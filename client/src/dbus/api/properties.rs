@@ -4,7 +4,7 @@ use serde::{
     ser::{Serialize, SerializeMap},
     Deserialize,
 };
-use zbus::zvariant::{self, Type, Value};
+use zbus::zvariant::{Type, Value};
 
 use crate::AsAttributes;
 
@@ -102,7 +102,7 @@ impl<'de> Deserialize<'de> for Properties {
 
 #[cfg(test)]
 mod tests {
-    use zbus::zvariant::{self, serialized::Context, to_bytes, Endian, Type};
+    use zbus::zvariant::{serialized::Context, to_bytes, Endian, Type};
 
     use super::*;
 

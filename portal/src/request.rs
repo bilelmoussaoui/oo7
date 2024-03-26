@@ -1,10 +1,7 @@
 use std::sync::Mutex;
 
-use oo7::zbus::{
-    self,
-    zvariant::{self, ObjectPath, Type},
-};
 use serde::Serialize;
+use zbus::zvariant::{self, ObjectPath, Type};
 
 #[derive(Serialize, PartialEq, Eq, Debug, Type)]
 pub enum ResponseType {

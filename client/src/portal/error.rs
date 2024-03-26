@@ -1,5 +1,3 @@
-use zbus::zvariant;
-
 /// File backend specific errors.
 #[derive(Debug)]
 pub enum Error {

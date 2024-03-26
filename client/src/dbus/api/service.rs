@@ -2,7 +2,7 @@ use std::{collections::HashMap, fmt};
 
 use futures_util::{Stream, StreamExt};
 use zbus::{
-    zvariant::{self, ObjectPath, OwnedObjectPath, OwnedValue, Type, Value},
+    zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Type, Value},
     ProxyDefault,
 };
 

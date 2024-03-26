@@ -4,16 +4,13 @@ mod request;
 use std::{collections::HashMap, future::pending, os::unix::net::UnixStream};
 
 use futures_util::FutureExt;
-use oo7::{
-    dbus::Service,
-    zbus::{
-        self,
-        zvariant::{self, OwnedObjectPath},
-        ProxyDefault,
-    },
-};
+use oo7::dbus::Service;
 use ring::rand::SecureRandom;
 use tokio::io::AsyncWriteExt;
+use zbus::{
+    zvariant::{self, OwnedObjectPath},
+    ProxyDefault,
+};
 
 use crate::{
     error::Error,
