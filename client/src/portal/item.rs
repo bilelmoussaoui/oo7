@@ -1,7 +1,6 @@
 use std::{collections::HashMap, time::Duration};
 
 use serde::{Deserialize, Serialize};
-use zbus::zvariant::{self, Type};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 use super::{
@@ -11,7 +10,7 @@ use super::{
 use crate::{crypto, AsAttributes, Key};
 
 /// An item stored in the file backend.
-#[derive(Deserialize, Serialize, Type, Clone, Debug, Zeroize, ZeroizeOnDrop)]
+#[derive(Deserialize, Serialize, zvariant::Type, Clone, Debug, Zeroize, ZeroizeOnDrop)]
 pub struct Item {
     #[zeroize(skip)]
     attributes: HashMap<String, AttributeValue>,

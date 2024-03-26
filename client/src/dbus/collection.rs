@@ -133,7 +133,7 @@ impl<'a> Collection<'a> {
                         Arc::clone(&self.session),
                         self.algorithm,
                         item,
-                        self.aes_key.as_ref().map(Arc::clone),
+                        self.aes_key.clone(), // Cheap clone, it is an Arc,
                     )
                 })
                 .collect::<Vec<_>>())
@@ -244,7 +244,7 @@ impl<'a> Collection<'a> {
             Arc::clone(&self.session),
             self.algorithm,
             item,
-            self.aes_key.as_ref().map(Arc::clone),
+            self.aes_key.clone(), // Cheap clone, it is an Arc,
         )
     }
 }
