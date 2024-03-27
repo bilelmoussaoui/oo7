@@ -4,7 +4,7 @@ use zvariant::Type;
 use crate::{crypto, portal};
 
 /// A key.
-#[derive(Debug, Zeroize, ZeroizeOnDrop)]
+#[derive(Clone, Debug, Zeroize, ZeroizeOnDrop)]
 pub struct Key {
     key: Vec<u8>,
     #[zeroize(skip)]
