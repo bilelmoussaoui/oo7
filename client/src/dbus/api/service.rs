@@ -48,7 +48,7 @@ impl<'a> Service<'a> {
     #[doc(alias = "CollectionCreated")]
     pub async fn receive_collection_created(
         &self,
-    ) -> Result<impl Stream<Item = Collection<'_>>, Error> {
+    ) -> Result<impl Stream<Item = Collection<'a>> + '_, Error> {
         let stream = self.inner().receive_signal("CollectionCreated").await?;
         let conn = self.inner().connection();
         Ok(stream.filter_map(move |message| async move {
@@ -60,19 +60,17 @@ impl<'a> Service<'a> {
     #[doc(alias = "CollectionDeleted")]
     pub async fn receive_collection_deleted(
         &self,
-    ) -> Result<impl Stream<Item = Collection<'_>>, Error> {
-        let stream = self.inner().receive_signal("CollectionDeleted").await?;
-        let conn = self.inner().connection();
+    ) -> Result<impl Stream<Item = OwnedObjectPath>, Error> {
+        let stream = self.inner().receive_signal("ItemDeleted").await?;
         Ok(stream.filter_map(move |message| async move {
-            let path = message.body().deserialize::<OwnedObjectPath>().ok()?;
-            Collection::new(conn, path).await.ok()
+            message.body().deserialize::<OwnedObjectPath>().ok()
         }))
     }
 
     #[doc(alias = "CollectionChanged")]
     pub async fn receive_collection_changed(
         &self,
-    ) -> Result<impl Stream<Item = Collection<'_>>, Error> {
+    ) -> Result<impl Stream<Item = Collection<'a>> + '_, Error> {
         let stream = self.inner().receive_signal("CollectionChanged").await?;
         let conn = self.inner().connection();
         Ok(stream.filter_map(move |message| async move {
