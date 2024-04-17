@@ -1,5 +1,8 @@
 use std::sync::Arc;
 
+use futures_util::{Stream, StreamExt};
+use zbus::zvariant::OwnedObjectPath;
+
 use super::{api, Algorithm, Collection, Error, DEFAULT_COLLECTION};
 use crate::Key;
 
@@ -159,6 +162,46 @@ impl<'a> Service<'a> {
             }
         }
         Ok(None)
+    }
+
+    /// Stream yielding when new collections get created
+    pub async fn receive_collection_created(
+        &self,
+    ) -> Result<impl Stream<Item = Collection<'a>> + '_, Error> {
+        Ok(self
+            .inner
+            .receive_collection_created()
+            .await?
+            .map(|collection| self.new_collection(collection)))
+    }
+
+    /// Stream yielding when existing collections get changed
+    pub async fn receive_collection_changed(
+        &self,
+    ) -> Result<impl Stream<Item = Collection<'a>> + '_, Error> {
+        Ok(self
+            .inner
+            .receive_collection_changed()
+            .await?
+            .map(|collection| self.new_collection(collection)))
+    }
+
+    /// Stream yielding when existing collections get deleted
+    pub async fn receive_collection_deleted(
+        &self,
+    ) -> Result<impl Stream<Item = OwnedObjectPath>, Error> {
+        self.inner.receive_collection_deleted().await
+    }
+
+    // Get public `Collection` from `api::Collection`
+    fn new_collection(&self, collection: api::Collection<'a>) -> Collection<'a> {
+        Collection::new(
+            Arc::clone(&self.inner),
+            Arc::clone(&self.session),
+            self.algorithm,
+            collection,
+            self.aes_key.clone(), // Cheap clone, it is an Arc,
+        )
     }
 }
 
