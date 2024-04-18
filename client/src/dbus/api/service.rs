@@ -61,7 +61,7 @@ impl<'a> Service<'a> {
     pub async fn receive_collection_deleted(
         &self,
     ) -> Result<impl Stream<Item = OwnedObjectPath>, Error> {
-        let stream = self.inner().receive_signal("ItemDeleted").await?;
+        let stream = self.inner().receive_signal("CollectionDeleted").await?;
         Ok(stream.filter_map(move |message| async move {
             message.body().deserialize::<OwnedObjectPath>().ok()
         }))
