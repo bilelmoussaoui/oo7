@@ -5,7 +5,7 @@ use async_lock::RwLock;
 use futures_util::{Stream, StreamExt};
 #[cfg(feature = "tokio")]
 use tokio::sync::RwLock;
-use zbus::zvariant::OwnedObjectPath;
+use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 
 use super::{api, Algorithm, Error, Item};
 use crate::{AsAttributes, Key};
@@ -212,6 +212,11 @@ impl<'a> Collection<'a> {
             *self.available.write().await = false;
             Ok(())
         }
+    }
+
+    /// Returns collection path
+    pub fn path(&self) -> &ObjectPath<'_> {
+        self.inner.inner().path()
     }
 
     /// Stream yielding when new items get created
