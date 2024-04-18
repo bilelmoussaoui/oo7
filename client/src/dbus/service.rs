@@ -100,15 +100,11 @@ impl<'a> Service<'a> {
     ///
     /// Applications should make use of [`Service::default_collection`] instead.
     pub async fn with_alias(&self, alias: &str) -> Result<Option<Collection<'a>>, Error> {
-        Ok(self.inner.read_alias(alias).await?.map(|collection| {
-            Collection::new(
-                Arc::clone(&self.inner),
-                Arc::clone(&self.session),
-                self.algorithm,
-                collection,
-                self.aes_key.clone(), // Cheap clone, it is an Arc,
-            )
-        }))
+        Ok(self
+            .inner
+            .read_alias(alias)
+            .await?
+            .map(|collection| self.new_collection(collection)))
     }
 
     /// Get a list of all the available collections.
@@ -118,15 +114,7 @@ impl<'a> Service<'a> {
             .collections()
             .await?
             .into_iter()
-            .map(|collection| {
-                Collection::new(
-                    Arc::clone(&self.inner),
-                    Arc::clone(&self.session),
-                    self.algorithm,
-                    collection,
-                    self.aes_key.clone(), // Cheap clone, it is an Arc,
-                )
-            })
+            .map(|collection| self.new_collection(collection))
             .collect::<Vec<_>>())
     }
 
@@ -142,15 +130,7 @@ impl<'a> Service<'a> {
         self.inner
             .create_collection(label, alias)
             .await
-            .map(|collection| {
-                Collection::new(
-                    Arc::clone(&self.inner),
-                    Arc::clone(&self.session),
-                    self.algorithm,
-                    collection,
-                    self.aes_key.clone(), // Cheap clone, it is an Arc,
-                )
-            })
+            .map(|collection| self.new_collection(collection))
     }
 
     /// Find a collection with it label.
