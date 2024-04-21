@@ -375,12 +375,28 @@ impl Keyring {
 
     /// Return key, derive and store it first if not initialized
     async fn derive_key(&self) -> Arc<Key> {
-        if self.key.lock().await.is_none() {
-            let key = self.keyring.read().await.derive_key(&self.secret);
-            *self.key.lock().await = Some(Arc::new(key));
+        let keyring = Arc::clone(&self.keyring);
+        let secret_lock = self.secret.lock().await;
+        let secret = Arc::clone(&secret_lock);
+        drop(secret_lock);
+
+        let mut key_lock = self.key.lock().await;
+        if key_lock.is_none() {
+            #[cfg(feature = "async-std")]
+            let key = blocking::unblock(move || {
+                async_io::block_on(async { keyring.read().await.derive_key(&secret) })
+            })
+            .await;
+            #[cfg(feature = "tokio")]
+            let key =
+                tokio::task::spawn_blocking(move || keyring.blocking_read().derive_key(&secret))
+                    .await
+                    .unwrap();
+
+            *key_lock = Some(Arc::new(key));
         }
 
-        Arc::clone(self.key.lock().await.as_ref().unwrap())
+        Arc::clone(key_lock.as_ref().unwrap())
     }
 
     /// Change keyring secret
