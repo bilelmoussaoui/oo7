@@ -7,13 +7,13 @@ const LOGIN_KEYRING: &str = "login";
 const LOGIN_KEYRING_PATH: &str = "Downloads/default.keyring";
 // const LOGIN_KEYRING_PATH: &str = ".local/share/keyrings/login.keyring";
 #[cfg(debug_assertions)]
-const SERVICE_NAME: &str = "org.freedesktop.secrets.Devel";
+const SERVICE_NAME: &str = "org.freedesktop.secrets_Devel";
 #[cfg(debug_assertions)]
-const SECRET_SESSION_PREFIX: &str = "/org/freedesktop/secrets.Devel/session/";
+const SECRET_SESSION_PREFIX: &str = "/org/freedesktop/secrets_Devel/session/";
 #[cfg(not(debug_assertions))]
 const SECRET_SESSION_PREFIX: &str = "/org/freedesktop/secrets/session/";
 #[cfg(debug_assertions)]
-const SECRET_COLLECTION_PREFIX: &str = "/org/freedesktop/secrets.Devel/collection/";
+const SECRET_COLLECTION_PREFIX: &str = "/org/freedesktop/secrets_Devel/collection/";
 #[cfg(not(debug_assertions))]
 const SECRET_COLLECTION_PREFIX: &str = "/org/freedesktop/secrets/collection/";
 
