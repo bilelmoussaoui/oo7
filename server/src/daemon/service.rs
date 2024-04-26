@@ -340,13 +340,13 @@ impl Service {
 
         let n_items = service.keyring.n_items().await;
         if n_items > 0 {
-            let items: Vec<Item> = service
-                .keyring
-                .items()
-                .await
-                .into_iter()
-                .map(|item| item.unwrap())
-                .collect();
+            let mut items: Vec<Item> = Vec::with_capacity(n_items);
+            for item in service.keyring.items().await {
+                items.push(match item {
+                    Ok(item) => item,
+                    Err(e) => panic!("Item cannot be decrypted: {}", e.to_string()),
+                })
+            }
             for item in items {
                 let item = item::Item::new(
                     item.clone(),
