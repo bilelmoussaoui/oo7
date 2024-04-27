@@ -425,6 +425,11 @@ impl Keyring {
         // Unset the old key
         *key_lock = None;
         drop(key_lock);
+
+        // Reset Keyring content before setting the new key
+        let mut keyring = self.keyring.write().await;
+        keyring.reset();
+        drop(keyring);
         let key = self.derive_key().await;
 
         let mut keyring = self.keyring.write().await;
