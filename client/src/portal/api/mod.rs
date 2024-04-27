@@ -252,6 +252,16 @@ impl Keyring {
             self.iteration_count.try_into().unwrap(),
         )
     }
+
+    // Reset Keyring content
+    pub(crate) fn reset(&mut self) {
+        let salt = rand::thread_rng().gen::<[u8; DEFAULT_SALT_SIZE]>().to_vec();
+        self.salt_size = salt.len() as u32;
+        self.salt = salt;
+        self.iteration_count = DEFAULT_ITERATION_COUNT;
+        self.usage_count = 0;
+        self.items = Vec::new();
+    }
 }
 
 impl TryFrom<&[u8]> for Keyring {
