@@ -410,7 +410,6 @@ impl Keyring {
 
         let keyring = self.keyring.read().await;
         let key = self.derive_key().await;
-
         let mut items = Vec::with_capacity(keyring.items.len());
         for item in &keyring.items {
             items.push(item.clone().decrypt(&key)?);
@@ -430,10 +429,11 @@ impl Keyring {
         let mut keyring = self.keyring.write().await;
         keyring.reset();
         drop(keyring);
+
+        // Set new key
         let key = self.derive_key().await;
 
         let mut keyring = self.keyring.write().await;
-
         for item in items {
             let encrypted_item = item.encrypt(&key)?;
             keyring.items.push(encrypted_item);
