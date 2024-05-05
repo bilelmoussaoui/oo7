@@ -69,18 +69,18 @@ async-std = [
 ]
 tokio = ["zbus/tokio", "dep:tokio"]
 native_crypto = [
-    "aes",
-    "cbc",
-    "cipher",
-    "digest",
-    "hkdf",
-    "hmac",
-    "md-5",
-    "pbkdf2",
-    "sha2",
-    "subtle",
+    "dep:aes",
+    "dep:cbc",
+    "dep:cipher",
+    "dep:digest",
+    "dep:hkdf",
+    "dep:hmac",
+    "dep:md-5",
+    "dep:pbkdf2",
+    "dep:sha2",
+    "dep:subtle",
 ]
-openssl_crypto = ["openssl"]
+openssl_crypto = ["dep:openssl"]
 
 [package.metadata.docs.rs]
 features = ["unstable"]
