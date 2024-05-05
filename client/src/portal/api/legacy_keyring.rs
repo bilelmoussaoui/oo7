@@ -240,6 +240,7 @@ mod tests {
 
     use super::*;
 
+    #[test]
     fn legacy_decrypt() -> Result<(), Error> {
         let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("fixtures")
