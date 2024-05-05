@@ -9,7 +9,7 @@ use crate::{crypto, dbus::Error, Key};
 
 #[derive(Debug, Serialize, Deserialize, Type)]
 #[zvariant(signature = "(oayays)")]
-pub(crate) struct SecretInner(pub OwnedObjectPath, pub Vec<u8>, pub Vec<u8>, pub String);
+pub struct SecretInner(pub OwnedObjectPath, pub Vec<u8>, pub Vec<u8>, pub String);
 
 #[derive(Debug, Type, Zeroize, ZeroizeOnDrop)]
 #[zvariant(signature = "(oayays)")]
