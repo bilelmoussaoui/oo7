@@ -183,7 +183,7 @@ impl Collection {
     }
 
     pub async fn set_alias(&self, ctxt: &zbus::SignalContext<'_>, alias: &str) -> Result<()> {
-        *self.alias.write().await = alias.to_owned();
+        *self.alias.write().await = alias.to_string();
         Service::collection_changed(ctxt, self.path.as_ref()).await?;
         Ok(())
     }
@@ -200,7 +200,7 @@ impl Collection {
         *self.item_counter.read().await
     }
 
-    pub async fn set_item_counter(&self) {
+    pub async fn incr_item_counter(&self) {
         *self.item_counter.write().await += 1;
     }
 }

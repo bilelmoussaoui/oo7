@@ -344,7 +344,7 @@ impl Service {
             for item in service.keyring.items().await {
                 items.push(match item {
                     Ok(item) => item,
-                    Err(e) => panic!("Item cannot be decrypted: {}", e.to_string()),
+                    Err(err) => panic!("Item cannot be decrypted: {}", err),
                 })
             }
             for item in items {
@@ -358,7 +358,7 @@ impl Service {
                     service.manager.clone(),
                 )
                 .await;
-                login.set_item_counter().await;
+                login.incr_item_counter().await;
                 let path = OwnedObjectPath::from(item.path());
                 login.items.write().await.push(item.clone());
                 object_server.at(&path, item).await.unwrap();
