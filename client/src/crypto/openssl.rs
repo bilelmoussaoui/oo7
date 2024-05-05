@@ -157,7 +157,7 @@ pub(crate) fn verify_mac(data: impl AsRef<[u8]>, key: &Key, expected: impl AsRef
 
 pub(crate) fn verify_checksum_md5(digest: impl AsRef<[u8]>, content: impl AsRef<[u8]>) -> bool {
     memcmp::eq(
-        &*hash(MessageDigest::md5(), content.as_ref()).unwrap(),
+        &hash(MessageDigest::md5(), content.as_ref()).unwrap(),
         digest.as_ref(),
     )
 }
@@ -201,7 +201,7 @@ pub(crate) fn legacy_derive_key_and_iv(
         let mut digest = hasher.finish().unwrap();
 
         for _ in 1..iteration_count {
-            hasher.update(&*digest).unwrap();
+            hasher.update(&digest).unwrap();
             digest = hasher.finish().unwrap();
         }
 
@@ -213,7 +213,7 @@ pub(crate) fn legacy_derive_key_and_iv(
             break;
         }
 
-        hasher.update(&*digest).unwrap();
+        hasher.update(&digest).unwrap();
     }
 
     let iv = buffer.split_off(cipher.key_len());
