@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, zvariant::Type, PartialEq, Eq, Copy, Clone)]
 #[zvariant(signature = "s")]
@@ -19,11 +19,24 @@ impl Serialize for Algorithm {
         S: serde::Serializer,
     {
         match self {
-            Algorithm::Plain => String::serialize(&"plain".to_owned(), serializer),
-            Algorithm::Encrypted => String::serialize(
+            Self::Plain => String::serialize(&"plain".to_owned(), serializer),
+            Self::Encrypted => String::serialize(
                 &"dh-ietf1024-sha256-aes128-cbc-pkcs7".to_owned(),
                 serializer,
             ),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Algorithm {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        match String::deserialize(deserializer)?.as_str() {
+            "plain" => Ok(Self::Plain),
+            "dh-ietf1024-sha256-aes128-cbc-pkcs7" => Ok(Self::Encrypted),
+            e => Err(serde::de::Error::custom(format!("Invalid algorithm {e}"))),
         }
     }
 }
