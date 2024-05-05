@@ -244,7 +244,7 @@ mod tests {
         let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("fixtures")
             .join("legacy.keyring");
-        let blob = std::fs::read(&path)?;
+        let blob = std::fs::read(path)?;
         let keyring = Keyring::try_from(blob.as_slice())?;
         let password = b"test";
         let secret = Secret::from(password.to_vec());
