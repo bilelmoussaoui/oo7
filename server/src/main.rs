@@ -27,11 +27,12 @@ struct Args {
 #[tokio::main]
 async fn main() -> daemon::Result<()> {
     let args = Args::parse();
-    let mut password = String::new();
+    let mut password = None;
     tracing_subscriber::fmt::init();
 
     if args.login {
-        password = rpassword::prompt_password("Enter the login password: ").unwrap();
+        password = Some(rpassword::prompt_password("Enter the login password: ").unwrap());
+        // TODO fix this unwrap
     }
 
     tracing::info!("Starting {}", BINARY_NAME);
