@@ -46,7 +46,7 @@ mod test {
         let salt = &[0x92, 0xf4, 0xc0, 0x34, 0x0f, 0x5f, 0x36, 0xf9];
         let iteration_count = 1782;
         let password = b"test";
-        let (key, iv) = legacy_derive_key_and_iv(&password, Ok(()), &salt, iteration_count);
+        let (key, iv) = legacy_derive_key_and_iv(password, Ok(()), salt, iteration_count);
         assert_eq!(key.as_ref(), &expected_key[..]);
         assert_eq!(iv, &expected_iv[..]);
     }
