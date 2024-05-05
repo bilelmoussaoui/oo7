@@ -194,7 +194,7 @@ impl Keyring {
         let v0_path = api::Keyring::path(name, api::LEGACY_MAJOR_VERSION)?;
         if v0_path.exists() {
             #[cfg(feature = "tracing")]
-            tracing::debug!("Trying to load keyring file at {:?}", v0_path.as_ref());
+            tracing::debug!("Trying to load keyring file at {:?}", v0_path);
             match fs::File::open(&v0_path).await {
                 Err(err) => Err(err.into()),
                 Ok(mut file) => Self::migrate(&mut file, v1_path, secret).await,
