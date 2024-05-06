@@ -16,7 +16,11 @@ pub use key::Key;
 #[cfg(not(feature = "unstable"))]
 pub(crate) use key::Key;
 
+#[cfg(not(feature = "unstable"))]
 mod crypto;
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+pub mod crypto;
 pub mod dbus;
 pub mod portal;
 

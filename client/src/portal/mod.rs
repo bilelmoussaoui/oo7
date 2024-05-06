@@ -318,7 +318,7 @@ impl Keyring {
 
     /// Deletes item at the given index.
     ///
-    /// The `index` refers to the index of the [`Vec`](Vec) returned by
+    /// The `index` refers to the index of the [`Vec`] returned by
     /// [`items()`](Self::items). If the index does not exist, the functions
     /// returns an error.
     pub async fn delete_item_index(&self, index: usize) -> Result<(), Error> {
