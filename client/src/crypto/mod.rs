@@ -1,12 +1,19 @@
+//! Cryptographic primitives using either native crates or openssl.
 #[cfg(feature = "native_crypto")]
 mod native;
-#[cfg(feature = "native_crypto")]
+#[cfg(all(feature = "native_crypto", not(feature = "unstable")))]
 pub(crate) use native::*;
+#[cfg(all(feature = "native_crypto", feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+pub use native::*;
 
 #[cfg(feature = "openssl_crypto")]
 mod openssl;
-#[cfg(feature = "openssl_crypto")]
+#[cfg(all(feature = "openssl_crypto", not(feature = "unstable")))]
 pub(crate) use self::openssl::*;
+#[cfg(all(feature = "openssl_crypto", feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+pub use self::openssl::*;
 
 #[cfg(test)]
 mod test {

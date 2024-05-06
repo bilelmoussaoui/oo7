@@ -19,7 +19,7 @@ use crate::{portal, Key};
 const ENC_ALG: Nid = Nid::AES_128_CBC;
 const MAC_ALG: Nid = Nid::SHA256;
 
-pub(crate) fn encrypt(data: impl AsRef<[u8]>, key: &Key, iv: impl AsRef<[u8]>) -> Vec<u8> {
+pub fn encrypt(data: impl AsRef<[u8]>, key: &Key, iv: impl AsRef<[u8]>) -> Vec<u8> {
     let cipher = Cipher::from_nid(ENC_ALG).unwrap();
     let mut encryptor = Crypter::new(cipher, Mode::Encrypt, key.as_ref(), Some(iv.as_ref()))
         .expect("Invalid key or IV length");
@@ -131,7 +131,7 @@ pub(crate) fn generate_aes_key(
     okm
 }
 
-pub(crate) fn generate_iv() -> Vec<u8> {
+pub fn generate_iv() -> Vec<u8> {
     let mut buf = vec![0; iv_len()];
     // FIXME: should return an error?
     rand_bytes(&mut buf).unwrap();

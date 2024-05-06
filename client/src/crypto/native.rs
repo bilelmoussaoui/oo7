@@ -22,7 +22,7 @@ type EncAlg = cbc::Encryptor<aes::Aes128>;
 type DecAlg = cbc::Decryptor<aes::Aes128>;
 type MacAlg = hmac::Hmac<sha2::Sha256>;
 
-pub(crate) fn encrypt(data: impl AsRef<[u8]>, key: &Key, iv: impl AsRef<[u8]>) -> Vec<u8> {
+pub fn encrypt(data: impl AsRef<[u8]>, key: &Key, iv: impl AsRef<[u8]>) -> Vec<u8> {
     let mut blob = vec![0; data.as_ref().len() + EncAlg::block_size()];
 
     // Unwrapping since adding `CIPHER_BLOCK_SIZE` to array is enough space for
@@ -117,7 +117,7 @@ pub(crate) fn generate_aes_key(
     okm
 }
 
-pub(crate) fn generate_iv() -> Vec<u8> {
+pub fn generate_iv() -> Vec<u8> {
     EncAlg::generate_iv(cipher::rand_core::OsRng).to_vec()
 }
 

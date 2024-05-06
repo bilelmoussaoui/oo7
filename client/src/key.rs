@@ -39,15 +39,15 @@ impl Key {
         Self { key, strength }
     }
 
-    pub(crate) fn generate_private_key() -> Self {
+    pub fn generate_private_key() -> Self {
         Self::new(crypto::generate_private_key().to_vec())
     }
 
-    pub(crate) fn generate_public_key(private_key: &Self) -> Self {
+    pub fn generate_public_key(private_key: &Self) -> Self {
         Self::new(crypto::generate_public_key(private_key))
     }
 
-    pub(crate) fn generate_aes_key(private_key: &Self, server_public_key: &Self) -> Self {
+    pub fn generate_aes_key(private_key: &Self, server_public_key: &Self) -> Self {
         Self::new(crypto::generate_aes_key(private_key, server_public_key).to_vec())
     }
 }
