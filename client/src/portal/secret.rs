@@ -1,14 +1,16 @@
 //! Implementation of the XDG secret portal.
 //!
 //! This is a modified copy from ASHPD.
-use std::{
-    collections::HashMap,
-    io::Read,
-    os::{fd::AsFd, unix::net::UnixStream},
-};
+use std::{collections::HashMap, os::fd::AsFd};
 
+#[cfg(feature = "async-std")]
+use async_net::unix::UnixStream;
+#[cfg(feature = "async-std")]
+use futures_util::AsyncReadExt;
 use futures_util::StreamExt;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
+#[cfg(feature = "tokio")]
+use tokio::{io::AsyncReadExt, net::UnixStream};
 use zbus::{
     zvariant::{Fd, ObjectPath, OwnedValue, SerializeDict, Type},
     ProxyDefault,
@@ -158,13 +160,11 @@ pub async fn retrieve() -> Result<Secret, Error> {
         Err(e) => Err(e.into()),
     }?;
 
-    // FIXME Use async-std's (tokio's) UnixStream once
-    // https://github.com/async-rs/async-std/pull/1036 is in.
     let (mut x1, x2) = UnixStream::pair()?;
     proxy.retrieve_secret(&x2).await?;
     drop(x2);
     let mut buf = Vec::new();
-    x1.read_to_end(&mut buf)?;
+    x1.read_to_end(&mut buf).await?;
 
     #[cfg(feature = "tracing")]
     tracing::debug!("Secret received from the portal successfully");
