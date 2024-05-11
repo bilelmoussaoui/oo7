@@ -13,17 +13,17 @@ pub enum Algorithm {
     Encrypted,
 }
 
+const PLAIN_ALGORITHM: &str = "plain";
+const ENCRYPTED_ALGORITHM: &str = "dh-ietf1024-sha256-aes128-cbc-pkcs7";
+
 impl Serialize for Algorithm {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
         match self {
-            Self::Plain => String::serialize(&"plain".to_owned(), serializer),
-            Self::Encrypted => String::serialize(
-                &"dh-ietf1024-sha256-aes128-cbc-pkcs7".to_owned(),
-                serializer,
-            ),
+            Self::Plain => str::serialize(PLAIN_ALGORITHM, serializer),
+            Self::Encrypted => str::serialize(ENCRYPTED_ALGORITHM, serializer),
         }
     }
 }
@@ -34,8 +34,8 @@ impl<'de> Deserialize<'de> for Algorithm {
         D: serde::Deserializer<'de>,
     {
         match String::deserialize(deserializer)?.as_str() {
-            "plain" => Ok(Self::Plain),
-            "dh-ietf1024-sha256-aes128-cbc-pkcs7" => Ok(Self::Encrypted),
+            PLAIN_ALGORITHM => Ok(Self::Plain),
+            ENCRYPTED_ALGORITHM => Ok(Self::Encrypted),
             e => Err(serde::de::Error::custom(format!("Invalid algorithm {e}"))),
         }
     }
