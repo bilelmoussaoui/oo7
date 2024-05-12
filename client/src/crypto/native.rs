@@ -38,7 +38,7 @@ pub fn encrypt(data: impl AsRef<[u8]>, key: &Key, iv: impl AsRef<[u8]>) -> Vec<u
     blob
 }
 
-pub(crate) fn decrypt(
+pub fn decrypt(
     blob: impl AsRef<[u8]>,
     key: &Key,
     iv: impl AsRef<[u8]>,
