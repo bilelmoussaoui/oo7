@@ -3,6 +3,7 @@ mod error;
 mod item;
 mod prompt;
 mod secret;
+mod secret_exchange;
 mod service;
 mod service_manager;
 mod session;
