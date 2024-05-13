@@ -14,7 +14,7 @@ const PUBLIC: &str = "public";
 const IV: &str = "iv";
 
 #[derive(Debug)]
-struct SecretExchange {
+pub struct SecretExchange {
     private_key: Key,
     public_key: Key,
 }
