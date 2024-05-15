@@ -1,8 +1,10 @@
-// SecretExchange — Exchange secrets between processes in an unexposed way
+// SecretExchange: Exchange secrets between processes in an unexposed way.
 
-// In this implementation the payload is a HashMap.
-// Initial implementation uses a KeyFile.
-// Secret components (key, iv, ...) are base64 encoded before transit.
+// The initial implementation of SecretExchange/GCRSecretExchange uses a KeyFile
+// to encode/parse the payload. And in this implementation the payload is based
+// on a HashMap.
+// Before any transit operations the payload is base64 encoded and parsed into a
+// String.
 
 use std::collections::HashMap;
 
@@ -12,6 +14,7 @@ use oo7::{crypto, Key};
 const SECRET: &str = "secret";
 const PUBLIC: &str = "public";
 const IV: &str = "iv";
+const PROTOCOL: &str = "[sx-aes-1]\n";
 
 #[derive(Debug)]
 pub struct SecretExchange {
@@ -20,55 +23,52 @@ pub struct SecretExchange {
 }
 
 impl SecretExchange {
-    pub fn secret_exchange_begin(&self) -> HashMap<&str, String> {
-        let mut exchange: HashMap<&str, String> = HashMap::new();
-        exchange.insert(PUBLIC, BASE64_STANDARD.encode(&self.public_key));
+    // Creates the initial payload containing caller public_key
+    pub fn secret_exchange_begin(&self) -> String {
+        let map = HashMap::from([(PUBLIC, self.public_key.as_ref())]);
 
-        exchange
+        encode(&map)
     }
 
-    pub fn secret_exchange_receive(
-        &self,
-        exchange_in: HashMap<&str, String>,
-    ) -> Result<HashMap<&str, String>, base64::DecodeError> {
-        let mut exchange_out: HashMap<&str, String> = HashMap::new();
-        let secret = exchange_in.get(SECRET);
-        if !secret.is_none() {
-            let secret = BASE64_STANDARD.decode(secret.unwrap())?;
-            let public_key = BASE64_STANDARD.decode(exchange_in.get(PUBLIC).unwrap())?;
-            let public_key = Key::new(public_key);
-            let iv = BASE64_STANDARD.decode(exchange_in.get(IV).unwrap())?;
+    // Decrypt and retrieve secret
+    pub fn secret_exchange_receive(&self, exchange: &str) -> String {
+        let decoded = decode(exchange).unwrap();
+        let mut encrypted: Vec<u8> = Vec::new();
+        let mut map: HashMap<&str, &[u8]> = HashMap::new();
+
+        let secret = decoded.get(SECRET);
+        if secret.is_some() {
+            let secret = secret.unwrap();
+            let public_key = Key::new(decoded.get(PUBLIC).unwrap().to_vec());
+            let iv = decoded.get(IV).unwrap();
 
             let aes_key = Key::generate_aes_key(&self.private_key, &public_key);
-            let secret = crypto::decrypt(secret, &aes_key, &iv).to_vec();
+            encrypted = crypto::decrypt(secret, &aes_key, &iv).to_vec();
 
-            let secret = std::str::from_utf8(&secret).unwrap().to_string();
-
-            exchange_out.insert(SECRET, secret);
+            map.insert(SECRET, &encrypted);
         }
-        exchange_out.insert(PUBLIC, BASE64_STANDARD.encode(&self.public_key));
+        map.insert(PUBLIC, self.public_key.as_ref());
 
-        Ok(exchange_out)
+        encode(&map)
     }
 
-    pub fn secret_exchange_send(
-        &self,
-        secret: &str,
-        exchange: HashMap<&str, String>,
-    ) -> Result<HashMap<&str, String>, base64::DecodeError> {
-        let public_key = BASE64_STANDARD.decode(exchange.get(PUBLIC).unwrap())?;
-        let public_key = Key::new(public_key);
+    // Send Secret and perform encryption
+    pub fn secret_exchange_send(&self, secret: &str, exchange: &str) -> String {
+        let decoded = decode(exchange).unwrap();
 
+        let public_key = Key::new(decoded.get(PUBLIC).unwrap().to_vec());
         let aes_key = Key::generate_aes_key(&self.private_key, &public_key);
         let iv = crypto::generate_iv();
+
         let secret = crypto::encrypt(secret, &aes_key, &iv);
 
-        let mut exchange: HashMap<&str, String> = HashMap::new();
-        exchange.insert(SECRET, BASE64_STANDARD.encode(secret));
-        exchange.insert(PUBLIC, BASE64_STANDARD.encode(&self.public_key));
-        exchange.insert(IV, BASE64_STANDARD.encode(iv));
+        let map = HashMap::from([
+            (PUBLIC, self.public_key.as_ref()),
+            (SECRET, secret.as_ref()),
+            (IV, iv.as_ref()),
+        ]);
 
-        Ok(exchange)
+        encode(&map)
     }
 
     pub fn new() -> Self {
@@ -82,8 +82,42 @@ impl SecretExchange {
     }
 }
 
-pub fn get_secret(exchange: HashMap<&str, String>) -> String {
-    exchange.get(SECRET).unwrap().to_owned()
+// Convert a HashMap into a payload String
+fn encode(map: &HashMap<&str, &[u8]>) -> String {
+    let mut exchange = map
+        .iter()
+        .map(|(k, v)| format!("{}={}", k, BASE64_STANDARD.encode(v)))
+        .collect::<Vec<_>>()
+        .join("\n");
+    exchange.insert_str(0, PROTOCOL); // to add PROTOCOL prefix
+
+    exchange
+}
+
+// Convert a payload String into a HashMap
+fn decode(exchange: &str) -> Result<HashMap<&str, Vec<u8>>, base64::DecodeError> {
+    let (_, exchange) = exchange.split_once(PROTOCOL).unwrap(); // to remove PROTOCOL prefix
+    let pairs = exchange.split("\n").collect::<Vec<_>>();
+    let mut map: HashMap<&str, Vec<u8>> = HashMap::new();
+    let mut encoded: Vec<u8> = Vec::new();
+
+    for pair in pairs {
+        let (key, value) = pair.split_once("=").unwrap();
+        encoded = BASE64_STANDARD.decode(value)?;
+        map.insert(key, encoded);
+    }
+
+    Ok(map)
+}
+
+// Retrieve secret from the payload
+pub fn get_secret(exchange: &str) -> Result<String, std::str::Utf8Error> {
+    let decoded = decode(&exchange).unwrap();
+    let secret = std::str::from_utf8(&decoded.get(SECRET).unwrap().to_vec())?
+        .to_string()
+        .to_owned();
+
+    Ok(secret)
 }
 
 #[cfg(test)]
@@ -96,10 +130,10 @@ mod test {
         let caller = SecretExchange::new();
         let callee = SecretExchange::new();
         let exchange = caller.secret_exchange_begin();
-        let exchange = caller.secret_exchange_receive(exchange);
-        let exchange = callee.secret_exchange_send(secret, exchange.unwrap());
-        let exchange = caller.secret_exchange_receive(exchange.unwrap());
+        let exchange = caller.secret_exchange_receive(&exchange);
+        let exchange = callee.secret_exchange_send(secret, &exchange);
+        let exchange = caller.secret_exchange_receive(&exchange);
 
-        assert_eq!(get_secret(exchange.unwrap()), secret);
+        assert_eq!(get_secret(&exchange).unwrap(), secret);
     }
 }
