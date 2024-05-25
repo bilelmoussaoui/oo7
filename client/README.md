@@ -8,8 +8,7 @@ The library consists of two modules:
 
 - An implementation of the Secret Service specifications using [zbus](https://lib.rs/zbus). Which sends the secrets to a DBus implementation of the `org.freedesktop.Secrets` interface that stores them somewhere safe.
 
-- A file backend using the `org.freedesktop.portal.Secrets` portal to retrieve the service's key to encrypt the file with.
-The file format is compatible with [libsecret](https://gitlab.gnome.org/GNOME/libsecret/).
+- A file backend using the `org.freedesktop.portal.Secrets` portal to retrieve the service's key to encrypt the file with. The file format is compatible with [libsecret](https://gitlab.gnome.org/GNOME/libsecret/).
 
 Sandboxed applications should prefer using the file backend as it doesn't expose the application secrets to other sandboxed applications if they can talk to the `org.freedesktop.Secrets` service.
 
@@ -111,10 +110,7 @@ SOME_RUNTIME.block_on(async {
 
 ## How does it compare to other libraries?
 
-- [libsecret-rs](https://gitlab.gnome.org/World/Rust/libsecret-rs) provides Rust bindings of the C library [libsecret](https://gitlab.gnome.org/GNOME/libsecret/). The current main pain point with it is that
-it does assume things for you so it will either use the host or the sandbox file-based keyring which makes migrating your secrets
-to inside the sandbox a probably impossible task. There are also issues like <https://gitlab.gnome.org/GNOME/libsecret/-/issues/58>
-that makes it not usable inside the Flatpak sandbox.
+- [libsecret-rs](https://gitlab.gnome.org/World/Rust/libsecret-rs) provides Rust bindings of the C library [libsecret](https://gitlab.gnome.org/GNOME/libsecret/). The current main pain point with it is that it does assume things for you so it will either use the host or the sandbox file-based keyring which makes migrating your secrets to inside the sandbox a probably impossible task. There are also issues like <https://gitlab.gnome.org/GNOME/libsecret/-/issues/58> that makes it not usable inside the Flatpak sandbox.
 
 - [secret-service-rs](https://github.com/hwchen/secret-service-rs/) uses [zbus](https://lib.rs/zbus) internally as well but does provide a sync only API, hasn't seen an update in a while, doesn't integrate with [Secret portal](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.Secret.html) if sandboxed.
 
