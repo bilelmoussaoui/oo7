@@ -135,7 +135,7 @@ impl<'a> Item<'a> {
     #[doc(alias = "SetSecret")]
     pub async fn set_secret(&self, secret: &Secret<'_>) -> Result<(), Error> {
         self.inner()
-            .call_method("SetSecret", &(secret))
+            .call_method("SetSecret", &(secret,))
             .await
             .map_err::<ServiceError, _>(From::from)?;
         Ok(())
