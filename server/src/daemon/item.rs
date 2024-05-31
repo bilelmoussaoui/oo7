@@ -38,7 +38,7 @@ impl Item {
         &self,
         #[zbus(object_server)] object_server: &ObjectServer,
         #[zbus(signal_context)] ctxt: SignalContext<'_>,
-    ) -> Result<Prompt> {
+    ) -> Result<ObjectPath> {
         let inner = self.inner.read().await;
         let attributes = inner.attributes();
         self.keyring
@@ -47,7 +47,9 @@ impl Item {
             .map_err::<ServiceError, _>(From::from)?;
         object_server.remove::<Item, _>(self.path()).await?;
         Collection::item_deleted(&ctxt, self.path()).await?;
-        Ok(Prompt::default())
+
+        // returning an empty objectpath: "/" is enough here
+        Ok(ObjectPath::default())
     }
 
     #[zbus(name = "GetSecret")]
