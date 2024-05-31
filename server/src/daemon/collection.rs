@@ -60,7 +60,7 @@ impl Collection {
         secret: SecretInner,
         replace: bool,
         #[zbus(object_server)] object_server: &ObjectServer,
-    ) -> Result<(OwnedObjectPath, Prompt)> {
+    ) -> Result<(OwnedObjectPath, ObjectPath)> {
         let label = properties.label();
         let attributes = properties.attributes().unwrap();
 
@@ -95,8 +95,6 @@ impl Collection {
             .map_err::<ServiceError, _>(From::from)?;
         *self.item_counter.write().await += 1;
 
-        let prompt = Prompt::default(); // temp Prompt
-
         let item = super::item::Item::new(
             item,
             parameters,
@@ -111,8 +109,20 @@ impl Collection {
         self.items.write().await.push(item.clone());
         object_server.at(&path, item).await.unwrap();
 
+        // perform prompt
+        self.manager.lock().unwrap().update_prompts_counter();
+        let prompt = Prompt::new(
+            Arc::clone(&self.manager),
+            self.manager.lock().unwrap().prompts_counter(),
+        );
+        object_server
+            .at(prompt.path().to_owned(), prompt.to_owned())
+            .await?;
+
+        // signal
         Self::item_created(&ctxt, path.as_ref()).await?;
-        Ok((path, prompt))
+
+        Ok((path, prompt.path().to_owned()))
     }
 
     #[zbus(property, name = "Items")]

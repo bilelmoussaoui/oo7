@@ -88,7 +88,7 @@ impl Service {
         properties: Properties,
         alias: &str,
         #[zbus(object_server)] object_server: &ObjectServer,
-    ) -> Result<(OwnedObjectPath, Prompt)> {
+    ) -> Result<(OwnedObjectPath, ObjectPath)> {
         let collection = Collection::new(
             properties.label(),
             alias,
@@ -102,11 +102,23 @@ impl Service {
 
         let path = OwnedObjectPath::from(collection.path());
         object_server.at(&path, collection).await?;
-        let prompt = Prompt::default(); // temp Prompt
+
+        // perform prompt
+        self.manager.lock().unwrap().update_prompts_counter();
+        let prompt = Prompt::new(
+            Arc::clone(&self.manager),
+            self.manager.lock().unwrap().prompts_counter(),
+        );
+        object_server
+            .at(prompt.path().to_owned(), prompt.to_owned())
+            .await?;
+
+        // signal
         Self::collection_created(&ctxt, path.as_ref())
             .await
             .map_err::<ServiceError, _>(From::from)?;
-        Ok((path, prompt))
+
+        Ok((path, prompt.path().to_owned()))
     }
 
     #[zbus(out_args("unlocked", "locked"))]
@@ -126,8 +138,6 @@ impl Service {
         for item in items {
             let attributes = item.attributes();
             if attributes.get("locked").is_some() {
-                // this if condition is probably wrong
-                // how to access &AttributeValue value
                 locked.push(item)
             } else {
                 unlocked.push(item)
@@ -140,11 +150,11 @@ impl Service {
     #[zbus(out_args("unlocked", "prompt"))]
     pub async fn unlock(
         &mut self,
-        #[zbus(signal_context)] ctxt: SignalContext<'_>,
         objects: Vec<OwnedObjectPath>,
-    ) -> Result<(Vec<OwnedObjectPath>, Prompt)> {
-        // manage unlock state in memory
-        // when do we need to prompt?
+        #[zbus(signal_context)] ctxt: SignalContext<'_>,
+        #[zbus(object_server)] object_server: &zbus::ObjectServer,
+    ) -> Result<(Vec<OwnedObjectPath>, ObjectPath)> {
+        // manages unlock state in memory
         let mut unlocked: Vec<OwnedObjectPath> = Vec::new();
 
         'main: for object in objects {
@@ -164,9 +174,17 @@ impl Service {
             unlocked.push(OwnedObjectPath::default());
         }
 
-        let prompt = Prompt::default(); // temporarily
+        // perform prompt
+        self.manager.lock().unwrap().update_prompts_counter();
+        let prompt = Prompt::new(
+            Arc::clone(&self.manager),
+            self.manager.lock().unwrap().prompts_counter(),
+        );
+        object_server
+            .at(prompt.path().to_owned(), prompt.to_owned())
+            .await?;
 
-        Ok((unlocked, prompt))
+        Ok((unlocked, prompt.path().to_owned()))
     }
 
     #[zbus(out_args("locked", "prompt"))]
@@ -174,9 +192,8 @@ impl Service {
         &mut self,
         #[zbus(signal_context)] ctxt: SignalContext<'_>,
         objects: Vec<OwnedObjectPath>,
-    ) -> Result<(Vec<OwnedObjectPath>, Prompt)> {
+    ) -> Result<(Vec<OwnedObjectPath>, ObjectPath)> {
         // manage lock state in memory
-        // when do we need to prompt?
         let mut locked: Vec<OwnedObjectPath> = Vec::new();
 
         for object in objects {
@@ -192,7 +209,9 @@ impl Service {
             locked.push(OwnedObjectPath::default());
         }
 
-        let prompt = Prompt::default(); // temporarily
+        self.manager.lock().unwrap().update_prompts_counter();
+        // returning "/" object path is enough as the prompt here
+        let prompt = ObjectPath::default();
 
         Ok((locked, prompt))
     }
