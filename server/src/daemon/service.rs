@@ -287,7 +287,6 @@ impl Service {
 
 impl Service {
     pub async fn new(password: Option<String>) -> Self {
-        let path = format!("{}/{}", env::var("HOME").unwrap(), LOGIN_KEYRING_PATH);
         let secret = match password {
             Some(pwd) => Secret::from(pwd.into_bytes()),
             None => panic!("Login password can't be empty."),
@@ -295,7 +294,7 @@ impl Service {
 
         Self {
             collections: Arc::new(RwLock::new(Vec::new())),
-            keyring: Arc::new(Keyring::load(path, secret).await.unwrap()),
+            keyring: Arc::new(Keyring::open(LOGIN_KEYRING, secret).await.unwrap()),
             cnx: Default::default(),
             manager: Arc::new(Mutex::new(ServiceManager::default())),
             sessions_counter: Arc::new(RwLock::new(0)),
