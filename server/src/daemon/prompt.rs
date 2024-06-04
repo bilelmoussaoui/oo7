@@ -37,7 +37,7 @@ pub struct Prompt {
 impl Prompt {
     pub async fn prompt(
         &self,
-        window_id: Option<&str>,
+        window_id: &str,
         #[zbus(object_server)] object_server: &zbus::ObjectServer,
         #[zbus(connection)] connection: &zbus::Connection,
     ) -> fdo::Result<()> {
