@@ -1,17 +1,23 @@
 // org.gnome.keyring.Prompter
 // https://gitlab.gnome.org/GNOME/gcr/-/blob/master/gcr/org.gnome.keyring.Prompter.xml
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
+use tokio;
 use zbus::{
-    fdo, interface, proxy,
+    fdo, interface,
+    message::Header,
+    proxy,
     zvariant::{
         self, DeserializeDict, ObjectPath, OwnedObjectPath, OwnedValue, SerializeDict, Type,
     },
-    SignalContext,
+    Connection, SignalContext,
 };
 
-use super::secret_exchange;
+use super::{secret_exchange, service_manager::ServiceManager};
 
 // May be change this to /org/oo7_daemon/Prompt
 const SECRET_PROMPTER_PREFIX: &str = "/org/gnome/keyring/Prompt/";
@@ -32,7 +38,7 @@ pub struct Properties {
     #[zvariant(rename = "cancel-label")]
     cancel_label: Option<String>,
     #[zvariant(rename = "choice-chosen")]
-    choice_chosen: Option<String>,
+    choice_chosen: Option<bool>,
     #[zvariant(rename = "password-new")]
     password_new: Option<bool>,
     #[zvariant(rename = "password-strength")]
@@ -43,6 +49,7 @@ pub struct Properties {
 
 #[derive(Clone, Debug)]
 pub struct PrompterCallback {
+    properties: Arc<Mutex<Properties>>,
     path: OwnedObjectPath,
 }
 
@@ -53,8 +60,57 @@ impl PrompterCallback {
         reply: &str,            // the purpose of this?
         properties: Properties, // this should probably be &mut Properties
         exchange: &str,         // this should probably be &mut String
+        #[zbus(connection)] connection: &zbus::Connection,
+        #[zbus(header)] header: Header<'_>,
     ) -> fdo::Result<()> {
-        // TODO: add implementation
+        println!("prompter: {}", header.path().unwrap());
+
+        let mut properties = properties.clone();
+
+        if header.path().unwrap().as_str().to_string().contains("/u") {
+            // setting properties related to Secret.Service.Unlock
+            properties.continue_label = Some(String::from("Unlock"));
+            properties.warning = Some(String::new());
+            properties.choice_chosen = Some(true);
+            properties.description = Some(String::from(
+                "An application wants access to the keyring \"login\", but it is locked.",
+            ));
+            properties.title = Some(String::from("Unlock Keyring"));
+            properties.message = Some(String::from("Authentication required"));
+            properties.choice_label = Some(String::from(
+                "Automatically unlock this keyring whenever I'm logged in",
+            ));
+            properties.caller_window = Some(String::new());
+            properties.cancel_label = Some(String::from("Cancel"));
+        } else {
+            // setting properties related to Secret.Service.CreateCollection
+            properties.continue_label = Some(String::from("Continue"));
+            properties.warning = Some(String::new());
+            properties.choice_chosen = Some(false);
+            properties.description = Some(String::from(
+                "An application wants to create a new keyring. Choose the password you want to use for it.",
+            ));
+            properties.title = Some(String::new());
+            properties.message = Some(String::from("Choose password for new keyring"));
+            properties.choice_label = Some(String::new());
+            properties.caller_window = Some(String::new());
+            properties.cancel_label = Some(String::from("Cancel"));
+            properties.password_new = Some(true);
+        }
+
+        *self.properties.lock().unwrap() = properties.clone();
+
+        let path = Arc::new(header.path().unwrap().to_owned());
+        let exchange = exchange.to_string();
+        let connection = Arc::new(connection.to_owned());
+
+        tokio::spawn(async move {
+            let prompter = PrompterProxy::new(&connection).await.unwrap();
+            prompter
+                .perform_prompt(&path, "password", properties, exchange)
+                .await
+                .unwrap();
+        });
 
         Ok(())
     }
@@ -69,13 +125,23 @@ impl PrompterCallback {
 }
 
 impl PrompterCallback {
-    pub fn new(prompts_counter: i32) -> Self {
-        Self {
-            path: OwnedObjectPath::try_from(format!(
-                "{}p{}",
-                SECRET_PROMPTER_PREFIX, prompts_counter
+    pub fn new(post_fix: Option<&str>, prompts_counter: i32) -> Self {
+        let path = if post_fix.is_some() {
+            OwnedObjectPath::try_from(format!(
+                "{}{}{}",
+                SECRET_PROMPTER_PREFIX,
+                post_fix.unwrap(),
+                prompts_counter
             ))
-            .unwrap(),
+            .unwrap()
+        } else {
+            OwnedObjectPath::try_from(format!("{}p{}", SECRET_PROMPTER_PREFIX, prompts_counter))
+                .unwrap()
+        };
+
+        Self {
+            properties: Arc::new(Mutex::new(Properties::default())),
+            path: path,
         }
     }
 
@@ -97,9 +163,9 @@ pub trait Prompter {
     fn perform_prompt(
         &self,
         callback: &ObjectPath<'_>,
-        type_: &str,             // 'password' or 'confirm', put this in Enum?
-        properties: &Properties, // probably should be &mut
-        exchange: &str,          // this should probably be &mut String
+        type_: &str, // 'password' or 'confirm', put this in Enum?
+        properties: Properties,
+        exchange: String, // this should probably be &mut String
     ) -> zbus::Result<()>;
 
     fn stop_prompting(&self, callback: &ObjectPath<'_>) -> zbus::Result<()>;

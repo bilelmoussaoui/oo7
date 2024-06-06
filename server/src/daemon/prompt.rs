@@ -7,10 +7,13 @@ use std::{
 
 use oo7::portal::{Keyring, Secret};
 use serde::{Serialize, Serializer};
+use tokio;
 use zbus::{
-    fdo, interface, proxy,
+    fdo, interface,
+    message::Header,
+    proxy,
     zvariant::{self, DeserializeDict, ObjectPath, OwnedObjectPath, SerializeDict, Type, Value},
-    SignalContext,
+    Connection, SignalContext,
 };
 
 use super::{
@@ -40,43 +43,32 @@ impl Prompt {
         window_id: &str,
         #[zbus(object_server)] object_server: &zbus::ObjectServer,
         #[zbus(connection)] connection: &zbus::Connection,
+        #[zbus(header)] header: Header<'_>,
     ) -> fdo::Result<()> {
-        // implementation : WIP
-        let callback = PrompterCallback::new(self.manager.lock().unwrap().prompts_counter());
+        println!("prompt: {}", header.path().unwrap());
+
+        let post_fix = if header.path().unwrap().as_str().to_string().contains("/u") {
+            Some("u")
+        } else {
+            None
+        };
+
+        let callback =
+            PrompterCallback::new(post_fix, self.manager.lock().unwrap().prompts_counter());
         object_server
             .at(callback.path().to_owned(), callback.to_owned())
             .await
             .unwrap();
 
-        let prompter = PrompterProxy::new(&connection).await?;
-        prompter.begin_prompting(&callback.path()).await?;
+        let connection = Arc::new(connection.to_owned());
 
-        let mut properties = Properties::default();
-        let se = SecretExchange::new();
-        let exchange = se.secret_exchange_begin();
+        // calling begin_prompting which start the UI Prompt
+        tokio::spawn(async move {
+            let prompter = PrompterProxy::new(&connection).await.unwrap();
+            prompter.begin_prompting(&callback.path()).await.unwrap();
+        });
 
-        callback
-            .prompt_ready("yes", properties.to_owned(), &exchange)
-            .await?;
-        prompter
-            .perform_prompt(&callback.path(), "password", &properties, &exchange)
-            .await?;
-        callback
-            .prompt_ready("yes", properties.to_owned(), &exchange)
-            .await?;
-
-        let secret = Secret::from(get_secret(&exchange).unwrap().into_bytes());
-
-        // do we need a way to identify what is the purpose of each prompt?
-        // for an example, if a prompt generated for Service:Unlock
-        // we can try to verify the secret (input) by calling Keyring::load
-
-        match Keyring::load(LOGIN_KEYRING_PATH, secret).await {
-            Ok(_) => todo!(),
-            Err(_) => todo!(),
-        }
-
-        prompter.stop_prompting(&callback.path()).await?;
+        // TODO: call stop_prompting
 
         Ok(())
     }
@@ -106,13 +98,28 @@ impl Prompt {
 }
 
 impl Prompt {
-    pub fn new(manager: Arc<Mutex<ServiceManager>>, prompts_counter: i32) -> Self {
-        Self {
-            path: OwnedObjectPath::try_from(format!(
-                "{}p{}",
-                SECRET_PROMPT_PREFIX, prompts_counter
+    pub fn new(
+        manager: Arc<Mutex<ServiceManager>>,
+        prompts_counter: i32,
+        post_fix: Option<&str>,
+    ) -> Self {
+        // if the Prompt::new() is coming from Unlock, we use a postfix 'u'
+        let path = if post_fix.is_some() {
+            OwnedObjectPath::try_from(format!(
+                "{}{}{}",
+                SECRET_PROMPT_PREFIX,
+                post_fix.unwrap(),
+                prompts_counter
             ))
-            .unwrap(),
+            .unwrap()
+        // otherwise "p"
+        } else {
+            OwnedObjectPath::try_from(format!("{}p{}", SECRET_PROMPT_PREFIX, prompts_counter))
+                .unwrap()
+        };
+
+        Self {
+            path: path,
             manager,
         }
     }
