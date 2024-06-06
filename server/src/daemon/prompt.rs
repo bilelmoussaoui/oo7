@@ -42,7 +42,7 @@ impl Prompt {
         #[zbus(connection)] connection: &zbus::Connection,
     ) -> fdo::Result<()> {
         // implementation : WIP
-        let callback = PrompterCallback::new();
+        let callback = PrompterCallback::new(self.manager.lock().unwrap().prompts_counter());
         object_server
             .at(callback.path().to_owned(), callback.to_owned())
             .await
