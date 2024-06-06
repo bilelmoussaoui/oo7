@@ -16,4 +16,4 @@ serde.workspace = true
 tokio = { workspace = true, features = ["full"] } # look for specific features
 tracing = "0.1"
 tracing-subscriber.workspace = true
-zbus.workspace = true
+zbus = { workspace = true, features = ["tokio"] }
