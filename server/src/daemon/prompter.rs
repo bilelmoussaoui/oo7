@@ -13,6 +13,7 @@ use zbus::{
 
 use super::secret_exchange;
 
+// May be change this to /org/oo7_daemon/Prompt
 const SECRET_PROMPTER_PREFIX: &str = "/org/gnome/keyring/Prompt/";
 
 #[derive(Clone, Default, DeserializeDict, Debug, Type, SerializeDict)]
@@ -68,10 +69,13 @@ impl PrompterCallback {
 }
 
 impl PrompterCallback {
-    pub fn new() -> Self {
+    pub fn new(prompts_counter: i32) -> Self {
         Self {
-            // temporarily using count 1
-            path: OwnedObjectPath::try_from(format!("{}p{}", SECRET_PROMPTER_PREFIX, 1)).unwrap(),
+            path: OwnedObjectPath::try_from(format!(
+                "{}p{}",
+                SECRET_PROMPTER_PREFIX, prompts_counter
+            ))
+            .unwrap(),
         }
     }
 
