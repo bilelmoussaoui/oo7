@@ -114,6 +114,7 @@ impl Collection {
         let prompt = Prompt::new(
             Arc::clone(&self.manager),
             self.manager.lock().unwrap().prompts_counter(),
+            None,
         );
         object_server
             .at(prompt.path().to_owned(), prompt.to_owned())

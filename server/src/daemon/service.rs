@@ -108,6 +108,7 @@ impl Service {
         let prompt = Prompt::new(
             Arc::clone(&self.manager),
             self.manager.lock().unwrap().prompts_counter(),
+            None,
         );
         object_server
             .at(prompt.path().to_owned(), prompt.to_owned())
@@ -175,10 +176,11 @@ impl Service {
         }
 
         // perform prompt
-        self.manager.lock().unwrap().update_prompts_counter();
+        let lock: () = self.manager.lock().unwrap().update_prompts_counter();
         let prompt = Prompt::new(
             Arc::clone(&self.manager),
             self.manager.lock().unwrap().prompts_counter(),
+            Some("u"),
         );
         object_server
             .at(prompt.path().to_owned(), prompt.to_owned())
