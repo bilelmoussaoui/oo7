@@ -211,7 +211,6 @@ impl Service {
             locked.push(OwnedObjectPath::default());
         }
 
-        self.manager.lock().unwrap().update_prompts_counter();
         // returning "/" object path is enough as the prompt here
         let prompt = ObjectPath::default();
 
