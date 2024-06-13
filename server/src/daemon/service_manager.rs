@@ -27,7 +27,8 @@ impl ServiceManager {
         *self.prompts_counter.read().unwrap()
     }
 
-    pub fn update_prompts_counter(&mut self) {
+    pub fn update_prompts_counter(&mut self) -> i32 {
         *self.prompts_counter.write().unwrap() += 1;
+        *self.prompts_counter.read().unwrap()
     }
 }
