@@ -6,6 +6,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use serde::{Serialize, Serializer};
 use tokio;
 use zbus::{
     fdo, interface,
@@ -17,7 +18,7 @@ use zbus::{
     Connection, SignalContext,
 };
 
-use super::{secret_exchange, service_manager::ServiceManager};
+use super::{secret_exchange::SecretExchange, service_manager::ServiceManager};
 
 // May be change this to /org/oo7_daemon/Prompt
 const SECRET_PROMPTER_PREFIX: &str = "/org/gnome/keyring/Prompt/";
@@ -49,7 +50,7 @@ pub struct Properties {
 
 #[derive(Clone, Debug)]
 pub struct PrompterCallback {
-    properties: Arc<Mutex<Properties>>,
+    manager: Arc<Mutex<ServiceManager>>,
     path: OwnedObjectPath,
 }
 
@@ -57,15 +58,19 @@ pub struct PrompterCallback {
 impl PrompterCallback {
     pub async fn prompt_ready(
         &self,
-        reply: &str,            // the purpose of this?
-        properties: Properties, // this should probably be &mut Properties
-        exchange: &str,         // this should probably be &mut String
+        reply: &str, // the purpose of this?
+        properties: Properties,
+        exchange: &str,
         #[zbus(connection)] connection: &zbus::Connection,
         #[zbus(header)] header: Header<'_>,
     ) -> fdo::Result<()> {
         println!("prompter: {}", header.path().unwrap());
 
         let mut properties = properties.clone();
+
+        let secret_exchange = SecretExchange::new();
+        let oo7_exchange = secret_exchange.begin();
+        println!("oo7_exchange: {}", oo7_exchange);
 
         if header.path().unwrap().as_str().to_string().contains("/u") {
             // setting properties related to Secret.Service.Unlock
@@ -98,19 +103,34 @@ impl PrompterCallback {
             properties.password_new = Some(true);
         }
 
-        *self.properties.lock().unwrap() = properties.clone();
+        let arced_path = Arc::new(header.path().unwrap().to_owned());
+        let path = Arc::clone(&arced_path);
+        let pt = Arc::clone(&arced_path);
+        let arced_connection = Arc::new(connection.to_owned());
+        let con = Arc::clone(&arced_connection);
 
-        let path = Arc::new(header.path().unwrap().to_owned());
-        let exchange = exchange.to_string();
-        let connection = Arc::new(connection.to_owned());
+        // self.manager.lock().unwrap().exchange = Arc::clone(&exchange); // todo:
+        // setter
 
-        tokio::spawn(async move {
-            let prompter = PrompterProxy::new(&connection).await.unwrap();
+        let perform_prompt_handle = tokio::spawn(async move {
+            let prompter = PrompterProxy::new(&Arc::clone(&arced_connection))
+                .await
+                .unwrap();
             prompter
-                .perform_prompt(&path, "password", properties, exchange)
+                .perform_prompt(&path, "password", properties, &oo7_exchange)
                 .await
                 .unwrap();
         });
+
+        // wip
+        if perform_prompt_handle.is_finished() {
+            tokio::spawn(async move {
+                let prompter = PrompterProxy::new(&con).await.unwrap();
+                prompter.stop_prompting(&pt).await.unwrap();
+            });
+        }
+
+        println!("end");
 
         Ok(())
     }
@@ -118,30 +138,47 @@ impl PrompterCallback {
     pub async fn prompt_done(
         &self,
         #[zbus(object_server)] object_server: &zbus::ObjectServer,
+        #[zbus(connection)] connection: &zbus::Connection,
+        #[zbus(header)] header: Header<'_>,
     ) -> fdo::Result<()> {
+        let connection = Arc::new(connection.to_owned());
+        let path = Arc::new(header.path().unwrap().to_owned());
+        println!("prompt_done: path: {}", path);
+
+        // tokio::spawn(async move {
+        // let prompter = PrompterProxy::new(&connection).await.unwrap();
+        // prompter.stop_prompting(&path).await.unwrap();
+        // });
+
         object_server.remove::<Self, _>(&self.path).await?;
         Ok(())
     }
 }
 
 impl PrompterCallback {
-    pub fn new(post_fix: Option<&str>, prompts_counter: i32) -> Self {
-        let path = if post_fix.is_some() {
-            OwnedObjectPath::try_from(format!(
-                "{}{}{}",
-                SECRET_PROMPTER_PREFIX,
-                post_fix.unwrap(),
-                prompts_counter
-            ))
-            .unwrap()
-        } else {
-            OwnedObjectPath::try_from(format!("{}p{}", SECRET_PROMPTER_PREFIX, prompts_counter))
-                .unwrap()
-        };
+    pub fn for_unlock(manager: Arc<Mutex<ServiceManager>>) -> Self {
+        let counter = manager.lock().unwrap().prompts_counter();
 
         Self {
-            properties: Arc::new(Mutex::new(Properties::default())),
-            path: path,
+            path: OwnedObjectPath::try_from(format!(
+                "{}{}{}",
+                SECRET_PROMPTER_PREFIX, "u", counter
+            ))
+            .unwrap(),
+            manager,
+        }
+    }
+
+    pub fn for_new_collection(manager: Arc<Mutex<ServiceManager>>) -> Self {
+        let counter = manager.lock().unwrap().prompts_counter();
+
+        Self {
+            path: OwnedObjectPath::try_from(format!(
+                "{}{}{}",
+                SECRET_PROMPTER_PREFIX, "p", counter
+            ))
+            .unwrap(),
+            manager,
         }
     }
 
@@ -165,7 +202,7 @@ pub trait Prompter {
         callback: &ObjectPath<'_>,
         type_: &str, // 'password' or 'confirm', put this in Enum?
         properties: Properties,
-        exchange: String, // this should probably be &mut String
+        exchange: &str,
     ) -> zbus::Result<()>;
 
     fn stop_prompting(&self, callback: &ObjectPath<'_>) -> zbus::Result<()>;

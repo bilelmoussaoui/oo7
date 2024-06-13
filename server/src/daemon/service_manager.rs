@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::RwLock};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex, RwLock},
+};
 
 use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 
@@ -8,6 +11,7 @@ use super::session::Session;
 pub struct ServiceManager {
     sessions: HashMap<OwnedObjectPath, Session>,
     prompts_counter: RwLock<i32>,
+    pub exchange: Arc<Mutex<String>>,
 }
 
 impl ServiceManager {
