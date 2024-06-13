@@ -45,7 +45,7 @@ impl Prompt {
         #[zbus(connection)] connection: &zbus::Connection,
         #[zbus(header)] header: Header<'_>,
     ) -> fdo::Result<()> {
-        println!("prompt: {}", header.path().unwrap());
+        tracing::info!("Prompt created: {}", self.path());
 
         let post_fix = if header.path().unwrap().as_str().to_string().contains("/u") {
             Some("u")
@@ -79,6 +79,7 @@ impl Prompt {
         #[zbus(signal_context)] ctxt: SignalContext<'_>,
     ) -> fdo::Result<()> {
         object_server.remove::<Self, _>(&self.path).await?;
+        tracing::info!("Prompt dismissed: {}", self.path);
 
         // signal
         Self::completed(&ctxt).await?;

@@ -73,6 +73,7 @@ impl Service {
         object_server
             .at(session.path().to_owned(), session.to_owned())
             .await?;
+        tracing::info!("Session created: {}", session.path());
 
         let key = service_public_key
             .map(|k| OwnedValue::from(&k))
@@ -102,6 +103,7 @@ impl Service {
 
         let path = OwnedObjectPath::from(collection.path());
         object_server.at(&path, collection).await?;
+        tracing::info!("Collection: created: {}", path);
 
         // perform prompt
         self.manager.lock().unwrap().update_prompts_counter();
