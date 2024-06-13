@@ -99,24 +99,20 @@ impl Prompt {
 }
 
 impl Prompt {
-    pub fn new(
-        manager: Arc<Mutex<ServiceManager>>,
-        prompts_counter: i32,
-        post_fix: Option<&str>,
-    ) -> Self {
+    pub fn new(manager: Arc<Mutex<ServiceManager>>, post_fix: Option<&str>) -> Self {
+        let counter = manager.lock().unwrap().update_prompts_counter();
         // if the Prompt::new() is coming from Unlock, we use a postfix 'u'
         let path = if post_fix.is_some() {
             OwnedObjectPath::try_from(format!(
                 "{}{}{}",
                 SECRET_PROMPT_PREFIX,
                 post_fix.unwrap(),
-                prompts_counter
+                counter
             ))
             .unwrap()
         // otherwise "p"
         } else {
-            OwnedObjectPath::try_from(format!("{}p{}", SECRET_PROMPT_PREFIX, prompts_counter))
-                .unwrap()
+            OwnedObjectPath::try_from(format!("{}p{}", SECRET_PROMPT_PREFIX, counter)).unwrap()
         };
 
         Self {
