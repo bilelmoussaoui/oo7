@@ -113,12 +113,7 @@ impl Collection {
         object_server.at(&path, item).await.unwrap();
 
         // perform prompt
-        self.manager.lock().unwrap().update_prompts_counter();
-        let prompt = Prompt::new(
-            Arc::clone(&self.manager),
-            self.manager.lock().unwrap().prompts_counter(),
-            None,
-        );
+        let prompt = Prompt::new(Arc::clone(&self.manager), None);
         object_server
             .at(prompt.path().to_owned(), prompt.to_owned())
             .await?;

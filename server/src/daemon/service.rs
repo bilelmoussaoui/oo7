@@ -106,12 +106,7 @@ impl Service {
         tracing::info!("Collection: created: {}", path);
 
         // perform prompt
-        self.manager.lock().unwrap().update_prompts_counter();
-        let prompt = Prompt::new(
-            Arc::clone(&self.manager),
-            self.manager.lock().unwrap().prompts_counter(),
-            None,
-        );
+        let prompt = Prompt::new(Arc::clone(&self.manager), None);
         object_server
             .at(prompt.path().to_owned(), prompt.to_owned())
             .await?;
@@ -178,12 +173,7 @@ impl Service {
         }
 
         // perform prompt
-        let lock: () = self.manager.lock().unwrap().update_prompts_counter();
-        let prompt = Prompt::new(
-            Arc::clone(&self.manager),
-            self.manager.lock().unwrap().prompts_counter(),
-            Some("u"),
-        );
+        let prompt = Prompt::new(Arc::clone(&self.manager), Some("u"));
         object_server
             .at(prompt.path().to_owned(), prompt.to_owned())
             .await?;
