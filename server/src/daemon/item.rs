@@ -47,6 +47,7 @@ impl Item {
             .map_err::<ServiceError, _>(From::from)?;
         object_server.remove::<Item, _>(self.path()).await?;
         Collection::item_deleted(&ctxt, self.path()).await?;
+        tracing::info!("Item: deleted: {}", self.path());
 
         // returning an empty objectpath: "/" is enough here
         Ok(ObjectPath::default())
