@@ -24,6 +24,8 @@ impl Session {
     ) -> fdo::Result<()> {
         self.manager.lock().unwrap().remove_session(self.path());
         object_server.remove::<Self, _>(&self.path).await?;
+        tracing::info!("Session closed: {}", self.path);
+
         Ok(())
     }
 }
