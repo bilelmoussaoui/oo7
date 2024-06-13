@@ -43,6 +43,8 @@ impl Collection {
     ) -> Result<Prompt> {
         let _ = object_server.remove::<Self, _>(&self.path).await;
         Service::collection_deleted(&ctxt, self.path.as_ref()).await?;
+        tracing::info!("Collection deleted: {}", self.path);
+
         Ok(Prompt::default())
     }
 
@@ -106,6 +108,7 @@ impl Collection {
         )
         .await;
         let path = OwnedObjectPath::from(item.path());
+        tracing::info!("Item: created: {}", path);
         self.items.write().await.push(item.clone());
         object_server.at(&path, item).await.unwrap();
 
