@@ -23,16 +23,23 @@ use super::{
 };
 use crate::{LOGIN_KEYRING, LOGIN_KEYRING_PATH, SECRET_PROMPT_PREFIX};
 
+#[derive(Clone, Debug)]
+pub enum PromptSource {
+    Unlock,
+    NewCollection,
+}
+
 #[derive(Default, DeserializeDict, Debug, Type, SerializeDict)]
 #[zvariant(signature = "dict")]
 pub struct PromptResult {
     path: OwnedObjectPath,
 }
 
-#[derive(Clone, Debug, Default, zvariant::Type)]
+#[derive(Clone, Debug, zvariant::Type)]
 #[zvariant(signature = "o")]
 pub struct Prompt {
     manager: Arc<Mutex<ServiceManager>>,
+    source: PromptSource,
     path: OwnedObjectPath,
 }
 
@@ -47,14 +54,12 @@ impl Prompt {
     ) -> fdo::Result<()> {
         tracing::info!("Prompt created: {}", self.path());
 
-        let post_fix = if header.path().unwrap().as_str().to_string().contains("/u") {
-            Some("u")
-        } else {
-            None
-        };
-
-        let callback =
-            PrompterCallback::new(post_fix, self.manager.lock().unwrap().prompts_counter());
+        let callback: PrompterCallback =
+            if header.path().unwrap().as_str().to_string().contains("/u") {
+                PrompterCallback::for_unlock(Arc::clone(&self.manager))
+            } else {
+                PrompterCallback::for_new_collection(Arc::clone(&self.manager))
+            };
         object_server
             .at(callback.path().to_owned(), callback.to_owned())
             .await
@@ -99,24 +104,24 @@ impl Prompt {
 }
 
 impl Prompt {
-    pub fn new(manager: Arc<Mutex<ServiceManager>>, post_fix: Option<&str>) -> Self {
+    pub fn for_unlock(manager: Arc<Mutex<ServiceManager>>) -> Self {
         let counter = manager.lock().unwrap().update_prompts_counter();
-        // if the Prompt::new() is coming from Unlock, we use a postfix 'u'
-        let path = if post_fix.is_some() {
-            OwnedObjectPath::try_from(format!(
-                "{}{}{}",
-                SECRET_PROMPT_PREFIX,
-                post_fix.unwrap(),
-                counter
-            ))
-            .unwrap()
-        // otherwise "p"
-        } else {
-            OwnedObjectPath::try_from(format!("{}p{}", SECRET_PROMPT_PREFIX, counter)).unwrap()
-        };
 
         Self {
-            path: path,
+            path: OwnedObjectPath::try_from(format!("{}{}{}", SECRET_PROMPT_PREFIX, "u", counter))
+                .unwrap(),
+            source: PromptSource::Unlock,
+            manager,
+        }
+    }
+
+    pub fn for_new_collection(manager: Arc<Mutex<ServiceManager>>) -> Self {
+        let counter = manager.lock().unwrap().update_prompts_counter();
+
+        Self {
+            path: OwnedObjectPath::try_from(format!("{}{}{}", SECRET_PROMPT_PREFIX, "p", counter))
+                .unwrap(),
+            source: PromptSource::NewCollection,
             manager,
         }
     }
@@ -126,6 +131,7 @@ impl Prompt {
     }
 }
 
+// we may not need this
 impl Serialize for Prompt {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
