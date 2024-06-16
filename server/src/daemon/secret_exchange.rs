@@ -1,5 +1,7 @@
 // SecretExchange: Exchange secrets between processes in an unexposed way.
 
+// Initial C implementation: https://gitlab.gnome.org/GNOME/gcr/-/blob/master/gcr/gcr-secret-exchange.c
+
 // The initial implementation of SecretExchange/GCRSecretExchange uses a KeyFile
 // to encode/parse the payload. And in this implementation the payload is based
 // on a HashMap.
@@ -24,14 +26,14 @@ pub struct SecretExchange {
 
 impl SecretExchange {
     // Creates the initial payload containing caller public_key
-    pub fn secret_exchange_begin(&self) -> String {
+    pub fn begin(&self) -> String {
         let map = HashMap::from([(PUBLIC, self.public_key.as_ref())]);
 
         encode(&map)
     }
 
     // Decrypt and retrieve secret
-    pub fn secret_exchange_receive(&self, exchange: &str) -> String {
+    pub fn receive(&self, exchange: &str) -> String {
         let decoded = decode(exchange).unwrap();
         let mut encrypted: Vec<u8> = Vec::new();
         let mut map: HashMap<&str, &[u8]> = HashMap::new();
@@ -53,7 +55,7 @@ impl SecretExchange {
     }
 
     // Send Secret and perform encryption
-    pub fn secret_exchange_send(&self, secret: &str, exchange: &str) -> String {
+    pub fn send(&self, secret: &str, exchange: &str) -> String {
         let decoded = decode(exchange).unwrap();
 
         let public_key = Key::new(decoded.get(PUBLIC).unwrap().to_vec());
@@ -129,10 +131,10 @@ mod test {
         let secret = "password";
         let caller = SecretExchange::new();
         let callee = SecretExchange::new();
-        let exchange = caller.secret_exchange_begin();
-        let exchange = caller.secret_exchange_receive(&exchange);
-        let exchange = callee.secret_exchange_send(secret, &exchange);
-        let exchange = caller.secret_exchange_receive(&exchange);
+        let exchange = begin();
+        let exchange = receive(&exchange);
+        let exchange = send(secret, &exchange);
+        let exchange = receive(&exchange);
 
         assert_eq!(get_secret(&exchange).unwrap(), secret);
     }
