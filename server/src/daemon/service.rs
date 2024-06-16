@@ -147,7 +147,7 @@ impl Service {
 
     #[zbus(out_args("unlocked", "prompt"))]
     pub async fn unlock(
-        &mut self,
+        &self,
         objects: Vec<OwnedObjectPath>,
         #[zbus(signal_context)] ctxt: SignalContext<'_>,
         #[zbus(object_server)] object_server: &zbus::ObjectServer,
@@ -183,7 +183,7 @@ impl Service {
 
     #[zbus(out_args("locked", "prompt"))]
     pub async fn lock(
-        &mut self,
+        &self,
         #[zbus(signal_context)] ctxt: SignalContext<'_>,
         objects: Vec<OwnedObjectPath>,
     ) -> Result<(Vec<OwnedObjectPath>, ObjectPath)> {
