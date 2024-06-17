@@ -40,12 +40,13 @@ impl Collection {
         &self,
         #[zbus(signal_context)] ctxt: SignalContext<'_>,
         #[zbus(object_server)] object_server: &ObjectServer,
-    ) -> Result<Prompt> {
+    ) -> Result<ObjectPath> {
         let _ = object_server.remove::<Self, _>(&self.path).await;
         Service::collection_deleted(&ctxt, self.path.as_ref()).await?;
         tracing::info!("Collection deleted: {}", self.path);
 
-        Ok(Prompt::default())
+        // gnome-keyring-daemon returns an empty objectpath: '/' here
+        Ok(ObjectPath::default())
     }
 
     pub async fn search_items(&self, attributes: HashMap<&str, &str>) -> Result<Vec<Item>> {
@@ -113,15 +114,13 @@ impl Collection {
         object_server.at(&path, item).await.unwrap();
 
         // perform prompt
-        let prompt = Prompt::new(Arc::clone(&self.manager), None);
-        object_server
-            .at(prompt.path().to_owned(), prompt.to_owned())
-            .await?;
+        // gnome-keyring-daemon returns an empty objectpath: '/' here
+        let prompt = ObjectPath::default();
 
         // signal
         Self::item_created(&ctxt, path.as_ref()).await?;
 
-        Ok((path, prompt.path().to_owned()))
+        Ok((path, prompt))
     }
 
     #[zbus(property, name = "Items")]
