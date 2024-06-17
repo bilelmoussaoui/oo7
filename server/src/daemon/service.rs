@@ -106,7 +106,7 @@ impl Service {
         tracing::info!("Collection: created: {}", path);
 
         // perform prompt
-        let prompt = Prompt::new(Arc::clone(&self.manager), None);
+        let prompt = Prompt::for_new_collection(Arc::clone(&self.manager));
         object_server
             .at(prompt.path().to_owned(), prompt.to_owned())
             .await?;
@@ -173,7 +173,7 @@ impl Service {
         }
 
         // perform prompt
-        let prompt = Prompt::new(Arc::clone(&self.manager), Some("u"));
+        let prompt = Prompt::for_unlock(Arc::clone(&self.manager));
         object_server
             .at(prompt.path().to_owned(), prompt.to_owned())
             .await?;
@@ -203,7 +203,7 @@ impl Service {
             locked.push(OwnedObjectPath::default());
         }
 
-        // returning "/" object path is enough as the prompt here
+        // gnome-keyring-daemon returns an empty objectpath: '/' here
         let prompt = ObjectPath::default();
 
         Ok((locked, prompt))
