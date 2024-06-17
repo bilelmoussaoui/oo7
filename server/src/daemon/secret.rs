@@ -1,12 +1,16 @@
 use oo7::{crypto, Key};
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use super::session::Session;
 
 #[allow(dead_code)]
+#[derive(Debug, Zeroize, ZeroizeOnDrop)]
 pub struct Secret {
+    #[zeroize(skip)]
     session: Session,
     parameters: Vec<u8>,
     value: Vec<u8>,
+    #[zeroize(skip)]
     content_type: String,
 }
 
@@ -36,7 +40,7 @@ impl Secret {
         }
     }
 
-    pub fn value(&self) -> Vec<u8> {
-        self.value.to_owned()
+    pub fn value(&self) -> &[u8] {
+        &self.value
     }
 }
