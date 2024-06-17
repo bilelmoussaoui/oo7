@@ -16,10 +16,7 @@ use zbus::{
     ObjectServer,
 };
 
-use super::{
-    collection::Collection, error::ServiceError, prompt::Prompt, service_manager::ServiceManager,
-    Result,
-};
+use super::{collection::Collection, error::ServiceError, service_manager::ServiceManager, Result};
 
 #[derive(Clone, Debug)]
 pub struct Item {
@@ -49,7 +46,7 @@ impl Item {
         Collection::item_deleted(&ctxt, self.path()).await?;
         tracing::info!("Item: deleted: {}", self.path());
 
-        // returning an empty objectpath: "/" is enough here
+        // gnome-keyring-daemon returns an empty objectpath: '/' here
         Ok(ObjectPath::default())
     }
 
