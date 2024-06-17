@@ -20,3 +20,4 @@ tokio = { workspace = true, features = ["full"] }
 tracing = "0.1"
 tracing-subscriber.workspace = true
 zbus = { workspace = true, features = ["tokio"] }
+zeroize = { workspace = true }
