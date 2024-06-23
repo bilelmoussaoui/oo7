@@ -17,7 +17,7 @@ use zbus::{
 };
 
 use super::{
-    prompter::{PrompterCallback, PrompterProxy, Properties},
+    prompter::{PrompterCallback, PrompterProxy},
     secret_exchange::{get_secret, SecretExchange},
     service_manager::ServiceManager,
 };
