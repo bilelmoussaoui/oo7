@@ -11,7 +11,7 @@ use super::session::Session;
 pub struct ServiceManager {
     sessions: HashMap<OwnedObjectPath, Session>,
     prompts_counter: RwLock<i32>,
-    pub exchange: Arc<Mutex<String>>,
+    oo7_exchange: RwLock<String>,
 }
 
 impl ServiceManager {
@@ -34,5 +34,13 @@ impl ServiceManager {
     pub fn update_prompts_counter(&mut self) -> i32 {
         *self.prompts_counter.write().unwrap() += 1;
         *self.prompts_counter.read().unwrap()
+    }
+
+    pub fn oo7_exchange(&self) -> String {
+        (*self.oo7_exchange.read().unwrap()).to_owned()
+    }
+
+    pub fn set_oo7_exchange(&mut self, oo7_exchange: &str) {
+        *self.oo7_exchange.write().unwrap() = oo7_exchange.to_string()
     }
 }
