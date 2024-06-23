@@ -98,13 +98,19 @@ fn encode(map: &HashMap<&str, &[u8]>) -> String {
 
 // Convert a payload String into a HashMap
 fn decode(exchange: &str) -> Result<HashMap<&str, Vec<u8>>, base64::DecodeError> {
+    let mut total_pairs = 0;
     let (_, exchange) = exchange.split_once(PROTOCOL).unwrap(); // to remove PROTOCOL prefix
     let pairs = exchange.split("\n").collect::<Vec<_>>();
     let mut map: HashMap<&str, Vec<u8>> = HashMap::new();
     let mut encoded: Vec<u8> = Vec::new();
 
     for pair in pairs {
+        if total_pairs == 3 {
+            // to avoid splitting an empty line (last line)
+            break;
+        }
         let (key, value) = pair.split_once("=").unwrap();
+        total_pairs += 1;
         encoded = BASE64_STANDARD.decode(value)?;
         map.insert(key, encoded);
     }
@@ -131,10 +137,10 @@ mod test {
         let secret = "password";
         let caller = SecretExchange::new();
         let callee = SecretExchange::new();
-        let exchange = begin();
-        let exchange = receive(&exchange);
-        let exchange = send(secret, &exchange);
-        let exchange = receive(&exchange);
+        let exchange = caller.begin();
+        let exchange = caller.receive(&exchange);
+        let exchange = callee.send(secret, &exchange);
+        let exchange = caller.receive(&exchange);
 
         assert_eq!(get_secret(&exchange).unwrap(), secret);
     }
