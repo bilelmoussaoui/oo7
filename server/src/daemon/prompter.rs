@@ -44,7 +44,8 @@ impl PrompterCallback {
 
             let mut properties: HashMap<&str, zvariant::Value<'_>> = HashMap::new();
             let secret_exchange = SecretExchange::new();
-            let oo7_exchange = secret_exchange.begin(); // store this for later
+            let oo7_exchange = secret_exchange.begin();
+            self.manager.lock().unwrap().set_oo7_exchange(&oo7_exchange);
 
             if header.path().unwrap().as_str().to_string().contains("/u") {
                 // setting properties related to Secret.Service.Unlock
