@@ -11,12 +11,17 @@
 use std::collections::HashMap;
 
 use base64::prelude::*;
+use hkdf::Hkdf;
 use oo7::{crypto, Key};
+use sha2::Sha256;
 
 const SECRET: &str = "secret";
 const PUBLIC: &str = "public";
+const PRIVATE: &str = "private";
 const IV: &str = "iv";
 const PROTOCOL: &str = "[sx-aes-1]\n";
+const CIPHER_TEXT_LEN: usize = 16;
+const IV_LEN: usize = 16;
 
 #[derive(Debug)]
 pub struct SecretExchange {
@@ -28,6 +33,16 @@ impl SecretExchange {
     // Creates the initial payload containing caller public_key
     pub fn begin(&self) -> String {
         let map = HashMap::from([(PUBLIC, self.public_key.as_ref())]);
+
+        encode(&map)
+    }
+
+    // Creates the shared secret: an AES key
+    pub fn create_shared_secret(&self, exchange: &str) -> String {
+        let decoded = decode(exchange).unwrap();
+        let public_key = Key::new(decoded.get(PUBLIC).unwrap().to_vec());
+        let aes_key = Key::generate_aes_key(&self.private_key, &public_key);
+        let map = HashMap::from([(PRIVATE, aes_key.as_ref())]);
 
         encode(&map)
     }
@@ -126,6 +141,37 @@ pub fn get_secret(exchange: &str) -> Result<String, std::str::Utf8Error> {
     Ok(secret)
 }
 
+pub fn retrieve_secret(exchange: &str, key: &str) {
+    // wip: not ready
+    let decoded_exchange = decode(exchange).unwrap();
+    let secret = decoded_exchange.get(SECRET).unwrap();
+    let iv = decoded_exchange.get(IV).unwrap();
+    let decoded_key = decode(key).unwrap();
+
+    let public_key = decoded_exchange.get(PUBLIC).unwrap().to_vec();
+    let context = Key::new(decoded_key.get(PRIVATE).unwrap().to_vec());
+
+    // let mut okm = [0u8; 16];
+    //
+    // let hk = Hkdf::<Sha256>::from_prk(&public_key).unwrap();
+    // hk.expand(&context, &mut okm).unwrap();
+    //
+    // let dec_key = Key::new(okm.to_vec());
+
+    // todo: return errors instead
+    if iv.len() != IV_LEN {
+        println!("Invalid IV");
+    }
+
+    if secret.len() != CIPHER_TEXT_LEN {
+        println!("Invalid length for cipher text");
+    }
+
+    let decrypted = crypto::decrypt(secret, &context, iv);
+
+    // assert_eq!(b"password".to_vec(), decrypted.to_vec()); // temporarily
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -141,5 +187,18 @@ mod test {
         let exchange = caller.receive(&exchange);
 
         assert_eq!(get_secret(&exchange).unwrap(), secret);
+    }
+
+    #[test]
+    fn test_secret_retrieve() {
+        let prompt_exchange = "[sx-aes-1]
+public=XOE/aEl6QV4QoNIAHowIbLOocNU3ldtW7clZFQpn7ElNLjTF74DXqbwIDEePqMrqSxP7tmdJG2fKxasnEmnH3eOLZk3ao2PaIrepLSi6oZ6TrCGCTMdO6XVVmeIEM2+TrcyRuoVMEsFVFUnY8zQnpb+ASwDXPmWAnPU5M9aT1/VNBrnMe052pq+5WSCVE7N7EWyvr4YbhbscGaFw6KpQijNzHf3YcWT7K8LvMHiA0xlxHbeuNx3k6+7BppuEtSPB
+secret=JEFgxYZ92dNLvGYs4I1jng==
+iv=T0BArlOP7/tx6U8VBPn6RA==";
+        let oo7_private_key = "[sx-aes-1]
+private=klv5xWoMMwtRebrWeOlpkg==";
+        let aes_key = "[sx-aes-1]
+private=AfJ7OdRWEQ7qWDQCIB0KCQ==";
+        retrieve_secret(prompt_exchange, aes_key);
     }
 }

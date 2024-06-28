@@ -3,6 +3,7 @@ use std::{
     sync::{Arc, Mutex, RwLock},
 };
 
+use oo7::Key;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 
 use super::session::Session;
@@ -11,7 +12,7 @@ use super::session::Session;
 pub struct ServiceManager {
     sessions: HashMap<OwnedObjectPath, Session>,
     prompts_counter: RwLock<i32>,
-    oo7_exchange: RwLock<String>,
+    oo7_exchange_aes: RwLock<String>,
 }
 
 impl ServiceManager {
@@ -36,11 +37,11 @@ impl ServiceManager {
         *self.prompts_counter.read().unwrap()
     }
 
-    pub fn oo7_exchange(&self) -> String {
-        (*self.oo7_exchange.read().unwrap()).to_owned()
+    pub fn oo7_exchange_aes(&self) -> String {
+        (*self.oo7_exchange_aes.read().unwrap()).to_owned()
     }
 
-    pub fn set_oo7_exchange(&mut self, oo7_exchange: &str) {
-        *self.oo7_exchange.write().unwrap() = oo7_exchange.to_string()
+    pub fn set_oo7_exchange_aes(&mut self, oo7_exchange_aes: &str) {
+        *self.oo7_exchange_aes.write().unwrap() = oo7_exchange_aes.to_string()
     }
 }

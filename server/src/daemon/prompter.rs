@@ -14,7 +14,10 @@ use zbus::{
     zvariant::{self, ObjectPath, OwnedObjectPath, Value},
 };
 
-use super::{secret_exchange::SecretExchange, service_manager::ServiceManager};
+use super::{
+    secret_exchange::{retrieve_secret, SecretExchange},
+    service_manager::ServiceManager,
+};
 
 // May be change this to /org/oo7_daemon/Prompt
 const SECRET_PROMPTER_PREFIX: &str = "/org/gnome/keyring/Prompt/";
@@ -45,7 +48,11 @@ impl PrompterCallback {
             let mut properties: HashMap<&str, zvariant::Value<'_>> = HashMap::new();
             let secret_exchange = SecretExchange::new();
             let oo7_exchange = secret_exchange.begin();
-            self.manager.lock().unwrap().set_oo7_exchange(&oo7_exchange);
+            let mut guard = self
+                .manager
+                .lock()
+                .unwrap()
+                .set_oo7_exchange_aes(&secret_exchange.create_shared_secret(exchange));
 
             if header.path().unwrap().as_str().to_string().contains("/u") {
                 // setting properties related to Secret.Service.Unlock
@@ -83,9 +90,6 @@ impl PrompterCallback {
             let path = Arc::new(header.path().unwrap().to_owned());
             let connection = Arc::new(connection.to_owned());
 
-            // self.manager.lock().unwrap().exchange = Arc::clone(&exchange); // todo:
-            // setter
-
             tokio::spawn(async move {
                 let prompter = PrompterProxy::new(&Arc::clone(&connection)).await.unwrap();
                 prompter
@@ -97,6 +101,8 @@ impl PrompterCallback {
         // In second call properties argument is not empty
         } else {
             tracing::info!("second prompt_ready() call");
+
+            retrieve_secret(exchange, &self.manager.lock().unwrap().oo7_exchange_aes());
 
             let connection = Arc::new(connection.clone());
             let path = Arc::new(header.path().unwrap().to_owned());
