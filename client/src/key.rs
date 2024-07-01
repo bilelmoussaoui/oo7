@@ -24,7 +24,7 @@ impl AsMut<[u8]> for Key {
 }
 
 impl Key {
-    pub(crate) fn new(key: Vec<u8>) -> Self {
+    pub fn new(key: Vec<u8>) -> Self {
         Self::new_with_strength(key, Err(portal::WeakKeyError::StrengthUnknown))
     }
 

@@ -1,0 +1,22 @@
+[package]
+name = "oo7-daemon"
+edition.workspace = true
+exclude.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+base64 = "0.22.1"
+clap = { version = "4.4.6", features = [ "cargo", "derive" ] }
+hkdf = "0.12"
+oo7 = { workspace = true, features = ["unstable"] }
+rpassword = "7.2.0"
+serde.workspace = true
+sha2 = "0.10.8"
+tokio = { workspace = true, features = ["full"] } # look for specific features
+tracing = "0.1"
+tracing-subscriber.workspace = true
+zbus = { workspace = true, features = ["tokio"] }
+zeroize = { workspace = true }

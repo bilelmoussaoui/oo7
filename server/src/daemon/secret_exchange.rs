@@ -1,0 +1,204 @@
+// SecretExchange: Exchange secrets between processes in an unexposed way.
+
+// Initial C implementation: https://gitlab.gnome.org/GNOME/gcr/-/blob/master/gcr/gcr-secret-exchange.c
+
+// The initial implementation of SecretExchange/GCRSecretExchange uses a KeyFile
+// to encode/parse the payload. And in this implementation the payload is based
+// on a HashMap.
+// Before any transit operations the payload is base64 encoded and parsed into a
+// String.
+
+use std::collections::HashMap;
+
+use base64::prelude::*;
+use hkdf::Hkdf;
+use oo7::{crypto, Key};
+use sha2::Sha256;
+
+const SECRET: &str = "secret";
+const PUBLIC: &str = "public";
+const PRIVATE: &str = "private";
+const IV: &str = "iv";
+const PROTOCOL: &str = "[sx-aes-1]\n";
+const CIPHER_TEXT_LEN: usize = 16;
+const IV_LEN: usize = 16;
+
+#[derive(Debug)]
+pub struct SecretExchange {
+    private_key: Key,
+    public_key: Key,
+}
+
+impl SecretExchange {
+    // Creates the initial payload containing caller public_key
+    pub fn begin(&self) -> String {
+        let map = HashMap::from([(PUBLIC, self.public_key.as_ref())]);
+
+        encode(&map)
+    }
+
+    // Creates the shared secret: an AES key
+    pub fn create_shared_secret(&self, exchange: &str) -> String {
+        let decoded = decode(exchange).unwrap();
+        let public_key = Key::new(decoded.get(PUBLIC).unwrap().to_vec());
+        let aes_key = Key::generate_aes_key(&self.private_key, &public_key);
+        let map = HashMap::from([(PRIVATE, aes_key.as_ref())]);
+
+        encode(&map)
+    }
+
+    // Decrypt and retrieve secret
+    pub fn receive(&self, exchange: &str) -> String {
+        let decoded = decode(exchange).unwrap();
+        let mut encrypted: Vec<u8> = Vec::new();
+        let mut map: HashMap<&str, &[u8]> = HashMap::new();
+
+        let secret = decoded.get(SECRET);
+        if secret.is_some() {
+            let secret = secret.unwrap();
+            let public_key = Key::new(decoded.get(PUBLIC).unwrap().to_vec());
+            let iv = decoded.get(IV).unwrap();
+
+            let aes_key = Key::generate_aes_key(&self.private_key, &public_key);
+            encrypted = crypto::decrypt(secret, &aes_key, &iv).to_vec();
+
+            map.insert(SECRET, &encrypted);
+        }
+        map.insert(PUBLIC, self.public_key.as_ref());
+
+        encode(&map)
+    }
+
+    // Send Secret and perform encryption
+    pub fn send(&self, secret: &str, exchange: &str) -> String {
+        let decoded = decode(exchange).unwrap();
+
+        let public_key = Key::new(decoded.get(PUBLIC).unwrap().to_vec());
+        let aes_key = Key::generate_aes_key(&self.private_key, &public_key);
+        let iv = crypto::generate_iv();
+
+        let secret = crypto::encrypt(secret, &aes_key, &iv);
+
+        let map = HashMap::from([
+            (PUBLIC, self.public_key.as_ref()),
+            (SECRET, secret.as_ref()),
+            (IV, iv.as_ref()),
+        ]);
+
+        encode(&map)
+    }
+
+    pub fn new() -> Self {
+        let private_key = Key::generate_private_key();
+        let public_key = Key::generate_public_key(&private_key);
+
+        Self {
+            private_key,
+            public_key,
+        }
+    }
+}
+
+// Convert a HashMap into a payload String
+fn encode(map: &HashMap<&str, &[u8]>) -> String {
+    let mut exchange = map
+        .iter()
+        .map(|(k, v)| format!("{}={}", k, BASE64_STANDARD.encode(v)))
+        .collect::<Vec<_>>()
+        .join("\n");
+    exchange.insert_str(0, PROTOCOL); // to add PROTOCOL prefix
+
+    exchange
+}
+
+// Convert a payload String into a HashMap
+fn decode(exchange: &str) -> Result<HashMap<&str, Vec<u8>>, base64::DecodeError> {
+    let (_, exchange) = exchange.split_once(PROTOCOL).unwrap(); // to remove PROTOCOL prefix
+    let pairs = exchange.split("\n").collect::<Vec<_>>();
+    let mut map: HashMap<&str, Vec<u8>> = HashMap::new();
+    let mut encoded: Vec<u8> = Vec::new();
+
+    for pair in pairs {
+        if pair.is_empty() {
+            // to avoid splitting an empty line (last new line)
+            break;
+        }
+        let (key, value) = pair.split_once("=").unwrap();
+        encoded = BASE64_STANDARD.decode(value)?;
+        map.insert(key, encoded);
+    }
+
+    Ok(map)
+}
+
+// Retrieve secret from the payload
+pub fn get_secret(exchange: &str) -> Result<String, std::str::Utf8Error> {
+    let decoded = decode(&exchange).unwrap();
+    let secret = std::str::from_utf8(&decoded.get(SECRET).unwrap().to_vec())?
+        .to_string()
+        .to_owned();
+
+    Ok(secret)
+}
+
+pub fn retrieve_secret(exchange: &str, key: &str) {
+    // wip: not ready
+    let decoded_exchange = decode(exchange).unwrap();
+    let secret = decoded_exchange.get(SECRET).unwrap();
+    let iv = decoded_exchange.get(IV).unwrap();
+    let decoded_key = decode(key).unwrap();
+
+    let public_key = decoded_exchange.get(PUBLIC).unwrap().to_vec();
+    let context = Key::new(decoded_key.get(PRIVATE).unwrap().to_vec());
+
+    // let mut okm = [0u8; 16];
+    //
+    // let hk = Hkdf::<Sha256>::from_prk(&public_key).unwrap();
+    // hk.expand(&context, &mut okm).unwrap();
+    //
+    // let dec_key = Key::new(okm.to_vec());
+
+    // todo: return errors instead
+    if iv.len() != IV_LEN {
+        println!("Invalid IV");
+    }
+
+    if secret.len() != CIPHER_TEXT_LEN {
+        println!("Invalid length for cipher text");
+    }
+
+    let decrypted = crypto::decrypt(secret, &context, iv);
+
+    // assert_eq!(b"password".to_vec(), decrypted.to_vec()); // temporarily
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_secret_exchange() {
+        let secret = "password";
+        let caller = SecretExchange::new();
+        let callee = SecretExchange::new();
+        let exchange = caller.begin();
+        let exchange = caller.receive(&exchange);
+        let exchange = callee.send(secret, &exchange);
+        let exchange = caller.receive(&exchange);
+
+        assert_eq!(get_secret(&exchange).unwrap(), secret);
+    }
+
+    #[test]
+    fn test_secret_retrieve() {
+        let prompt_exchange = "[sx-aes-1]
+public=XOE/aEl6QV4QoNIAHowIbLOocNU3ldtW7clZFQpn7ElNLjTF74DXqbwIDEePqMrqSxP7tmdJG2fKxasnEmnH3eOLZk3ao2PaIrepLSi6oZ6TrCGCTMdO6XVVmeIEM2+TrcyRuoVMEsFVFUnY8zQnpb+ASwDXPmWAnPU5M9aT1/VNBrnMe052pq+5WSCVE7N7EWyvr4YbhbscGaFw6KpQijNzHf3YcWT7K8LvMHiA0xlxHbeuNx3k6+7BppuEtSPB
+secret=JEFgxYZ92dNLvGYs4I1jng==
+iv=T0BArlOP7/tx6U8VBPn6RA==";
+        let oo7_private_key = "[sx-aes-1]
+private=klv5xWoMMwtRebrWeOlpkg==";
+        let aes_key = "[sx-aes-1]
+private=AfJ7OdRWEQ7qWDQCIB0KCQ==";
+        retrieve_secret(prompt_exchange, aes_key);
+    }
+}
