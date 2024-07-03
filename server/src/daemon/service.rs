@@ -306,9 +306,10 @@ impl Service {
         Self {
             collections: Arc::new(RwLock::new(Vec::new())),
             keyring: Arc::new(
-                Keyring::open(LOGIN_KEYRING, Secret::from(password))
-                    .await
-                    .unwrap(),
+                match Keyring::open(LOGIN_KEYRING, Secret::from(password)).await {
+                    Ok(keyring) => keyring,
+                    Err(err) => panic!("Failed to unlock login keyring, wrong password: {}", err),
+                },
             ),
             cnx: Default::default(),
             manager: Arc::new(Mutex::new(ServiceManager::default())),
