@@ -36,12 +36,14 @@ struct Args {
 #[tokio::main]
 async fn main() -> daemon::Result<()> {
     let args = Args::parse();
-    let mut password = None;
+    let mut password: Vec<u8> = Vec::new();
     tracing_subscriber::fmt::init();
 
     if args.login {
-        password = Some(rpassword::prompt_password("Enter the login password: ").unwrap());
-        // TODO fix this unwrap
+        password = match rpassword::prompt_password("Enter the login password: ") {
+            Ok(pwd) => pwd.into_bytes(),
+            Err(err) => panic!("{}", err),
+        };
     }
 
     tracing::info!("Starting {}", BINARY_NAME);
