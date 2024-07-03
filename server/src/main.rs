@@ -71,8 +71,10 @@ async fn main() -> Result<(), Error> {
     }
 
     if args.login {
-        password = Some(rpassword::prompt_password("Enter the login password: ").unwrap());
-        // TODO fix this unwrap
+        password = match rpassword::prompt_password("Enter the login password: ") {
+            Ok(pwd) => pwd.into_bytes(),
+            Err(err) => panic!("{}", err),
+        };
     }
 
     tracing::info!("Starting {}", BINARY_NAME);
