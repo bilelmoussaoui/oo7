@@ -298,15 +298,18 @@ impl Service {
 }
 
 impl Service {
-    pub async fn new(password: Option<String>) -> Self {
-        let secret = match password {
-            Some(pwd) => Secret::from(pwd.into_bytes()),
-            None => panic!("Login password can't be empty."),
-        };
+    pub async fn new(password: Vec<u8>) -> Self {
+        if password.is_empty() {
+            panic!("Login password can't be empty");
+        }
 
         Self {
             collections: Arc::new(RwLock::new(Vec::new())),
-            keyring: Arc::new(Keyring::open(LOGIN_KEYRING, secret).await.unwrap()),
+            keyring: Arc::new(
+                Keyring::open(LOGIN_KEYRING, Secret::from(password))
+                    .await
+                    .unwrap(),
+            ),
             cnx: Default::default(),
             manager: Arc::new(Mutex::new(ServiceManager::default())),
             sessions_counter: Arc::new(RwLock::new(0)),
