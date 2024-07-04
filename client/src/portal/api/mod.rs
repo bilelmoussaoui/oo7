@@ -198,6 +198,14 @@ impl Keyring {
             .transpose()
     }
 
+    pub fn lookup_item_index(&self, attributes: &impl AsAttributes, key: &Key) -> Option<usize> {
+        let hashed_search = attributes.hash(key);
+
+        self.items
+            .iter()
+            .position(|e| hashed_search.iter().all(|(k, v)| e.has_attribute(k, v)))
+    }
+
     pub fn remove_items(&mut self, attributes: &impl AsAttributes, key: &Key) -> Result<(), Error> {
         let hashed_search = attributes.hash(key);
 

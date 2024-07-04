@@ -253,6 +253,14 @@ impl Keyring {
         keyring.lookup_item(attributes, &key)
     }
 
+    /// Find the index in the list of items of the first item matching the
+    /// attributes.
+    pub async fn lookup_item_index(&self, attributes: &impl AsAttributes) -> Option<usize> {
+        let key = self.derive_key().await;
+        let keyring = self.keyring.read().await;
+        keyring.lookup_item_index(attributes, &key)
+    }
+
     /// Delete an item.
     pub async fn delete(&self, attributes: &impl AsAttributes) -> Result<(), Error> {
         {
