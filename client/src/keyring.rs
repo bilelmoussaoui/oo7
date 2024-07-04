@@ -238,11 +238,20 @@ impl Item {
     pub async fn set_attributes(&self, attributes: &impl AsAttributes) -> Result<()> {
         match self {
             Self::File(item, backend) => {
+                let index = backend
+                    .lookup_item_index(item.read().await.attributes())
+                    .await;
+
                 item.write().await.set_attributes(attributes);
                 let item_guard = item.read().await;
-                backend
-                    .create_item(item_guard.label(), attributes, &*item_guard.secret(), true)
-                    .await?;
+
+                if let Some(index) = index {
+                    backend.replace_item_index(index, &item_guard).await?;
+                } else {
+                    backend
+                        .create_item(item_guard.label(), attributes, &*item_guard.secret(), true)
+                        .await?;
+                }
             }
             Self::DBus(item) => item.set_attributes(attributes).await?,
         };
@@ -340,5 +349,57 @@ impl Item {
             Self::DBus(item) => Ok(item.modified().await?),
             Self::File(item, _) => Ok(item.read().await.modified()),
         }
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "tokio")]
+mod tests {
+    use tempfile::tempdir;
+    use tokio::fs;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn portal_set_attributes() -> Result<()> {
+        let data_dir = tempdir().unwrap();
+        let dir = data_dir.path().join("keyrings");
+        fs::create_dir_all(&dir).await.unwrap();
+        let path = dir.join("default.keyring");
+
+        let password = b"test";
+        let secret = portal::Secret::from(password.to_vec());
+        let keyring = Keyring::File(portal::Keyring::load(&path, secret).await?.into());
+
+        let items = keyring.items().await?;
+        assert_eq!(items.len(), 0);
+
+        keyring
+            .create_item("my item", &vec![("key", "value")], "my_secret", false)
+            .await?;
+
+        let mut items = keyring.items().await?;
+        assert_eq!(items.len(), 1);
+        let item = items.remove(0);
+        assert_eq!(item.label().await?, "my item");
+        assert_eq!(*item.secret().await?, b"my_secret");
+        let attrs = item.attributes().await?;
+        assert_eq!(attrs.len(), 1);
+        assert_eq!(attrs.get("key").unwrap(), "value");
+
+        item.set_attributes(&vec![("key", "changed_value"), ("new_key", "new_value")])
+            .await?;
+
+        let mut items = keyring.items().await?;
+        assert_eq!(items.len(), 1);
+        let item = items.remove(0);
+        assert_eq!(item.label().await?, "my item");
+        assert_eq!(*item.secret().await?, b"my_secret");
+        let attrs = item.attributes().await?;
+        assert_eq!(attrs.len(), 2);
+        assert_eq!(attrs.get("key").unwrap(), "changed_value");
+        assert_eq!(attrs.get("new_key").unwrap(), "new_value");
+
+        Ok(())
     }
 }
