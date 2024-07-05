@@ -175,7 +175,7 @@ impl Collection {
             items: Default::default(),
             label: label.to_owned(),
             alias: Arc::new(RwLock::new(alias.to_owned())),
-            locked: Arc::new(AtomicBool::new(false)),
+            locked: Arc::new(AtomicBool::new(true)),
             modified: created,
             item_counter: Arc::new(RwLock::new(0)),
             path: OwnedObjectPath::try_from(format!("{}{}", SECRET_COLLECTION_PREFIX, label))
@@ -202,13 +202,5 @@ impl Collection {
         Service::collection_changed(ctxt, self.path.as_ref())
             .await
             .unwrap();
-    }
-
-    pub async fn item_counter(&self) -> i32 {
-        *self.item_counter.read().await
-    }
-
-    pub async fn incr_item_counter(&self) {
-        *self.item_counter.write().await += 1;
     }
 }
