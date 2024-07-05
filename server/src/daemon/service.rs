@@ -356,32 +356,5 @@ impl Service {
         service.collections.write().await.push(login.clone());
         let path = OwnedObjectPath::from(login.path());
         object_server.at(&path, login.clone()).await.unwrap();
-
-        let n_items = service.keyring.n_items().await;
-        if n_items > 0 {
-            let mut items: Vec<Item> = Vec::with_capacity(n_items);
-            for item in service.keyring.items().await {
-                items.push(match item {
-                    Ok(item) => item,
-                    Err(err) => panic!("Item cannot be decrypted: {}", err),
-                })
-            }
-            for item in items {
-                let item = item::Item::new(
-                    item.clone(),
-                    item.secret().to_vec(),
-                    "text/plain".to_string(),
-                    login.item_counter().await,
-                    login.path(),
-                    service.keyring.clone(),
-                    service.manager.clone(),
-                )
-                .await;
-                login.incr_item_counter().await;
-                let path = OwnedObjectPath::from(item.path());
-                login.items.write().await.push(item.clone());
-                object_server.at(&path, item).await.unwrap();
-            }
-        }
     }
 }
