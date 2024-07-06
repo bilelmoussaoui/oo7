@@ -98,6 +98,19 @@ pub(crate) fn generate_public_key(private_key: impl AsRef<[u8]>) -> Vec<u8> {
     .to_vec()
 }
 
+pub(crate) fn generate_public_key_for_secret_exchange(private_key: impl AsRef<[u8]>) -> Vec<u8> {
+    let private_key_bn = BigNum::from_slice(private_key.as_ref()).unwrap();
+    Dh::from_pqg(
+        BigNum::get_rfc3526_prime_1536().unwrap(),
+        None,
+        BigNum::from_u32(2).unwrap(),
+    )
+    .and_then(|key| key.set_private_key(private_key_bn))
+    .unwrap()
+    .public_key()
+    .to_vec()
+}
+
 pub(crate) fn generate_aes_key(
     private_key: impl AsRef<[u8]>,
     server_public_key: impl AsRef<[u8]>,
@@ -114,6 +127,39 @@ pub(crate) fn generate_aes_key(
     .unwrap();
 
     let mut common_secret_padded = vec![0; 128 - common_secret_bytes.len()];
+    // inefficient, but ok for now
+    common_secret_padded.append(&mut common_secret_bytes);
+
+    // hkdf
+    // input_keying_material
+    let ikm = common_secret_padded;
+
+    let mut okm = Zeroizing::new(vec![0; 16]);
+    let mut ctx = PkeyCtx::new_id(Id::HKDF).unwrap();
+    ctx.derive_init().unwrap();
+    ctx.set_hkdf_md(Md::sha256()).unwrap();
+    ctx.set_hkdf_key(&ikm).unwrap();
+    ctx.derive(Some(okm.as_mut()))
+        .expect("hkdf expand should never fail");
+    okm
+}
+
+pub(crate) fn generate_aes_key_for_secret_exchange(
+    private_key: impl AsRef<[u8]>,
+    server_public_key: impl AsRef<[u8]>,
+) -> Zeroizing<Vec<u8>> {
+    let private_key_bn = BigNum::from_slice(private_key.as_ref()).unwrap();
+    let server_public_key_bn = BigNum::from_slice(server_public_key.as_ref()).unwrap();
+    let mut common_secret_bytes = Dh::from_pqg(
+        BigNum::get_rfc3526_prime_1536().unwrap(),
+        None,
+        BigNum::from_u32(2).unwrap(),
+    )
+    .and_then(|key| key.set_private_key(private_key_bn))
+    .and_then(|key| key.compute_key(&server_public_key_bn))
+    .unwrap();
+
+    let mut common_secret_padded = vec![0; 192 - common_secret_bytes.len()];
     // inefficient, but ok for now
     common_secret_padded.append(&mut common_secret_bytes);
 
