@@ -12,9 +12,14 @@ use zbus::{
     message::Header,
     proxy,
     zvariant::{self, ObjectPath, OwnedObjectPath, Value},
+    SignalContext,
 };
 
-use super::{secret_exchange::SecretExchange, service_manager::ServiceManager};
+use super::{
+    prompt::Prompt,
+    secret_exchange::{retrieve_secret, SecretExchange},
+    service_manager::ServiceManager,
+};
 
 // May be change this to /org/oo7_daemon/Prompt
 const SECRET_PROMPTER_PREFIX: &str = "/org/gnome/keyring/Prompt/";
@@ -36,6 +41,7 @@ impl PrompterCallback {
         exchange: &str,
         #[zbus(connection)] connection: &zbus::Connection,
         #[zbus(header)] header: Header<'_>,
+        #[zbus(signal_context)] ctxt: SignalContext<'_>,
     ) -> fdo::Result<()> {
         // During a Prompt execution, prompt_ready() get called twise.
         // In the first call properties argument is empty.
@@ -45,7 +51,11 @@ impl PrompterCallback {
             let mut properties: HashMap<&str, zvariant::Value<'_>> = HashMap::new();
             let secret_exchange = SecretExchange::new();
             let oo7_exchange = secret_exchange.begin();
-            self.manager.lock().unwrap().set_oo7_exchange(&oo7_exchange);
+            let aes_key = secret_exchange.create_shared_secret(exchange);
+            self.manager
+                .lock()
+                .unwrap()
+                .set_secret_exchange_aes_key(&aes_key);
 
             if header.path().unwrap().as_str().to_string().contains("/u") {
                 // setting properties related to Secret.Service.Unlock
@@ -83,9 +93,7 @@ impl PrompterCallback {
             let path = Arc::new(header.path().unwrap().to_owned());
             let connection = Arc::new(connection.to_owned());
 
-            // self.manager.lock().unwrap().exchange = Arc::clone(&exchange); // todo:
-            // setter
-
+            // to call Prompter::PerformPrompt
             tokio::spawn(async move {
                 let prompter = PrompterProxy::new(&Arc::clone(&connection)).await.unwrap();
                 prompter
@@ -98,12 +106,44 @@ impl PrompterCallback {
         } else {
             tracing::info!("second prompt_ready() call");
 
+            let secret = retrieve_secret(
+                exchange,
+                &self.manager.lock().unwrap().secret_exchange_aes_key(),
+            );
+            if secret.is_none() {
+                // the prompt is dismissed
+                self.manager.lock().unwrap().set_prompt_dismissed(true);
+            } else {
+                self.manager.lock().unwrap().set_prompt_dismissed(false);
+            }
+
             let connection = Arc::new(connection.clone());
             let path = Arc::new(header.path().unwrap().to_owned());
 
+            // to call Prompter::StopPrompting
             tokio::spawn(async move {
                 let prompter = PrompterProxy::new(&Arc::clone(&connection)).await.unwrap();
                 prompter.stop_prompting(&Arc::clone(&path)).await.unwrap();
+            });
+
+            let signal_context = Arc::new(ctxt.to_owned());
+            let dismissed_out = Arc::new(self.manager.lock().unwrap().prompt_dismissed());
+            let result_out = Arc::new(self.manager.lock().unwrap().collections());
+
+            // to send Prompt::completed signal
+            tokio::spawn(async move {
+                let mut dismissed = true;
+                let mut result: Vec<OwnedObjectPath> = Vec::new();
+                let dismissed_in = Arc::clone(&dismissed_out);
+                let result_in = Arc::clone(&result_out);
+
+                if dismissed_in == false.into() {
+                    result = result_in.to_vec();
+                    dismissed = false;
+                }
+
+                let result = Value::new(result);
+                let _ = Prompt::completed(&Arc::clone(&signal_context), dismissed, result).await;
             });
         }
 
@@ -113,17 +153,8 @@ impl PrompterCallback {
     pub async fn prompt_done(
         &self,
         #[zbus(object_server)] object_server: &zbus::ObjectServer,
-        #[zbus(connection)] connection: &zbus::Connection,
-        #[zbus(header)] header: Header<'_>,
     ) -> fdo::Result<()> {
-        let connection = Arc::new(connection.to_owned());
-        let path = Arc::new(header.path().unwrap().to_owned());
-        println!("prompt_done: path: {}", path);
-
-        // tokio::spawn(async move {
-        // let prompter = PrompterProxy::new(&connection).await.unwrap();
-        // prompter.stop_prompting(&path).await.unwrap();
-        // });
+        tracing::info!("Prompt done: {}", self.path);
 
         object_server.remove::<Self, _>(&self.path).await?;
         Ok(())

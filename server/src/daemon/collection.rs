@@ -199,8 +199,8 @@ impl Collection {
     pub async fn set_locked(&self, ctxt: &zbus::SignalContext<'_>, locked: bool) {
         self.locked
             .store(locked, std::sync::atomic::Ordering::Relaxed);
-        Service::collection_changed(ctxt, self.path.as_ref())
-            .await
-            .unwrap();
+        // Service::collection_changed(ctxt, self.path.as_ref())
+        // .await
+        // .unwrap();
     }
 }

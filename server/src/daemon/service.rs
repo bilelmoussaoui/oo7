@@ -155,6 +155,11 @@ impl Service {
         // manages unlock state in memory
         let mut unlocked: Vec<OwnedObjectPath> = Vec::new();
 
+        self.manager
+            .lock()
+            .unwrap()
+            .insert_collection(objects.clone());
+
         'main: for object in objects {
             for collection in self.collections.read().await.iter() {
                 if collection.path() == *object {
