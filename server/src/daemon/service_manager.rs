@@ -11,8 +11,10 @@ use super::session::Session;
 #[derive(Debug, Default)]
 pub struct ServiceManager {
     sessions: HashMap<OwnedObjectPath, Session>,
+    collections: Vec<OwnedObjectPath>,
     prompts_counter: RwLock<i32>,
     secret_exchange_aes_key: RwLock<String>,
+    prompt_dismissed: bool,
 }
 
 impl ServiceManager {
@@ -26,6 +28,16 @@ impl ServiceManager {
 
     pub fn remove_session(&mut self, path: ObjectPath<'_>) {
         self.sessions.remove(&path.into());
+    }
+
+    pub fn collections(&self) -> Vec<OwnedObjectPath> {
+        self.collections.clone()
+    }
+
+    pub fn insert_collection(&mut self, paths: Vec<OwnedObjectPath>) {
+        for path in paths {
+            self.collections.push(path);
+        }
     }
 
     pub fn prompts_counter(&self) -> i32 {
@@ -43,5 +55,13 @@ impl ServiceManager {
 
     pub fn set_secret_exchange_aes_key(&mut self, aes_key: &str) {
         *self.secret_exchange_aes_key.write().unwrap() = aes_key.to_string()
+    }
+
+    pub fn prompt_dismissed(&self) -> bool {
+        self.prompt_dismissed
+    }
+
+    pub fn set_prompt_dismissed(&mut self, dismissed: bool) {
+        self.prompt_dismissed = dismissed;
     }
 }
