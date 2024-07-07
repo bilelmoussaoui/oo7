@@ -18,7 +18,7 @@ use zbus::{
 
 use super::{
     prompter::{PrompterCallback, PrompterProxy},
-    secret_exchange::{get_secret, SecretExchange},
+    secret_exchange::SecretExchange,
     service_manager::ServiceManager,
 };
 use crate::{LOGIN_KEYRING, LOGIN_KEYRING_PATH, SECRET_PROMPT_PREFIX};
@@ -27,12 +27,6 @@ use crate::{LOGIN_KEYRING, LOGIN_KEYRING_PATH, SECRET_PROMPT_PREFIX};
 pub enum PromptSource {
     Unlock,
     NewCollection,
-}
-
-#[derive(Default, DeserializeDict, Debug, Type, SerializeDict)]
-#[zvariant(signature = "dict")]
-pub struct PromptResult {
-    path: OwnedObjectPath,
 }
 
 #[derive(Clone, Debug, zvariant::Type)]
@@ -73,8 +67,6 @@ impl Prompt {
             prompter.begin_prompting(&callback.path()).await.unwrap();
         });
 
-        // TODO: call stop_prompting
-
         Ok(())
     }
 
@@ -83,24 +75,18 @@ impl Prompt {
         #[zbus(object_server)] object_server: &zbus::ObjectServer,
         #[zbus(signal_context)] ctxt: SignalContext<'_>,
     ) -> fdo::Result<()> {
-        object_server.remove::<Self, _>(&self.path).await?;
         tracing::info!("Prompt dismissed: {}", self.path);
 
-        // signal
-        Self::completed(&ctxt).await?;
-
+        object_server.remove::<Self, _>(&self.path).await?;
         Ok(())
     }
 
     #[zbus(signal)]
-    pub async fn completed(ctxt: &SignalContext<'_>) -> zbus::Result<()> {
-        // TODO: return values:
-        // OUT Boolean dismissed, OUT Variant result
-        let dismissed = true;
-        let result = PromptResult::default();
-
-        Ok(())
-    }
+    pub async fn completed(
+        ctxt: &SignalContext<'_>,
+        dismissed: bool,
+        result: Value<'_>,
+    ) -> zbus::Result<()>;
 }
 
 impl Prompt {
@@ -128,15 +114,5 @@ impl Prompt {
 
     pub fn path(&self) -> ObjectPath<'_> {
         self.path.as_ref()
-    }
-}
-
-// we may not need this
-impl Serialize for Prompt {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        OwnedObjectPath::serialize(&self.path, serializer)
     }
 }
