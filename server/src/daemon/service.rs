@@ -104,7 +104,7 @@ impl Service {
         self.manager
             .lock()
             .unwrap()
-            .insert_collection_(collection.path(), collection.clone());
+            .insert_collection(collection.label(), collection.clone());
 
         let path = OwnedObjectPath::from(collection.path());
         object_server.at(&path, collection).await?;
@@ -165,7 +165,7 @@ impl Service {
         self.manager
             .lock()
             .unwrap()
-            .insert_collection(objects.clone());
+            .set_collections_to_unlock(objects.clone());
 
         // perform prompt
         let prompt = Prompt::for_unlock(Arc::clone(&self.manager));
@@ -182,13 +182,14 @@ impl Service {
         #[zbus(signal_context)] ctxt: SignalContext<'_>,
         objects: Vec<OwnedObjectPath>,
     ) -> Result<(Vec<OwnedObjectPath>, ObjectPath)> {
-        // manage lock state in memory
+        // to store objectpaths that were locked without a prompt
         let mut locked: Vec<OwnedObjectPath> = Vec::new();
 
+        // sets lock state in memory
         for object in objects {
             for collection in self.collections.read().await.iter() {
                 if collection.path() == *object && !collection.locked() {
-                    collection.set_locked(&ctxt, true).await;
+                    collection.set_locked(true).await;
                     locked.push(object.clone());
                 }
             }
@@ -354,9 +355,9 @@ impl Service {
             .manager
             .lock()
             .unwrap()
-            .insert_collection_(login.path(), login.clone());
+            .insert_collection(login.label(), login.clone());
 
         let path = OwnedObjectPath::from(login.path());
-        object_server.at(&path, login.clone()).await.unwrap();
+        object_server.at(&path, login).await.unwrap();
     }
 }

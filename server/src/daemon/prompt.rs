@@ -7,7 +7,7 @@ use std::{
 
 use oo7::portal::{Keyring, Secret};
 use serde::{Serialize, Serializer};
-use tokio;
+use tokio::{self, sync::RwLock};
 use zbus::{
     fdo, interface,
     message::Header,
@@ -17,6 +17,7 @@ use zbus::{
 };
 
 use super::{
+    collection::Collection,
     prompter::{PrompterCallback, PrompterProxy},
     secret_exchange::SecretExchange,
     service_manager::ServiceManager,

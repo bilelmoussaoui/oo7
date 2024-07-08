@@ -7,7 +7,7 @@ use std::{
 };
 
 use oo7::portal::{Keyring, Secret};
-use tokio;
+use tokio::{self, sync::RwLock};
 use zbus::{
     fdo, interface,
     message::Header,
@@ -17,8 +17,10 @@ use zbus::{
 };
 
 use super::{
+    collection::Collection,
     prompt::Prompt,
     secret_exchange::{retrieve_secret, SecretExchange},
+    service::Service,
     service_manager::ServiceManager,
 };
 use crate::LOGIN_KEYRING;
@@ -191,7 +193,31 @@ impl PrompterCallback {
                 let secret = secret.unwrap();
                 // to verify the secret/password
                 match Keyring::open(LOGIN_KEYRING, Secret::from(secret.to_vec())).await {
-                    Ok(_) => tracing::info!("password matches"),
+                    Ok(_) => {
+                        tracing::info!("password matches");
+
+                        let collection = self.manager.lock().unwrap().collection(LOGIN_KEYRING);
+
+                        // send the collection_changed signal
+                        Service::collection_changed(&ctxt, collection.path())
+                            .await
+                            .unwrap();
+
+                        let interface_ref = connection
+                            .object_server()
+                            .interface::<_, Collection>(collection.path())
+                            .await
+                            .unwrap();
+                        let mut interface = interface_ref.get_mut().await;
+
+                        // set the locked property
+                        interface.set_locked(false).await;
+                        // calling zbus generated locked_changed signal
+                        interface
+                            .locked_changed(interface_ref.signal_context())
+                            .await
+                            .unwrap();
+                    }
                     Err(_) => {
                         tracing::info!("unlock password is incorrect");
 
@@ -241,7 +267,8 @@ impl PrompterCallback {
 
             let signal_context = Arc::new(ctxt.to_owned());
             let dismissed_out = Arc::new(self.manager.lock().unwrap().prompt_dismissed());
-            let result_out = Arc::new(self.manager.lock().unwrap().collections());
+            let result_out = Arc::new(self.manager.lock().unwrap().collections_to_unlock());
+            self.manager.lock().unwrap().reset_collections_to_unlock();
 
             // to send Prompt::completed signal
             tokio::spawn(async move {
