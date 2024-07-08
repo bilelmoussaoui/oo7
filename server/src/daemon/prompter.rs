@@ -11,7 +11,7 @@ use zbus::{
     fdo, interface,
     message::Header,
     proxy,
-    zvariant::{self, ObjectPath, OwnedObjectPath, Value},
+    zvariant::{self, ObjectPath, OwnedObjectPath, OwnedValue, Value},
     SignalContext,
 };
 
@@ -37,7 +37,7 @@ impl PrompterCallback {
     pub async fn prompt_ready(
         &self,
         reply: &str, // the purpose of this?
-        properties: HashMap<&str, Value<'_>>,
+        properties: HashMap<String, OwnedValue>,
         exchange: &str,
         #[zbus(connection)] connection: &zbus::Connection,
         #[zbus(header)] header: Header<'_>,
@@ -48,7 +48,7 @@ impl PrompterCallback {
         if properties.is_empty() {
             tracing::info!("first prompt_ready() call");
 
-            let mut properties: HashMap<&str, zvariant::Value<'_>> = HashMap::new();
+            let mut properties: HashMap<String, zvariant::OwnedValue> = HashMap::new();
             let secret_exchange = SecretExchange::new();
             let oo7_exchange = secret_exchange.begin();
             let aes_key = secret_exchange.create_shared_secret(exchange);
@@ -59,35 +59,91 @@ impl PrompterCallback {
 
             if header.path().unwrap().as_str().to_string().contains("/u") {
                 // setting properties related to Secret.Service.Unlock
-                properties.insert("continue-label", Value::new("Unlock"));
-                properties.insert("warning", Value::new(""));
-                properties.insert("choice-chosen", Value::new(true));
                 properties.insert(
-                    "description",
+                    String::from("continue-label"),
+                    Value::new("Unlock").try_to_owned().unwrap(),
+                );
+                properties.insert(
+                    String::from("warning"),
+                    Value::new("").try_to_owned().unwrap(),
+                );
+                properties.insert(
+                    String::from("choice-chosen"),
+                    Value::new(true).try_to_owned().unwrap(),
+                );
+                properties.insert(
+                    String::from("description"),
                     Value::new(
                         "An application wants access to the keyring \"login\", but it is locked.",
-                    ),
+                    )
+                    .try_to_owned()
+                    .unwrap(),
                 );
-                properties.insert("title", Value::new("Unlock Keyring"));
-                properties.insert("message", Value::new("Authentication required"));
                 properties.insert(
-                    "choice-label",
-                    Value::new("Automatically unlock this keyring whenever I'm logged in"),
+                    String::from("title"),
+                    Value::new("Unlock Keyring").try_to_owned().unwrap(),
                 );
-                properties.insert("caller-window", Value::new(""));
-                properties.insert("cancel-label", Value::new("Cancel"));
+                properties.insert(
+                    String::from("message"),
+                    Value::new("Authentication required")
+                        .try_to_owned()
+                        .unwrap(),
+                );
+                properties.insert(
+                    String::from("choice-label"),
+                    Value::new("Automatically unlock this keyring whenever I'm logged in")
+                        .try_to_owned()
+                        .unwrap(),
+                );
+                properties.insert(
+                    String::from("caller-window"),
+                    Value::new("").try_to_owned().unwrap(),
+                );
+                properties.insert(
+                    String::from("cancel-label"),
+                    Value::new("Cancel").try_to_owned().unwrap(),
+                );
             } else {
                 // setting properties related to Secret.Service.CreateCollection
-                properties.insert("continue-label", Value::new("Continue"));
-                properties.insert("warning", Value::new(""));
-                properties.insert("choice-chosen", Value::new(false));
-                properties.insert("description", Value::new("An application wants to create a new keyring. Choose the password you want to use for it."));
-                properties.insert("title", Value::new(""));
-                properties.insert("message", Value::new("Choose password for new keyring"));
-                properties.insert("choice-label", Value::new(""));
-                properties.insert("caller-window", Value::new(""));
-                properties.insert("cancel-label", Value::new("Cancel"));
-                properties.insert("password-new", Value::new(true));
+                properties.insert(
+                    String::from("continue-label"),
+                    Value::new("Continue").try_to_owned().unwrap(),
+                );
+                properties.insert(
+                    String::from("warning"),
+                    Value::new("").try_to_owned().unwrap(),
+                );
+                properties.insert(
+                    String::from("choice-chosen"),
+                    Value::new(false).try_to_owned().unwrap(),
+                );
+                properties.insert(String::from("description"), Value::new("An application wants to create a new keyring. Choose the password you want to use for it.").try_to_owned().unwrap());
+                properties.insert(
+                    String::from("title"),
+                    Value::new("").try_to_owned().unwrap(),
+                );
+                properties.insert(
+                    String::from("message"),
+                    Value::new("Choose password for new keyring")
+                        .try_to_owned()
+                        .unwrap(),
+                );
+                properties.insert(
+                    String::from("choice-label"),
+                    Value::new("").try_to_owned().unwrap(),
+                );
+                properties.insert(
+                    String::from("caller-window"),
+                    Value::new("").try_to_owned().unwrap(),
+                );
+                properties.insert(
+                    String::from("cancel-label"),
+                    Value::new("Cancel").try_to_owned().unwrap(),
+                );
+                properties.insert(
+                    String::from("password-new"),
+                    Value::new(true).try_to_owned().unwrap(),
+                );
             }
 
             let path = Arc::new(header.path().unwrap().to_owned());
@@ -207,7 +263,7 @@ pub trait Prompter {
         &self,
         callback: &ObjectPath<'_>,
         type_: &str, // 'password' or 'confirm', put this in Enum?
-        properties: HashMap<&str, Value<'_>>,
+        properties: HashMap<String, OwnedValue>,
         exchange: &str,
     ) -> zbus::Result<()>;
 
