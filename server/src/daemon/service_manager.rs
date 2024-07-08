@@ -6,12 +6,13 @@ use std::{
 use oo7::Key;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 
-use super::session::Session;
+use super::{collection::Collection, session::Session};
 
 #[derive(Debug, Default)]
 pub struct ServiceManager {
     sessions: HashMap<OwnedObjectPath, Session>,
-    collections: Vec<OwnedObjectPath>,
+    collection_s: HashMap<OwnedObjectPath, Collection>, // todo: rename
+    collections: Vec<OwnedObjectPath>,                  // todo: rename
     prompts_counter: RwLock<i32>,
     secret_exchange_aes_key: RwLock<String>,
     prompt_dismissed: bool,
@@ -28,6 +29,18 @@ impl ServiceManager {
 
     pub fn remove_session(&mut self, path: ObjectPath<'_>) {
         self.sessions.remove(&path.into());
+    }
+
+    pub fn collection(&self, path: ObjectPath<'_>) -> Option<&Collection> {
+        self.collection_s.get(&path.into())
+    }
+
+    pub fn insert_collection_(&mut self, path: ObjectPath<'_>, collection: Collection) {
+        self.collection_s.insert(path.into(), collection);
+    }
+
+    pub fn remove_collection(&mut self, path: ObjectPath<'_>) {
+        self.collection_s.remove(&path.into());
     }
 
     pub fn collections(&self) -> Vec<OwnedObjectPath> {
