@@ -11,8 +11,8 @@ use super::{collection::Collection, session::Session};
 #[derive(Debug, Default)]
 pub struct ServiceManager {
     sessions: HashMap<OwnedObjectPath, Session>,
-    collection_s: HashMap<OwnedObjectPath, Collection>, // todo: rename
-    collections: Vec<OwnedObjectPath>,                  // todo: rename
+    collections: HashMap<String, Collection>,
+    collections_to_unlock: Vec<OwnedObjectPath>,
     prompts_counter: RwLock<i32>,
     secret_exchange_public_key: RwLock<String>,
     secret_exchange_aes_key: RwLock<String>,
@@ -32,26 +32,30 @@ impl ServiceManager {
         self.sessions.remove(&path.into());
     }
 
-    pub fn collection(&self, path: ObjectPath<'_>) -> Option<&Collection> {
-        self.collection_s.get(&path.into())
+    pub fn collection(&self, label: &str) -> Collection {
+        self.collections.get(label).unwrap().to_owned()
     }
 
-    pub fn insert_collection_(&mut self, path: ObjectPath<'_>, collection: Collection) {
-        self.collection_s.insert(path.into(), collection);
+    pub fn insert_collection(&mut self, label: &str, collection: Collection) {
+        self.collections.insert(label.to_string(), collection);
     }
 
-    pub fn remove_collection(&mut self, path: ObjectPath<'_>) {
-        self.collection_s.remove(&path.into());
+    pub fn remove_collection(&mut self, label: &str) {
+        self.collections.remove(label);
     }
 
-    pub fn collections(&self) -> Vec<OwnedObjectPath> {
-        self.collections.clone()
+    pub fn collections_to_unlock(&self) -> Vec<OwnedObjectPath> {
+        self.collections_to_unlock.clone()
     }
 
-    pub fn insert_collection(&mut self, paths: Vec<OwnedObjectPath>) {
-        for path in paths {
-            self.collections.push(path);
+    pub fn set_collections_to_unlock(&mut self, collections: Vec<OwnedObjectPath>) {
+        for collection in collections {
+            self.collections_to_unlock.push(collection);
         }
+    }
+
+    pub fn reset_collections_to_unlock(&mut self) {
+        self.collections_to_unlock.clear();
     }
 
     pub fn prompts_counter(&self) -> i32 {
