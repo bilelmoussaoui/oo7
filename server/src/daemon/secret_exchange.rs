@@ -19,8 +19,6 @@ const PUBLIC: &str = "public";
 const PRIVATE: &str = "private";
 const IV: &str = "iv";
 const PROTOCOL: &str = "[sx-aes-1]\n";
-const CIPHER_TEXT_LEN: usize = 16;
-const IV_LEN: usize = 16;
 
 #[derive(Debug)]
 pub struct SecretExchange {
@@ -102,14 +100,6 @@ pub(crate) fn retrieve_secret(exchange: &str, aes_key: &str) -> Option<Zeroizing
     }
     let secret = secret.unwrap();
     let iv = decoded.get(IV).unwrap();
-
-    if iv.len() != IV_LEN {
-        panic!("Invalid IV");
-    }
-
-    if secret.len() != CIPHER_TEXT_LEN {
-        panic!("Invalid length for cipher text");
-    }
 
     let decoded = decode(aes_key).unwrap();
     let aes_key = Key::new(decoded.get(PRIVATE).unwrap().to_vec());
