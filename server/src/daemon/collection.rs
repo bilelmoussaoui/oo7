@@ -43,6 +43,15 @@ impl Collection {
     ) -> Result<ObjectPath> {
         let _ = object_server.remove::<Self, _>(&self.path).await;
         Service::collection_deleted(&ctxt, self.path.as_ref()).await?;
+
+        let collection = self
+            .manager
+            .lock()
+            .unwrap()
+            .collection(self.path())
+            .unwrap();
+        // todo: call remove_collection
+
         tracing::info!("Collection deleted: {}", self.path);
 
         // gnome-keyring-daemon returns an empty objectpath: '/' here
@@ -199,8 +208,8 @@ impl Collection {
     pub async fn set_locked(&self, ctxt: &zbus::SignalContext<'_>, locked: bool) {
         self.locked
             .store(locked, std::sync::atomic::Ordering::Relaxed);
-        // Service::collection_changed(ctxt, self.path.as_ref())
-        // .await
-        // .unwrap();
+        Service::collection_changed(ctxt, self.path.as_ref())
+            .await
+            .unwrap();
     }
 }
