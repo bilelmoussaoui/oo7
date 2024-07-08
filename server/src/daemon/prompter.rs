@@ -6,6 +6,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use oo7::portal::{Keyring, Secret};
 use tokio;
 use zbus::{
     fdo, interface,
@@ -20,6 +21,7 @@ use super::{
     secret_exchange::{retrieve_secret, SecretExchange},
     service_manager::ServiceManager,
 };
+use crate::LOGIN_KEYRING;
 
 // May be change this to /org/oo7_daemon/Prompt
 const SECRET_PROMPTER_PREFIX: &str = "/org/gnome/keyring/Prompt/";
@@ -36,15 +38,21 @@ pub struct PrompterCallback {
 impl PrompterCallback {
     pub async fn prompt_ready(
         &self,
-        reply: &str, // the purpose of this?
+        reply: &str,
         properties: HashMap<String, OwnedValue>,
         exchange: &str,
         #[zbus(connection)] connection: &zbus::Connection,
         #[zbus(header)] header: Header<'_>,
         #[zbus(signal_context)] ctxt: SignalContext<'_>,
     ) -> fdo::Result<()> {
+        // flag to indicate to repeat another PromptReady when password is incorrect.
+        // this flag will be used to exit early to avoid executing StopPrompting call
+        // and Prompt::completed signal.
+        let mut repeat = false;
+
         // During a Prompt execution, prompt_ready() get called twise.
         // In the first call properties argument is empty.
+
         if properties.is_empty() {
             tracing::info!("first prompt_ready() call");
 
@@ -170,7 +178,54 @@ impl PrompterCallback {
                 // the prompt is dismissed
                 self.manager.lock().unwrap().set_prompt_dismissed(true);
             } else {
+                // the secret is retrieved from the exchange and available in this branch
                 self.manager.lock().unwrap().set_prompt_dismissed(false);
+
+                let secret = secret.unwrap();
+                // to verify the secret/password
+                match Keyring::open(LOGIN_KEYRING, Secret::from(secret.to_vec())).await {
+                    Ok(_) => tracing::info!("password matches"),
+                    Err(_) => {
+                        tracing::info!("unlock password is incorrect");
+
+                        // set repeat flag to true to indicate another PromptReady is needed
+                        repeat = true;
+
+                        let mut map: HashMap<String, zvariant::OwnedValue> = properties;
+                        map.insert(
+                            String::from("warning"),
+                            Value::new("The unlock password was incorrect")
+                                .try_to_owned()
+                                .unwrap(),
+                        );
+
+                        let secret_exchange = SecretExchange::new();
+                        let oo7_exchange = secret_exchange.begin();
+                        let aes_key = secret_exchange.create_shared_secret(exchange);
+                        self.manager
+                            .lock()
+                            .unwrap()
+                            .set_secret_exchange_aes_key(&aes_key);
+
+                        let connection = Arc::new(connection.to_owned());
+                        let path = Arc::new(header.path().unwrap().to_owned());
+
+                        // repeating Prompter::PerformPrompt
+                        tokio::spawn(async move {
+                            let prompter =
+                                PrompterProxy::new(&Arc::clone(&connection)).await.unwrap();
+                            prompter
+                                .perform_prompt(&Arc::clone(&path), "password", map, &oo7_exchange)
+                                .await
+                                .unwrap();
+                        });
+                    }
+                };
+            }
+
+            // early exit to prompt another PromptReady call from the gnome-shell
+            if repeat {
+                return Ok(());
             }
 
             let connection = Arc::new(connection.clone());
