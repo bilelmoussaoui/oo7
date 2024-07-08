@@ -99,7 +99,12 @@ impl Service {
             Arc::clone(&self.keyring),
             Arc::clone(&self.manager),
         );
+
         self.collections.write().await.push(collection.clone());
+        self.manager
+            .lock()
+            .unwrap()
+            .insert_collection_(collection.path(), collection.clone());
 
         let path = OwnedObjectPath::from(collection.path());
         object_server.at(&path, collection).await?;
@@ -358,7 +363,14 @@ impl Service {
             service.keyring.clone(),
             service.manager.clone(),
         );
+
         service.collections.write().await.push(login.clone());
+        service
+            .manager
+            .lock()
+            .unwrap()
+            .insert_collection_(login.path(), login.clone());
+
         let path = OwnedObjectPath::from(login.path());
         object_server.at(&path, login.clone()).await.unwrap();
     }
