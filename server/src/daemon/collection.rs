@@ -42,15 +42,9 @@ impl Collection {
         #[zbus(object_server)] object_server: &ObjectServer,
     ) -> Result<ObjectPath> {
         let _ = object_server.remove::<Self, _>(&self.path).await;
+        // send signal
         Service::collection_deleted(&ctxt, self.path.as_ref()).await?;
-
-        let collection = self
-            .manager
-            .lock()
-            .unwrap()
-            .collection(self.path())
-            .unwrap();
-        // todo: call remove_collection
+        self.manager.lock().unwrap().remove_collection(self.label());
 
         tracing::info!("Collection deleted: {}", self.path);
 
@@ -152,6 +146,12 @@ impl Collection {
         self.locked.load(std::sync::atomic::Ordering::Relaxed)
     }
 
+    #[zbus(property)]
+    pub async fn set_locked(&self, locked: bool) {
+        self.locked
+            .store(locked, std::sync::atomic::Ordering::Relaxed);
+    }
+
     #[zbus(property, name = "Created")]
     pub fn created_as_secs(&self) -> u64 {
         self.created.as_secs()
@@ -203,13 +203,5 @@ impl Collection {
         *self.alias.write().await = alias.to_string();
         Service::collection_changed(ctxt, self.path.as_ref()).await?;
         Ok(())
-    }
-
-    pub async fn set_locked(&self, ctxt: &zbus::SignalContext<'_>, locked: bool) {
-        self.locked
-            .store(locked, std::sync::atomic::Ordering::Relaxed);
-        Service::collection_changed(ctxt, self.path.as_ref())
-            .await
-            .unwrap();
     }
 }
