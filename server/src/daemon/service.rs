@@ -156,31 +156,16 @@ impl Service {
         objects: Vec<OwnedObjectPath>,
         #[zbus(signal_context)] ctxt: SignalContext<'_>,
         #[zbus(object_server)] object_server: &zbus::ObjectServer,
-    ) -> Result<(Vec<OwnedObjectPath>, ObjectPath)> {
-        // manages unlock state in memory
-        let mut unlocked: Vec<OwnedObjectPath> = Vec::new();
+    ) -> Result<(Vec<ObjectPath>, ObjectPath)> {
+        // to store objectpaths that were unlocked without a prompt.
+        // todo: we don't support this yet.
+        let mut unlocked: Vec<ObjectPath> = Vec::new();
 
+        // to send objects to unlock information to the Prompter
         self.manager
             .lock()
             .unwrap()
             .insert_collection(objects.clone());
-
-        'main: for object in objects {
-            for collection in self.collections.read().await.iter() {
-                if collection.path() == *object {
-                    if collection.locked() {
-                        collection.set_locked(&ctxt, false).await;
-                        unlocked.push(object.clone());
-                    } else {
-                        break 'main;
-                    }
-                }
-            }
-        }
-
-        if unlocked.is_empty() {
-            unlocked.push(OwnedObjectPath::default());
-        }
 
         // perform prompt
         let prompt = Prompt::for_unlock(Arc::clone(&self.manager));
