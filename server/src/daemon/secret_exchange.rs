@@ -19,6 +19,7 @@ const PUBLIC: &str = "public";
 const PRIVATE: &str = "private";
 const IV: &str = "iv";
 const PROTOCOL: &str = "[sx-aes-1]\n";
+const CIPHER_TEXT_LEN: usize = 16;
 
 #[derive(Debug)]
 pub struct SecretExchange {
@@ -98,9 +99,15 @@ pub(crate) fn retrieve_secret(exchange: &str, aes_key: &str) -> Option<Zeroizing
         // value
         return None;
     }
-    let secret = secret.unwrap();
-    let iv = decoded.get(IV).unwrap();
 
+    let secret = secret.unwrap();
+    if secret.len() != CIPHER_TEXT_LEN {
+        // to avoid a short secret/cipher-text causing an UnpadError during decryption
+        let false_secret: Vec<u8> = vec![0, 1];
+        return Some(Zeroizing::new(false_secret));
+    }
+
+    let iv = decoded.get(IV).unwrap();
     let decoded = decode(aes_key).unwrap();
     let aes_key = Key::new(decoded.get(PRIVATE).unwrap().to_vec());
 
