@@ -60,6 +60,13 @@ impl PrompterCallback {
             let secret_exchange = SecretExchange::new();
             let oo7_exchange = secret_exchange.begin();
             let aes_key = secret_exchange.create_shared_secret(exchange);
+
+            let mut lock = self.manager.lock().unwrap();
+            // storing oo7 server generated public_key in case we need it later when
+            // handling incorrect password attempts.
+            lock.set_secret_exchange_public_key(&oo7_exchange);
+            drop(lock);
+            // storing the aes_key for retrieve_secret() call
             self.manager
                 .lock()
                 .unwrap()
@@ -199,13 +206,8 @@ impl PrompterCallback {
                                 .unwrap(),
                         );
 
-                        let secret_exchange = SecretExchange::new();
-                        let oo7_exchange = secret_exchange.begin();
-                        let aes_key = secret_exchange.create_shared_secret(exchange);
-                        self.manager
-                            .lock()
-                            .unwrap()
-                            .set_secret_exchange_aes_key(&aes_key);
+                        let oo7_exchange =
+                            self.manager.lock().unwrap().secret_exchange_public_key();
 
                         let connection = Arc::new(connection.to_owned());
                         let path = Arc::new(header.path().unwrap().to_owned());
