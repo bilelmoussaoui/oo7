@@ -14,6 +14,7 @@ pub struct ServiceManager {
     collection_s: HashMap<OwnedObjectPath, Collection>, // todo: rename
     collections: Vec<OwnedObjectPath>,                  // todo: rename
     prompts_counter: RwLock<i32>,
+    secret_exchange_public_key: RwLock<String>,
     secret_exchange_aes_key: RwLock<String>,
     prompt_dismissed: bool,
 }
@@ -68,6 +69,14 @@ impl ServiceManager {
 
     pub fn set_secret_exchange_aes_key(&mut self, aes_key: &str) {
         *self.secret_exchange_aes_key.write().unwrap() = aes_key.to_string()
+    }
+
+    pub fn secret_exchange_public_key(&self) -> String {
+        (*self.secret_exchange_public_key.read().unwrap()).to_owned()
+    }
+
+    pub fn set_secret_exchange_public_key(&mut self, pub_key: &str) {
+        *self.secret_exchange_public_key.write().unwrap() = pub_key.to_string()
     }
 
     pub fn prompt_dismissed(&self) -> bool {
