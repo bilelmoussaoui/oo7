@@ -1,9 +1,5 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex, RwLock},
-};
+use std::{collections::HashMap, sync::RwLock};
 
-use oo7::Key;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 
 use super::{collection::Collection, session::Session};

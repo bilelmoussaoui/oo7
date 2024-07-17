@@ -23,8 +23,8 @@ use zbus::{
 };
 
 use super::{
-    collection::Collection, error::ServiceError, item, prompt::Prompt,
-    service_manager::ServiceManager, session::Session, Result,
+    collection::Collection, error::ServiceError, prompt::Prompt, service_manager::ServiceManager,
+    session::Session, Result,
 };
 #[cfg(debug_assertions)]
 use crate::SERVICE_NAME;
@@ -154,12 +154,11 @@ impl Service {
     pub async fn unlock(
         &self,
         objects: Vec<OwnedObjectPath>,
-        #[zbus(signal_context)] ctxt: SignalContext<'_>,
         #[zbus(object_server)] object_server: &zbus::ObjectServer,
     ) -> Result<(Vec<ObjectPath>, ObjectPath)> {
         // to store objectpaths that were unlocked without a prompt.
         // todo: we don't support this yet.
-        let mut unlocked: Vec<ObjectPath> = Vec::new();
+        let unlocked: Vec<ObjectPath> = Vec::new();
 
         // to send objects to unlock information to the Prompter
         self.manager
@@ -179,7 +178,6 @@ impl Service {
     #[zbus(out_args("locked", "prompt"))]
     pub async fn lock(
         &self,
-        #[zbus(signal_context)] ctxt: SignalContext<'_>,
         objects: Vec<OwnedObjectPath>,
     ) -> Result<(Vec<OwnedObjectPath>, ObjectPath)> {
         // to store objectpaths that were locked without a prompt
