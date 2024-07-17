@@ -197,26 +197,39 @@ impl PrompterCallback {
                         tracing::info!("password matches");
 
                         let collection = self.manager.lock().unwrap().collection(LOGIN_KEYRING);
+                        let connection_out = Arc::new(connection.to_owned());
 
-                        // send the collection_changed signal
-                        Service::collection_changed(&ctxt, collection.path())
+                        // to set locked and send PropertiesChanged signal
+                        tokio::spawn(async move {
+                            let connection = Arc::clone(&connection_out);
+                            let interface_ref = connection
+                                .object_server()
+                                .interface::<_, Collection>(collection.path())
+                                .await
+                                .unwrap();
+                            let mut interface = interface_ref.get_mut().await;
+
+                            // set the locked property
+                            interface.set_locked(false).await;
+                            // calling zbus generated locked_changed signal
+                            interface
+                                .locked_changed(interface_ref.signal_context())
+                                .await
+                                .unwrap();
+                        });
+
+                        let collection = self.manager.lock().unwrap().collection(LOGIN_KEYRING);
+                        let signal_context = Arc::new(ctxt.to_owned());
+
+                        // to send CollectionChanged signal
+                        tokio::spawn(async move {
+                            Service::collection_changed(
+                                &Arc::clone(&signal_context),
+                                collection.path(),
+                            )
                             .await
                             .unwrap();
-
-                        let interface_ref = connection
-                            .object_server()
-                            .interface::<_, Collection>(collection.path())
-                            .await
-                            .unwrap();
-                        let mut interface = interface_ref.get_mut().await;
-
-                        // set the locked property
-                        interface.set_locked(false).await;
-                        // calling zbus generated locked_changed signal
-                        interface
-                            .locked_changed(interface_ref.signal_context())
-                            .await
-                            .unwrap();
+                        });
                     }
                     Err(_) => {
                         tracing::info!("unlock password is incorrect");
