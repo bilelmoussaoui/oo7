@@ -1,28 +1,20 @@
 // org.freedesktop.Secret.Prompt
 
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
-use oo7::portal::{Keyring, Secret};
-use serde::{Serialize, Serializer};
-use tokio::{self, sync::RwLock};
+use tokio;
 use zbus::{
     fdo, interface,
     message::Header,
-    proxy,
-    zvariant::{self, DeserializeDict, ObjectPath, OwnedObjectPath, SerializeDict, Type, Value},
-    Connection, SignalContext,
+    zvariant::{self, ObjectPath, OwnedObjectPath, Value},
+    SignalContext,
 };
 
 use super::{
-    collection::Collection,
     prompter::{PrompterCallback, PrompterProxy},
-    secret_exchange::SecretExchange,
     service_manager::ServiceManager,
 };
-use crate::{LOGIN_KEYRING, LOGIN_KEYRING_PATH, SECRET_PROMPT_PREFIX};
+use crate::SECRET_PROMPT_PREFIX;
 
 #[derive(Clone, Debug)]
 pub enum PromptSource {
@@ -74,7 +66,6 @@ impl Prompt {
     pub async fn dismiss(
         &self,
         #[zbus(object_server)] object_server: &zbus::ObjectServer,
-        #[zbus(signal_context)] ctxt: SignalContext<'_>,
     ) -> fdo::Result<()> {
         tracing::info!("Prompt dismissed: {}", self.path);
 
