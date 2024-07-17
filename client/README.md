@@ -73,7 +73,7 @@ fn main() {
         let items = KEYRING
             .get()
             .unwrap()
-            .search_items(&HashMap::from([("attribute", "attribute_value")]))
+            .search_items(&[("attribute", "attribute_value")])
             .await;
     });
 }
