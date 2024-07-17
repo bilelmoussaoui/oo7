@@ -7,7 +7,7 @@ use std::{
 };
 
 use oo7::portal::{Keyring, Secret};
-use tokio::{self, sync::RwLock};
+use tokio;
 use zbus::{
     fdo, interface,
     message::Header,
@@ -207,7 +207,7 @@ impl PrompterCallback {
                                 .interface::<_, Collection>(collection.path())
                                 .await
                                 .unwrap();
-                            let mut interface = interface_ref.get_mut().await;
+                            let interface = interface_ref.get_mut().await;
 
                             // set the locked property
                             interface.set_locked(false).await;

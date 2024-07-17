@@ -15,8 +15,7 @@ use zbus::{interface, zvariant, ObjectServer, SignalContext};
 use zvariant::{ObjectPath, OwnedObjectPath};
 
 use super::{
-    error::ServiceError, prompt::Prompt, secret::Secret, service_manager::ServiceManager, Result,
-    Service,
+    error::ServiceError, secret::Secret, service_manager::ServiceManager, Result, Service,
 };
 use crate::SECRET_COLLECTION_PREFIX;
 
