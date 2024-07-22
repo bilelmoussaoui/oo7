@@ -157,14 +157,30 @@ impl Service {
         #[zbus(object_server)] object_server: &zbus::ObjectServer,
     ) -> Result<(Vec<ObjectPath>, ObjectPath)> {
         // to store objectpaths that were unlocked without a prompt.
-        // todo: we don't support this yet.
-        let unlocked: Vec<ObjectPath> = Vec::new();
+        let mut unlocked: Vec<ObjectPath> = Vec::new();
 
         // to send objects to unlock information to the Prompter
         self.manager
             .lock()
             .unwrap()
             .set_collections_to_unlock(objects.clone());
+
+        // todo: set ObjectPath dynamically
+        let interface_ref = object_server
+            .interface::<_, Collection>(
+                OwnedObjectPath::try_from("/org/freedesktop/secrets/collection/login").unwrap(),
+            )
+            .await
+            .unwrap();
+        let interface = interface_ref.get_mut().await;
+
+        // if the collection is alreday in unlocked state update unlocked
+        if !interface.locked() {
+            for object in objects {
+                unlocked.push(object.into_inner());
+            }
+            return Ok((unlocked, ObjectPath::default()));
+        }
 
         // perform prompt
         let prompt = Prompt::for_unlock(Arc::clone(&self.manager));
