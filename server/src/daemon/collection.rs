@@ -135,6 +135,16 @@ impl Collection {
             .collect()
     }
 
+    #[zbus(property)]
+    pub async fn alias(&self) -> String {
+        self.alias.read().await.clone()
+    }
+
+    #[zbus(property)]
+    pub async fn set_alias(&self, alias: &str) {
+        *self.alias.write().await = alias.to_string();
+    }
+
     #[zbus(property, name = "Label")]
     pub fn label(&self) -> &str {
         &self.label
@@ -196,11 +206,5 @@ impl Collection {
 
     pub fn path(&self) -> ObjectPath {
         self.path.as_ref()
-    }
-
-    pub async fn set_alias(&self, ctxt: &zbus::SignalContext<'_>, alias: &str) -> Result<()> {
-        *self.alias.write().await = alias.to_string();
-        Service::collection_changed(ctxt, self.path.as_ref()).await?;
-        Ok(())
     }
 }
