@@ -174,7 +174,7 @@ impl Service {
             .unwrap();
         let interface = interface_ref.get_mut().await;
 
-        // if the collection is alreday in unlocked state update unlocked
+        // if the collection is already in unlocked state update unlocked
         if !interface.locked() {
             for object in objects {
                 unlocked.push(object.into_inner());
@@ -239,19 +239,32 @@ impl Service {
         Ok(secrets)
     }
 
-    pub async fn read_alias(&self, name: &str) -> ObjectPath {
-        self.collections
-            .read()
-            .await
-            .iter()
-            .find_map(|c| {
-                if c.label() == name {
-                    Some(c.path().to_owned())
-                } else {
-                    None
+    pub async fn read_alias(
+        &self,
+        name: &str,
+        #[zbus(object_server)] object_server: &zbus::ObjectServer,
+    ) -> ObjectPath {
+        let mut objectpath = ObjectPath::default();
+        for collection in self.collections.read().await.iter() {
+            let interface_ref = object_server
+                .interface::<_, Collection>(collection.path())
+                .await
+                .unwrap();
+            let interface = interface_ref.get_mut().await;
+
+            // temporarily
+            if name == "default" {
+                if interface.alias().await == name {
+                    objectpath = collection.path().to_owned();
                 }
-            })
-            .unwrap_or_default()
+            } else {
+                if interface.label() == name {
+                    objectpath = collection.path().to_owned();
+                }
+            }
+        }
+
+        objectpath
     }
 
     pub async fn set_alias(
