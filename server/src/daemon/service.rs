@@ -256,9 +256,10 @@ impl Service {
 
     pub async fn set_alias(
         &self,
-        #[zbus(signal_context)] ctxt: SignalContext<'_>,
         alias: &str,
         path: ObjectPath<'_>,
+        #[zbus(signal_context)] ctxt: SignalContext<'_>,
+        #[zbus(object_server)] object_server: &zbus::ObjectServer,
     ) -> Result<()> {
         match self
             .collections
@@ -268,7 +269,28 @@ impl Service {
             .find(|c| c.path() == path)
         {
             Some(collection) => {
-                collection.set_alias(&ctxt, alias).await?;
+                if alias != "default" {
+                    return Err(ServiceError::ZBus(zbus::Error::Failure(String::from(
+                        "Only the 'default' alias is supported",
+                    ))));
+                }
+
+                collection.set_alias(alias).await;
+
+                let interface_ref = object_server
+                    .interface::<_, Collection>(collection.path())
+                    .await
+                    .unwrap();
+                let interface = interface_ref.get_mut().await;
+
+                interface.set_alias(alias).await;
+                interface
+                    .alias_changed(interface_ref.signal_context())
+                    .await
+                    .unwrap();
+
+                let _ = Service::collection_changed(&ctxt, collection.path()).await;
+
                 Ok(())
             }
             None => {
