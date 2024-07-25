@@ -1,0 +1,26 @@
+option('dbus_service_dir',
+  type: 'string',
+  description: 'Directory for D-Bus service files'
+)
+
+option('systemd',
+  type: 'feature',
+  value: 'auto',
+  description: 'Enable systemd support'
+)
+
+option('systemduserunitdir',
+  type: 'string',
+  description: 'Directory for systemd user service files'
+)
+
+option (
+  'profile',
+  type: 'combo',
+  choices: [
+    'default',
+    'development'
+  ],
+  value: 'default',
+  description: 'The build profile for Obfuscate. One of "default" or "development".'
+)

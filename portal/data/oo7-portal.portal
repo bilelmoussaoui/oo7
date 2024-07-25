@@ -1,4 +1,4 @@
 [portal]
 DBusName=org.freedesktop.impl.portal.desktop.oo7
-Interfaces=org.freedesktop.impl.portal.Secret
+Interfaces=org.freedesktop.impl.portal.Secret;
 UseIn=gnome

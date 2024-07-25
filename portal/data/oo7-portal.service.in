@@ -1,0 +1,10 @@
+[Unit]
+Description=Secret portal service (oo7 implementation)
+After=graphical-session.target
+Requisite=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=dbus
+BusName=org.freedesktop.impl.portal.desktop.oo7
+ExecStart=@libexecdir@/oo7-portal
