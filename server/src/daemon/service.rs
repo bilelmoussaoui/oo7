@@ -30,6 +30,8 @@ use super::{
 use crate::SERVICE_NAME;
 use crate::{LOGIN_KEYRING, LOGIN_KEYRING_PATH};
 
+const SESSION_COLLECTION: &str = "session";
+
 #[derive(Clone, Debug)]
 pub struct Service {
     collections: Arc<RwLock<Vec<Collection>>>,
@@ -393,7 +395,7 @@ impl Service {
             .unwrap();
         let login = Collection::new(
             LOGIN_KEYRING,
-            "login",
+            "default",
             created,
             service.keyring.clone(),
             service.manager.clone(),
@@ -408,5 +410,19 @@ impl Service {
 
         let path = OwnedObjectPath::from(login.path());
         object_server.at(&path, login).await.unwrap();
+
+        // setting up the temporary session collection
+        let session = Collection::new(
+            SESSION_COLLECTION,
+            "",
+            created,
+            service.keyring.clone(),
+            service.manager.clone(),
+        );
+
+        service.collections.write().await.push(session.clone());
+
+        let path = OwnedObjectPath::from(session.path());
+        object_server.at(&path, session).await.unwrap();
     }
 }
