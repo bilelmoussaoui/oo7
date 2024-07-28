@@ -24,7 +24,7 @@ pub struct Collection {
     keyring: Arc<Keyring>,
     pub(crate) items: Arc<RwLock<Vec<super::item::Item>>>,
     alias: Arc<RwLock<String>>,
-    label: String,
+    label: Arc<RwLock<String>>,
     locked: Arc<AtomicBool>,
     created: Duration,
     modified: Duration,
@@ -43,7 +43,8 @@ impl Collection {
         let _ = object_server.remove::<Self, _>(&self.path).await;
         // send signal
         Service::collection_deleted(&ctxt, self.path.as_ref()).await?;
-        self.manager.lock().unwrap().remove_collection(self.label());
+        let label = self.label().await;
+        self.manager.lock().unwrap().remove_collection(&label);
 
         tracing::info!("Collection deleted: {}", self.path);
 
@@ -135,30 +136,19 @@ impl Collection {
             .collect()
     }
 
-    #[zbus(property)]
-    pub async fn alias(&self) -> String {
-        self.alias.read().await.clone()
-    }
-
-    #[zbus(property)]
-    pub async fn set_alias(&self, alias: &str) {
-        *self.alias.write().await = alias.to_string();
-    }
-
     #[zbus(property, name = "Label")]
-    pub fn label(&self) -> &str {
-        &self.label
+    pub async fn label(&self) -> String {
+        self.label.read().await.clone()
+    }
+
+    #[zbus(property)]
+    pub async fn set_label(&self, label: &str) {
+        *self.label.write().await = label.to_owned();
     }
 
     #[zbus(property, name = "Locked")]
     pub fn locked(&self) -> bool {
         self.locked.load(std::sync::atomic::Ordering::Relaxed)
-    }
-
-    #[zbus(property)]
-    pub async fn set_locked(&self, locked: bool) {
-        self.locked
-            .store(locked, std::sync::atomic::Ordering::Relaxed);
     }
 
     #[zbus(property, name = "Created")]
@@ -191,7 +181,7 @@ impl Collection {
     ) -> Self {
         Self {
             items: Default::default(),
-            label: label.to_owned(),
+            label: Arc::new(RwLock::new(label.to_owned())),
             alias: Arc::new(RwLock::new(alias.to_owned())),
             locked: Arc::new(AtomicBool::new(true)),
             modified: created,
@@ -206,5 +196,18 @@ impl Collection {
 
     pub fn path(&self) -> ObjectPath {
         self.path.as_ref()
+    }
+
+    pub async fn alias(&self) -> String {
+        self.alias.read().await.clone()
+    }
+
+    pub async fn set_alias(&self, alias: &str) {
+        *self.alias.write().await = alias.to_string();
+    }
+
+    pub async fn set_locked(&self, locked: bool) {
+        self.locked
+            .store(locked, std::sync::atomic::Ordering::Relaxed);
     }
 }
