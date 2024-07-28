@@ -103,10 +103,11 @@ impl Service {
         );
 
         self.collections.write().await.push(collection.clone());
+        let label = collection.label().await;
         self.manager
             .lock()
             .unwrap()
-            .insert_collection(collection.label(), collection.clone());
+            .insert_collection(&label, collection.clone());
 
         let path = OwnedObjectPath::from(collection.path());
         object_server.at(&path, collection).await?;
@@ -260,7 +261,7 @@ impl Service {
                     objectpath = collection.path().to_owned();
                 }
             } else {
-                if interface.label() == name {
+                if interface.label().await == name {
                     objectpath = collection.path().to_owned();
                 }
             }
@@ -299,10 +300,6 @@ impl Service {
                 let interface = interface_ref.get_mut().await;
 
                 interface.set_alias(alias).await;
-                interface
-                    .alias_changed(interface_ref.signal_context())
-                    .await
-                    .unwrap();
 
                 let _ = Service::collection_changed(&ctxt, collection.path()).await;
 
@@ -402,11 +399,12 @@ impl Service {
         );
 
         service.collections.write().await.push(login.clone());
+        let label = login.label().await;
         service
             .manager
             .lock()
             .unwrap()
-            .insert_collection(login.label(), login.clone());
+            .insert_collection(&label, login.clone());
 
         let path = OwnedObjectPath::from(login.path());
         object_server.at(&path, login).await.unwrap();
