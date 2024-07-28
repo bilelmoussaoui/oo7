@@ -80,12 +80,13 @@ impl Item {
         self.locked
     }
 
-    // #[zbus(property, name = "Attributes")] Error
+    // todo: #[zbus(property, name = "Attributes")] Error
     pub async fn attributes(&self) -> HashMap<String, AttributeValue> {
         let inner = self.inner.read().await;
         inner.attributes().clone()
     }
 
+    // todo: #[zbus(property)]
     pub async fn set_attributes(
         &self,
         #[zbus(signal_context)] ctxt: SignalContext<'_>,
@@ -103,14 +104,10 @@ impl Item {
         inner.label().to_owned()
     }
 
-    pub async fn set_label(
-        &self,
-        #[zbus(signal_context)] ctxt: SignalContext<'_>,
-        label: &str,
-    ) -> Result<()> {
+    #[zbus(property)]
+    pub async fn set_label(&self, label: &str) -> zbus::Result<()> {
         let mut inner = self.inner.write().await;
         inner.set_label(label);
-        Collection::item_changed(&ctxt, self.path()).await?;
         Ok(())
     }
 
