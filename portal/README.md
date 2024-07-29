@@ -2,7 +2,7 @@
 
 [![crates.io](https://img.shields.io/crates/v/oo7-portal)](https://crates.io/crates/oo7-portal) ![CI](https://github.com/bilelmoussaoui/oo7/workflows/CI/badge.svg)
 
-A implementation of [`org.freedesktop.impl.portal.Secret`](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.impl.portal.Secret.html)
+An implementation of [`org.freedesktop.impl.portal.Secret`](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.impl.portal.Secret.html)
 
 ## License
 
