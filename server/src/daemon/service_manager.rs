@@ -9,6 +9,7 @@ pub struct ServiceManager {
     sessions: HashMap<OwnedObjectPath, Session>,
     collections: HashMap<String, Collection>,
     collections_to_unlock: Vec<OwnedObjectPath>,
+    unlock_request_sender: RwLock<String>,
     prompts_counter: RwLock<i32>,
     secret_exchange_public_key: RwLock<String>,
     secret_exchange_aes_key: RwLock<String>,
@@ -44,10 +45,16 @@ impl ServiceManager {
         self.collections_to_unlock.clone()
     }
 
-    pub fn set_collections_to_unlock(&mut self, collections: Vec<OwnedObjectPath>) {
+    pub fn unlock_request_sender(&self) -> String {
+        (*self.unlock_request_sender.read().unwrap()).to_owned()
+    }
+
+    pub fn set_collections_to_unlock(&mut self, collections: Vec<OwnedObjectPath>, sender: &str) {
         for collection in collections {
             self.collections_to_unlock.push(collection);
         }
+
+        *self.unlock_request_sender.write().unwrap() = sender.to_owned();
     }
 
     pub fn reset_collections_to_unlock(&mut self) {

@@ -15,6 +15,7 @@ use zbus::{
     zvariant::{self, ObjectPath, OwnedObjectPath, OwnedValue, Value},
     SignalContext,
 };
+use zbus_names::BusName;
 
 use super::{
     collection::Collection,
@@ -278,7 +279,14 @@ impl PrompterCallback {
                 prompter.stop_prompting(&Arc::clone(&path)).await.unwrap();
             });
 
-            let signal_context = Arc::new(ctxt.to_owned());
+            let lock = self.manager.lock().unwrap();
+            let sender = lock.unlock_request_sender();
+            drop(lock);
+
+            // sets the signal destination
+            let new_signal_ctxt = ctxt.set_destination(BusName::try_from(sender).unwrap());
+
+            let signal_context = Arc::new(new_signal_ctxt.to_owned());
             let dismissed_out = Arc::new(self.manager.lock().unwrap().prompt_dismissed());
             let result_out = Arc::new(self.manager.lock().unwrap().collections_to_unlock());
             self.manager.lock().unwrap().reset_collections_to_unlock();
