@@ -17,6 +17,7 @@ use oo7::{
 };
 use tokio::sync::RwLock;
 use zbus::{
+    message::Header,
     proxy::ProxyDefault,
     zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Value},
     ObjectServer, SignalContext,
@@ -158,15 +159,17 @@ impl Service {
         &self,
         objects: Vec<OwnedObjectPath>,
         #[zbus(object_server)] object_server: &zbus::ObjectServer,
+        #[zbus(header)] header: Header<'_>,
     ) -> Result<(Vec<ObjectPath>, ObjectPath)> {
         // to store objectpaths that were unlocked without a prompt.
         let mut unlocked: Vec<ObjectPath> = Vec::new();
 
         // to send objects to unlock information to the Prompter
+        // also stores the sender's BusName
         self.manager
             .lock()
             .unwrap()
-            .set_collections_to_unlock(objects.clone());
+            .set_collections_to_unlock(objects.clone(), header.sender().unwrap().as_str());
 
         // todo: set ObjectPath dynamically
         let interface_ref = object_server
