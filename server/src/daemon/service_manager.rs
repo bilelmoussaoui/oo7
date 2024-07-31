@@ -10,6 +10,7 @@ pub struct ServiceManager {
     collections: HashMap<String, Collection>,
     collections_to_unlock: Vec<OwnedObjectPath>,
     unlock_request_sender: RwLock<String>,
+    unlock_prompt_path: RwLock<OwnedObjectPath>,
     prompts_counter: RwLock<i32>,
     secret_exchange_public_key: RwLock<String>,
     secret_exchange_aes_key: RwLock<String>,
@@ -59,6 +60,14 @@ impl ServiceManager {
 
     pub fn reset_collections_to_unlock(&mut self) {
         self.collections_to_unlock.clear();
+    }
+
+    pub fn unlock_prompt_path(&self) -> OwnedObjectPath {
+        self.unlock_prompt_path.read().unwrap().clone()
+    }
+
+    pub fn set_unlock_prompt_path(&self, path: ObjectPath<'_>) {
+        *self.unlock_prompt_path.write().unwrap() = path.into();
     }
 
     pub fn prompts_counter(&self) -> i32 {

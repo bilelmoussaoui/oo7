@@ -13,7 +13,6 @@ use zbus::{
     message::Header,
     proxy,
     zvariant::{self, ObjectPath, OwnedObjectPath, OwnedValue, Value},
-    SignalContext,
 };
 use zbus_names::BusName;
 
@@ -24,7 +23,7 @@ use super::{
     service::Service,
     service_manager::ServiceManager,
 };
-use crate::LOGIN_KEYRING;
+use crate::{LOGIN_KEYRING, SERVICE_PATH};
 
 // May be change this to /org/oo7_daemon/Prompt
 const SECRET_PROMPTER_PREFIX: &str = "/org/gnome/keyring/Prompt/";
@@ -46,7 +45,6 @@ impl PrompterCallback {
         exchange: &str,
         #[zbus(connection)] connection: &zbus::Connection,
         #[zbus(header)] header: Header<'_>,
-        #[zbus(signal_context)] ctxt: SignalContext<'_>,
     ) -> fdo::Result<()> {
         // flag to indicate to repeat another PromptReady when password is incorrect.
         // this flag will be used to exit early to avoid executing StopPrompting call
@@ -200,7 +198,8 @@ impl PrompterCallback {
                         let collection = self.manager.lock().unwrap().collection(LOGIN_KEYRING);
                         let connection_out = Arc::new(connection.to_owned());
 
-                        // to set locked and send PropertiesChanged signal
+                        // to update locked property and send PropertiesChanged, CollectionChanged
+                        // signals
                         tokio::spawn(async move {
                             let connection = Arc::clone(&connection_out);
                             let interface_ref = connection
@@ -210,22 +209,27 @@ impl PrompterCallback {
                                 .unwrap();
                             let interface = interface_ref.get_mut().await;
 
-                            // set the locked property
+                            // update the locked property
                             interface.set_locked(false).await;
-                            // calling zbus generated locked_changed signal
+                            // calling zbus generated locked_changed to send PropertiesChanged
+                            // signal
                             interface
                                 .locked_changed(interface_ref.signal_context())
                                 .await
                                 .unwrap();
-                        });
 
-                        let collection = self.manager.lock().unwrap().collection(LOGIN_KEYRING);
-                        let signal_context = Arc::new(ctxt.to_owned());
+                            // to retrieve the signal_context for the Service objectpath
+                            let interface_ref = connection
+                                .object_server()
+                                .interface::<_, Service>(
+                                    OwnedObjectPath::try_from(SERVICE_PATH).unwrap(),
+                                )
+                                .await
+                                .unwrap();
 
-                        // to send CollectionChanged signal
-                        tokio::spawn(async move {
+                            // send the Service.CollectionChanged signal
                             Service::collection_changed(
-                                &Arc::clone(&signal_context),
+                                interface_ref.signal_context(),
                                 collection.path(),
                             )
                             .await
@@ -271,27 +275,41 @@ impl PrompterCallback {
             }
 
             let connection = Arc::new(connection.clone());
+            let connection_for_stop_prompting = Arc::clone(&connection);
             let path = Arc::new(header.path().unwrap().to_owned());
 
             // to call Prompter::StopPrompting
             tokio::spawn(async move {
-                let prompter = PrompterProxy::new(&Arc::clone(&connection)).await.unwrap();
+                let prompter = PrompterProxy::new(&Arc::clone(&connection_for_stop_prompting))
+                    .await
+                    .unwrap();
                 prompter.stop_prompting(&Arc::clone(&path)).await.unwrap();
             });
 
-            let lock = self.manager.lock().unwrap();
-            let sender = lock.unlock_request_sender();
-            drop(lock);
+            // retrieve the Unlock request sender's BusName and Prompt path
+            let sender = self.manager.lock().unwrap().unlock_request_sender();
+            let prompt_path = self.manager.lock().unwrap().unlock_prompt_path();
 
-            // sets the signal destination
-            let new_signal_ctxt = ctxt.set_destination(BusName::try_from(sender).unwrap());
+            // rather than using the signal_context from "zbus(signal_context)]" attribute
+            // we need to retrieve the signal_context for the Unlock request Prompt
+            // objectpath
+            let interface_ref = connection
+                .object_server()
+                .interface::<_, Prompt>(prompt_path)
+                .await
+                .unwrap();
+            let signal_ctxt = interface_ref.signal_context().to_owned();
 
-            let signal_context = Arc::new(new_signal_ctxt.to_owned());
+            // create a new SignalContext with a predefined destination.
+            // because later we need to send Prompt.Completed signal as a "Directed signal"
+            let new_signal_ctxt = signal_ctxt.set_destination(BusName::try_from(sender).unwrap());
+
+            let signal_context = Arc::new(new_signal_ctxt);
             let dismissed_out = Arc::new(self.manager.lock().unwrap().prompt_dismissed());
             let result_out = Arc::new(self.manager.lock().unwrap().collections_to_unlock());
             self.manager.lock().unwrap().reset_collections_to_unlock();
 
-            // to send Prompt::completed signal
+            // send Prompt.Completed signal
             tokio::spawn(async move {
                 let mut dismissed = true;
                 let mut result: Vec<OwnedObjectPath> = Vec::new();
