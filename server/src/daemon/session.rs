@@ -19,7 +19,7 @@ pub struct Session {
 #[interface(name = "org.freedesktop.Secret.Session")]
 impl Session {
     pub async fn close(
-        &mut self,
+        &self,
         #[zbus(object_server)] object_server: &zbus::ObjectServer,
     ) -> fdo::Result<()> {
         self.manager.lock().unwrap().remove_session(self.path());
