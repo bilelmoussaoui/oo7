@@ -11,6 +11,10 @@ const LOGIN_KEYRING: &str = "login";
 const LOGIN_KEYRING_PATH: &str = ".local/share/keyrings/test.keyring";
 #[cfg(not(debug_assertions))]
 const LOGIN_KEYRING_PATH: &str = ".local/share/keyrings/login.keyring";
+#[cfg(not(debug_assertions))]
+const SERVICE_PATH: &str = "/org/freedesktop/secrets";
+#[cfg(debug_assertions)]
+const SERVICE_PATH: &str = "/org/freedesktop/secrets_Devel";
 #[cfg(debug_assertions)]
 const SERVICE_NAME: &str = "org.freedesktop.secrets_Devel";
 #[cfg(debug_assertions)]
