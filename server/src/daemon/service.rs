@@ -190,6 +190,12 @@ impl Service {
 
         // perform prompt
         let prompt = Prompt::for_unlock(Arc::clone(&self.manager));
+        // set the Prompt path in ServiceManager
+        self.manager
+            .lock()
+            .unwrap()
+            .set_unlock_prompt_path(prompt.path());
+
         object_server
             .at(prompt.path().to_owned(), prompt.to_owned())
             .await?;
