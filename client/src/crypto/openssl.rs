@@ -201,6 +201,10 @@ pub(crate) fn legacy_derive_key_and_iv(
         let mut digest = hasher.finish().unwrap();
 
         for _ in 1..iteration_count {
+            // We can't pass an instance, the borrow checker
+            // would complain about digest being dropped at the end of
+            // foor block
+            #[allow(clippy::needless_borrows_for_generic_args)]
             hasher.update(&digest).unwrap();
             digest = hasher.finish().unwrap();
         }
@@ -213,6 +217,10 @@ pub(crate) fn legacy_derive_key_and_iv(
             break;
         }
 
+        // We can't pass an instance, the borrow checker
+        // would complain about digest being dropped at the end of
+        // foor block
+        #[allow(clippy::needless_borrows_for_generic_args)]
         hasher.update(&digest).unwrap();
     }
 

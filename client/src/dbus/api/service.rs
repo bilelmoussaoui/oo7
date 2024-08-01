@@ -213,6 +213,8 @@ impl<'a> Service<'a> {
             .deserialize::<HashMap<OwnedObjectPath, SecretInner>>()?;
 
         let cnx = self.inner().connection();
+        // Item's Hash implementation doesn't make use of any mutable internals
+        #[allow(clippy::mutable_key_type)]
         let mut output = HashMap::with_capacity(secrets.capacity());
         for (path, secret_inner) in secrets {
             output.insert(
