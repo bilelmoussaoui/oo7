@@ -7,7 +7,7 @@ use std::{
 
 use oo7::{
     dbus::api::SecretInner,
-    portal::{self, api::AttributeValue, Keyring},
+    portal::{self, Keyring},
 };
 use tokio::sync::RwLock;
 use zbus::{
@@ -80,21 +80,25 @@ impl Item {
         self.locked
     }
 
-    // todo: #[zbus(property, name = "Attributes")] Error
-    pub async fn attributes(&self) -> HashMap<String, AttributeValue> {
+    #[zbus(property, name = "Attributes")]
+    pub async fn attributes(&self) -> HashMap<String, String> {
         let inner = self.inner.read().await;
-        inner.attributes().clone()
+        let inner_attributes = inner.attributes().clone();
+
+        let mut attributes: HashMap<String, String> =
+            HashMap::with_capacity(inner_attributes.len());
+
+        for (key, value) in inner_attributes.iter() {
+            attributes.insert(key.to_owned(), value.to_string());
+        }
+
+        attributes
     }
 
-    // todo: #[zbus(property)]
-    pub async fn set_attributes(
-        &self,
-        #[zbus(signal_context)] ctxt: SignalContext<'_>,
-        attributes: HashMap<&str, &str>,
-    ) -> Result<()> {
+    #[zbus(property)]
+    pub async fn set_attributes(&self, attributes: HashMap<String, String>) -> zbus::Result<()> {
         let mut inner = self.inner.write().await;
         inner.set_attributes(&attributes);
-        Collection::item_changed(&ctxt, self.path()).await?;
         Ok(())
     }
 
