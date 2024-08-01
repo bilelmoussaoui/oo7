@@ -11,7 +11,7 @@ use oo7::{
     portal::{Item, Keyring},
 };
 use tokio::sync::RwLock;
-use zbus::{interface, zvariant, ObjectServer, SignalContext};
+use zbus::{interface, message::Header, zvariant, ObjectServer, SignalContext};
 use zvariant::{ObjectPath, OwnedObjectPath};
 
 use super::{
@@ -22,7 +22,7 @@ use crate::SECRET_COLLECTION_PREFIX;
 #[derive(Clone, Debug)]
 pub struct Collection {
     keyring: Arc<Keyring>,
-    pub(crate) items: Arc<RwLock<Vec<super::item::Item>>>,
+    items: Arc<RwLock<Vec<super::item::Item>>>,
     alias: Arc<RwLock<String>>,
     label: Arc<RwLock<String>>,
     locked: Arc<AtomicBool>,
@@ -61,11 +61,13 @@ impl Collection {
 
     pub async fn create_item(
         &self,
-        #[zbus(signal_context)] ctxt: SignalContext<'_>,
         properties: Properties,
         secret: SecretInner,
         replace: bool,
+        #[zbus(header)] header: Header<'_>,
+        #[zbus(connection)] connection: &zbus::Connection,
         #[zbus(object_server)] object_server: &ObjectServer,
+        #[zbus(signal_context)] ctxt: SignalContext<'_>,
     ) -> Result<(OwnedObjectPath, ObjectPath)> {
         let label = properties.label();
         let attributes = properties.attributes().unwrap();
@@ -113,11 +115,32 @@ impl Collection {
         .await;
         let path = OwnedObjectPath::from(item.path());
         tracing::info!("Item: created: {}", path);
-        self.items.write().await.push(item.clone());
-        object_server.at(&path, item).await.unwrap();
 
-        // perform prompt
-        // gnome-keyring-daemon returns an empty objectpath: '/' here
+        object_server.at(&path, item.clone()).await.unwrap();
+
+        let connection_out = Arc::new(connection.to_owned());
+        let collection_path = header.path().unwrap().to_owned();
+
+        // to update the items property and send out the PropertiesChanged signal
+        tokio::spawn(async move {
+            let connection = Arc::clone(&connection_out);
+
+            let interface_ref = connection
+                .object_server()
+                .interface::<_, Collection>(collection_path)
+                .await
+                .unwrap();
+            let interface = interface_ref.get_mut().await;
+
+            interface.set_items(item).await;
+            interface
+                .items_changed(interface_ref.signal_context())
+                .await
+                .unwrap();
+        });
+
+        // no prompt required here (client side handles this) so returning an empty
+        // objectpath: '/' is enough.
         let prompt = ObjectPath::default();
 
         // signal
@@ -196,6 +219,14 @@ impl Collection {
 
     pub fn path(&self) -> ObjectPath {
         self.path.as_ref()
+    }
+
+    pub async fn items_read(&self) -> Vec<super::item::Item> {
+        self.items.read().await.clone()
+    }
+
+    pub async fn set_items(&self, item: super::item::Item) {
+        self.items.write().await.push(item);
     }
 
     pub async fn alias(&self) -> String {

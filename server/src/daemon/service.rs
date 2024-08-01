@@ -213,6 +213,7 @@ impl Service {
 
         // sets lock state in memory
         for object in objects {
+            // todo: use interface method access
             for collection in self.collections.read().await.iter() {
                 if collection.path() == *object && !collection.locked() {
                     collection.set_locked(true).await;
@@ -225,7 +226,7 @@ impl Service {
             locked.push(OwnedObjectPath::default());
         }
 
-        // gnome-keyring-daemon returns an empty objectpath: '/' here
+        // a prompt isn't required here. returning an empty objectpath: '/' is enough
         let prompt = ObjectPath::default();
 
         Ok((locked, prompt))
@@ -238,7 +239,7 @@ impl Service {
     ) -> Result<HashMap<OwnedObjectPath, SecretInner>> {
         let mut secrets = HashMap::with_capacity(paths.len());
         for collection in self.collections.read().await.iter() {
-            let items = collection.items.read().await;
+            let items = collection.items_read().await;
             for item in items.iter() {
                 for path in paths.iter() {
                     if item.path() == path.as_ref() {
