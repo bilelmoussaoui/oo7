@@ -9,7 +9,7 @@ use oo7::{
     dbus::api::SecretInner,
     portal::{self, Keyring},
 };
-use tokio::sync::RwLock;
+use tokio::{self, sync::RwLock};
 use zbus::{
     object_server::SignalContext,
     zvariant::{ObjectPath, OwnedObjectPath},
@@ -46,7 +46,7 @@ impl Item {
         Collection::item_deleted(&ctxt, self.path()).await?;
         tracing::info!("Item: deleted: {}", self.path());
 
-        // gnome-keyring-daemon returns an empty objectpath: '/' here
+        // a prompt isn't required here. returning an empty objectpath: '/' is enough
         Ok(ObjectPath::default())
     }
 
