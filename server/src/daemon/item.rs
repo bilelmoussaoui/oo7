@@ -11,7 +11,6 @@ use oo7::{
 };
 use tokio::{self, sync::RwLock};
 use zbus::{
-    object_server::SignalContext,
     zvariant::{ObjectPath, OwnedObjectPath},
     ObjectServer,
 };
@@ -24,6 +23,7 @@ pub struct Item {
     parameters: Vec<u8>,
     content_type: String,
     path: OwnedObjectPath,
+    collection: OwnedObjectPath,
     keyring: Arc<Keyring>,
     locked: bool,
     manager: Arc<Mutex<ServiceManager>>,
@@ -34,7 +34,6 @@ impl Item {
     pub async fn delete(
         &self,
         #[zbus(object_server)] object_server: &ObjectServer,
-        #[zbus(signal_context)] ctxt: SignalContext<'_>,
     ) -> Result<ObjectPath> {
         let inner = self.inner.read().await;
         let attributes = inner.attributes();
@@ -42,8 +41,24 @@ impl Item {
             .delete(attributes)
             .await
             .map_err::<ServiceError, _>(From::from)?;
+
+        let interface_ref = object_server
+            .interface::<_, Collection>(self.collection())
+            .await
+            .unwrap();
+        let interface = interface_ref.get_mut().await;
+
+        // update Collection.Items property
+        interface.drop_item(self.path()).await;
+        interface
+            .items_changed(interface_ref.signal_context())
+            .await
+            .unwrap();
+
         object_server.remove::<Item, _>(self.path()).await?;
-        Collection::item_deleted(&ctxt, self.path()).await?;
+        // send ItemDeleted signal
+        Collection::item_deleted(interface_ref.signal_context(), self.path()).await?;
+
         tracing::info!("Item: deleted: {}", self.path());
 
         // a prompt isn't required here. returning an empty objectpath: '/' is enough
@@ -140,6 +155,7 @@ impl Item {
             path: OwnedObjectPath::try_from(format!("{}/{}", collection_path, item_counter))
                 .unwrap(),
             inner: Arc::new(RwLock::new(item)),
+            collection: collection_path.into(),
             parameters,
             content_type,
             keyring,
@@ -158,5 +174,9 @@ impl Item {
 
     pub(crate) fn content_type(&self) -> &str {
         &self.content_type
+    }
+
+    pub(crate) fn collection(&self) -> ObjectPath {
+        self.collection.as_ref()
     }
 }
