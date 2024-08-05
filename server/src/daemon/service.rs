@@ -236,7 +236,7 @@ impl Service {
         &self,
         paths: Vec<OwnedObjectPath>,
         session: ObjectPath<'_>,
-    ) -> Result<HashMap<OwnedObjectPath, SecretInner>> {
+    ) -> Result<HashMap<OwnedObjectPath, (SecretInner,)>> {
         let mut secrets = HashMap::with_capacity(paths.len());
         for collection in self.collections.read().await.iter() {
             let items = collection.items_read().await;

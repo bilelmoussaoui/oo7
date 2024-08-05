@@ -51,18 +51,18 @@ impl Item {
     }
 
     #[zbus(name = "GetSecret")]
-    pub async fn secret(&self, session: ObjectPath<'_>) -> Result<SecretInner> {
+    pub async fn secret(&self, session: ObjectPath<'_>) -> Result<(SecretInner,)> {
         let inner = self.inner.read().await;
         let secret = inner.secret();
         let parameters = self.parameters();
         let content_type = self.content_type();
         match self.manager.lock().unwrap().session(session.clone()) {
-            Some(session) => Ok(SecretInner(
+            Some(session) => Ok((SecretInner(
                 session.path().into(),
                 parameters.to_vec(),
                 secret.to_vec(),
                 content_type.to_owned(),
-            )),
+            ),)),
             None => {
                 tracing::error!("Session {session} not found");
                 Err(ServiceError::NoSession)
