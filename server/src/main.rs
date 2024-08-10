@@ -81,7 +81,7 @@ async fn main() -> Result<(), Error> {
         };
     }
 
-    tracing::info!("Starting {}", BINARY_NAME);
+    tracing::info!("Initializing {BINARY_NAME} {}", env!("CARGO_PKG_VERSION"));
 
     Service::run(secret, flags).await?;
 
