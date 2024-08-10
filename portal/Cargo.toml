@@ -12,6 +12,7 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
+clap.workspace = true
 futures-channel.workspace = true
 futures-util.workspace = true
 oo7.workspace = true
