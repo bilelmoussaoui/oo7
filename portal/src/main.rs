@@ -3,6 +3,7 @@ mod request;
 
 use std::{collections::HashMap, future::pending, os::unix::net::UnixStream};
 
+use clap::Parser;
 use futures_util::FutureExt;
 use oo7::dbus::Service;
 use ring::rand::SecureRandom;
@@ -125,8 +126,19 @@ async fn send_secret_to_app(app_id: &str, fd: zvariant::OwnedFd) -> Result<(), E
     Ok(())
 }
 
+/// A backend implementation for org.freedesktop.impl.portal.Secret.
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Replace a running instance
+    #[arg(short, long)]
+    replace: bool,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), zbus::Error> {
+    let args = Args::parse();
+
     tracing_subscriber::fmt::init();
 
     tracing::info!(
@@ -140,9 +152,11 @@ async fn main() -> Result<(), zbus::Error> {
         .serve_at(oo7::portal::SecretProxy::PATH.unwrap(), backend)?
         .build()
         .await?;
-    // NOTE For debugging.
-    let flags = zbus::fdo::RequestNameFlags::ReplaceExisting
-        | zbus::fdo::RequestNameFlags::AllowReplacement;
+
+    let mut flags = zbus::fdo::RequestNameFlags::AllowReplacement.into();
+    if args.replace {
+        flags |= zbus::fdo::RequestNameFlags::ReplaceExisting;
+    }
     cnx.request_name_with_flags(PORTAL_NAME, flags).await?;
 
     loop {
