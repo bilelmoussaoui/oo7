@@ -129,6 +129,12 @@ async fn send_secret_to_app(app_id: &str, fd: zvariant::OwnedFd) -> Result<(), E
 async fn main() -> Result<(), zbus::Error> {
     tracing_subscriber::fmt::init();
 
+    tracing::info!(
+        "Initializing {} {}",
+        env!("CARGO_BIN_NAME"),
+        env!("CARGO_PKG_VERSION")
+    );
+
     let backend = Secret;
     let cnx = zbus::ConnectionBuilder::session()?
         .serve_at(oo7::portal::SecretProxy::PATH.unwrap(), backend)?
