@@ -50,7 +50,7 @@ async fn main() -> daemon::Result<()> {
         };
     }
 
-    tracing::info!("Starting {}", BINARY_NAME);
+    tracing::info!("Initializing {BINARY_NAME} {}", env!("CARGO_PKG_VERSION"));
 
     let service = daemon::Service::new(password).await;
     service.run().await?;
