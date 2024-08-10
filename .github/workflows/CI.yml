@@ -49,6 +49,12 @@ jobs:
         run: |
           cargo test --manifest-path ./client/Cargo.toml --no-default-features --features tokio --features openssl_crypto
 
+  cargo-deny:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+        - uses: EmbarkStudios/cargo-deny-action@v1
+
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest
