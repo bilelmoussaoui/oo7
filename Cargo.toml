@@ -21,6 +21,7 @@ exclude = ["org.freedesktop.Secrets.xml"]
 
 [workspace.dependencies]
 endi = "1.1"
+clap = { version = "4.4.6", features = [ "cargo", "derive" ] }
 futures-channel = "0.3"
 futures-lite = "2.1"
 futures-util = "0.3"
