@@ -20,7 +20,7 @@ jobs:
       - env:
           RUSTFLAGS: --cfg docsrs
           RUSTDOCFLAGS: --cfg docsrs
-        run: cargo doc --package oo7 --features "async-std, unstable" --no-deps
+        run: cargo doc --package oo7 --features "unstable" --no-deps
 
       - name: Fix permissions
         run: |
