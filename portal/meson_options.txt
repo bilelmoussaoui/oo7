@@ -22,5 +22,5 @@ option (
     'development'
   ],
   value: 'default',
-  description: 'The build profile for Obfuscate. One of "default" or "development".'
+  description: 'The build profile. One of "default" or "development".'
 )
