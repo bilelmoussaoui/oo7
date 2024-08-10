@@ -6,7 +6,7 @@ use zbus::zvariant::OwnedObjectPath;
 use super::{api, Algorithm, Collection, Error, DEFAULT_COLLECTION};
 use crate::Key;
 
-/// The entry point of communicating with a [`org.freedesktop.Secrets`](https://specifications.freedesktop.org/secret-service/latest/index.html) implementation.
+/// The entry point of communicating with a [`org.freedesktop.Secrets`](https://specifications.freedesktop.org/secret-service-spec/latest/index.html) implementation.
 ///
 /// It will automatically create a session for you and allow you to retrieve
 /// collections or create new ones.

@@ -1,7 +1,7 @@
 use std::fmt;
 
 /// DBus Secret Service specific errors.
-/// <https://specifications.freedesktop.org/secret-service/latest/ch15.html>
+/// <https://specifications.freedesktop.org/secret-service-spec/latest/errors.html>
 #[derive(zbus::DBusError, Debug)]
 #[zbus(prefix = "org.freedesktop.Secret.Error")]
 pub enum ServiceError {

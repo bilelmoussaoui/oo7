@@ -7,9 +7,9 @@ use serde::{Deserialize, Serialize};
 /// The communication between the Secret Service and the application can either
 /// be encrypted or the items can be sent in plain text.
 pub enum Algorithm {
-    /// Plain text, per <https://specifications.freedesktop.org/secret-service/latest/ch07s02.html>.
+    /// Plain text, per <https://specifications.freedesktop.org/secret-service-spec/latest/ch07s02.html>.
     Plain,
-    /// Encrypted, per <https://specifications.freedesktop.org/secret-service/latest/ch07s03.html>.
+    /// Encrypted, per <https://specifications.freedesktop.org/secret-service-spec/latest/ch07s03.html>.
     Encrypted,
 }
 

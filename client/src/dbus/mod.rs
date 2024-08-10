@@ -1,4 +1,4 @@
-//! A [Secret Service](https://specifications.freedesktop.org/secret-service/latest/index.html) implementation.
+//! A [Secret Service](https://specifications.freedesktop.org/secret-service-spec/latest/index.html) implementation.
 //!
 //! That is usually done with
 //! ```no_run
