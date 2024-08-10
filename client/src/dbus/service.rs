@@ -186,13 +186,11 @@ impl<'a> Service<'a> {
 }
 
 #[cfg(test)]
-#[cfg(feature = "tokio")]
+#[cfg(all(feature = "tokio", feature = "local_tests"))]
 mod tests {
-    #[cfg(feature = "local_tests")]
     use super::Service;
 
     #[tokio::test]
-    #[cfg(feature = "local_tests")]
     async fn create_collection() {
         let service = Service::new().await.unwrap();
         let collection = service.create_collection("somelabel", None).await.unwrap();

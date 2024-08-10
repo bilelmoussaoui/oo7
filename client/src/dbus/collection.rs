@@ -255,14 +255,12 @@ impl<'a> Collection<'a> {
 }
 
 #[cfg(test)]
-#[cfg(feature = "tokio")]
+#[cfg(all(feature = "tokio", feature = "local_tests"))]
 mod tests {
-    #[cfg(feature = "local_tests")]
-    use super::*;
-    #[cfg(feature = "local_tests")]
+    use std::collections::HashMap;
+
     use crate::dbus::{self, Service};
 
-    #[cfg(feature = "local_tests")]
     async fn create_item(service: Service<'_>, encrypted: bool) {
         let mut attributes = HashMap::new();
         let value = if encrypted {
@@ -309,14 +307,12 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "local_tests")]
     async fn create_plain_item() {
         let service = Service::plain().await.unwrap();
         create_item(service, false).await;
     }
 
     #[tokio::test]
-    #[cfg(feature = "local_tests")]
     async fn create_encrypted_item() {
         let service = Service::encrypted().await.unwrap();
         create_item(service, true).await;
