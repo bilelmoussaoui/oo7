@@ -14,7 +14,7 @@ version.workspace = true
 [dependencies]
 futures-channel.workspace = true
 futures-util.workspace = true
-oo7 = { workspace = true, features = ["unstable"] }
+oo7.workspace = true
 ring = "0.17.5"
 secrecy = { version = "0.8", features = ["alloc"] }
 serde.workspace = true
