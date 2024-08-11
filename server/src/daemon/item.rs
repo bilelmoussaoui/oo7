@@ -2,7 +2,7 @@
 
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex},
+    sync::{atomic::AtomicBool, Arc, Mutex},
 };
 
 use oo7::{
@@ -25,7 +25,7 @@ pub struct Item {
     path: OwnedObjectPath,
     collection: OwnedObjectPath,
     keyring: Arc<Keyring>,
-    locked: bool,
+    locked: Arc<AtomicBool>,
     manager: Arc<Mutex<ServiceManager>>,
 }
 
@@ -71,7 +71,7 @@ impl Item {
         let secret = inner.secret();
         let parameters = self.parameters();
         let content_type = self.content_type();
-        match self.manager.lock().unwrap().session(session.clone()) {
+        match self.manager.lock().unwrap().session(session) {
             Some(session) => Ok((SecretInner(
                 session.path().into(),
                 parameters.to_vec(),
@@ -79,7 +79,7 @@ impl Item {
                 content_type.to_owned(),
             ),)),
             None => {
-                tracing::error!("Session {session} not found");
+                tracing::error!("The session does not exist");
                 Err(ServiceError::NoSession)
             }
         }
@@ -92,7 +92,7 @@ impl Item {
 
     #[zbus(property, name = "Locked")]
     pub fn locked(&self) -> bool {
-        self.locked
+        self.locked.load(std::sync::atomic::Ordering::Relaxed)
     }
 
     #[zbus(property, name = "Attributes")]
@@ -156,11 +156,11 @@ impl Item {
                 .unwrap(),
             inner: Arc::new(RwLock::new(item)),
             collection: collection_path.into(),
+            locked: Arc::new(AtomicBool::new(false)),
             parameters,
             content_type,
             keyring,
             manager,
-            locked: true,
         }
     }
 
