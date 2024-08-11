@@ -18,6 +18,7 @@ use zbus_names::BusName;
 
 use super::{
     collection::Collection,
+    item::Item,
     prompt::Prompt,
     secret_exchange::{retrieve_secret, SecretExchange},
     service::Service,
@@ -195,45 +196,72 @@ impl PrompterCallback {
                     Ok(_) => {
                         tracing::info!("password matches");
 
-                        let collection = self.manager.lock().unwrap().collection(LOGIN_KEYRING);
+                        let collections = self.manager.lock().unwrap().collections_to_unlock();
                         let connection_out = Arc::new(connection.to_owned());
 
-                        // to update locked property and send PropertiesChanged, CollectionChanged
-                        // signals
+                        // to update locked properties and sent out signals usings a separate task
                         tokio::spawn(async move {
                             let connection = Arc::clone(&connection_out);
-                            let interface_ref = connection
-                                .object_server()
-                                .interface::<_, Collection>(collection.path())
-                                .await
-                                .unwrap();
-                            let interface = interface_ref.get_mut().await;
 
-                            // update the locked property
-                            interface.set_locked(false).await;
-                            // calling zbus generated locked_changed to send PropertiesChanged
-                            // signal
-                            interface
-                                .locked_changed(interface_ref.signal_context())
-                                .await
-                                .unwrap();
+                            for collection in collections {
+                                let collection_interface_ref = connection
+                                    .object_server()
+                                    .interface::<_, Collection>(collection.clone())
+                                    .await
+                                    .unwrap();
+                                let collection_interface = collection_interface_ref.get_mut().await;
 
-                            // to retrieve the signal_context for the Service objectpath
-                            let interface_ref = connection
-                                .object_server()
-                                .interface::<_, Service>(
-                                    OwnedObjectPath::try_from(SERVICE_PATH).unwrap(),
+                                let items = collection_interface.items().await;
+                                if items.len() > 0 {
+                                    for item in items {
+                                        let item_interface_ref = connection
+                                            .object_server()
+                                            .interface::<_, Item>(item.clone())
+                                            .await
+                                            .unwrap();
+                                        let item_interface = item_interface_ref.get_mut().await;
+
+                                        // update item locked property
+                                        item_interface.set_locked(false).await;
+                                        // send PropertiesChanged
+                                        item_interface
+                                            .locked_changed(item_interface_ref.signal_context())
+                                            .await
+                                            .unwrap();
+                                        // send Collection.ItemChanged signal
+                                        Collection::item_changed(
+                                            collection_interface_ref.signal_context(),
+                                            item.into(),
+                                        )
+                                        .await
+                                        .unwrap();
+                                    }
+                                }
+                                // update the collection locked property
+                                collection_interface.set_locked(false).await;
+                                // calling zbus generated locked_changed to send PropertiesChanged
+                                // signal
+                                collection_interface
+                                    .locked_changed(collection_interface_ref.signal_context())
+                                    .await
+                                    .unwrap();
+
+                                // to retrieve the signal_context for the Service objectpath
+                                let service_interface_ref = connection
+                                    .object_server()
+                                    .interface::<_, Service>(
+                                        OwnedObjectPath::try_from(SERVICE_PATH).unwrap(),
+                                    )
+                                    .await
+                                    .unwrap();
+                                // send the Service.CollectionChanged signal
+                                Service::collection_changed(
+                                    service_interface_ref.signal_context(),
+                                    collection.into(),
                                 )
                                 .await
                                 .unwrap();
-
-                            // send the Service.CollectionChanged signal
-                            Service::collection_changed(
-                                interface_ref.signal_context(),
-                                collection.path(),
-                            )
-                            .await
-                            .unwrap();
+                            }
                         });
                     }
                     Err(_) => {
