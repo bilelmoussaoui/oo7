@@ -229,6 +229,18 @@ impl Collection {
         self.items.write().await.push(item);
     }
 
+    pub async fn drop_item(&self, path: ObjectPath<'_>) {
+        let mut index = 0;
+        for item in self.items.read().await.iter() {
+            if item.path() == path {
+                break;
+            }
+            index += 1;
+        }
+
+        self.items.write().await.remove(index);
+    }
+
     pub async fn alias(&self) -> String {
         self.alias.read().await.clone()
     }
