@@ -24,12 +24,12 @@ use zbus::{
 };
 
 use super::{
-    collection::Collection, error::ServiceError, prompt::Prompt, service_manager::ServiceManager,
-    session::Session, Result,
+    collection::Collection, error::ServiceError, item, prompt::Prompt,
+    service_manager::ServiceManager, session::Session, Result,
 };
 #[cfg(debug_assertions)]
 use crate::SERVICE_NAME;
-use crate::{LOGIN_KEYRING, LOGIN_KEYRING_PATH};
+use crate::{LOGIN_KEYRING, LOGIN_KEYRING_PATH, SERVICE_PATH};
 
 const SESSION_COLLECTION: &str = "session";
 
@@ -207,19 +207,72 @@ impl Service {
     pub async fn lock(
         &self,
         objects: Vec<OwnedObjectPath>,
+        #[zbus(object_server)] object_server: &zbus::ObjectServer,
     ) -> Result<(Vec<OwnedObjectPath>, ObjectPath)> {
         // to store objectpaths that were locked without a prompt
         let mut locked: Vec<OwnedObjectPath> = Vec::new();
 
-        // sets lock state in memory
         for object in objects {
-            // todo: use interface method access
-            for collection in self.collections.read().await.iter() {
-                if collection.path() == *object && !collection.locked() {
-                    collection.set_locked(true).await;
-                    locked.push(object.clone());
+            let collection_interface_ref = object_server
+                .interface::<_, Collection>(object.clone())
+                .await
+                .unwrap();
+            let collection_interface = collection_interface_ref.get_mut().await;
+
+            // if the collection is already in locked state exit this loop and the rest of
+            // the code block
+            if collection_interface.locked() {
+                break;
+            }
+
+            let items = collection_interface.items().await;
+            if items.len() > 0 {
+                for item in items {
+                    let item_interface_ref = object_server
+                        .interface::<_, item::Item>(item.clone())
+                        .await
+                        .unwrap();
+                    let item_interface = item_interface_ref.get_mut().await;
+
+                    // update item locked property
+                    item_interface.set_locked(true).await;
+                    // send PropertiesChanged signal
+                    item_interface
+                        .locked_changed(item_interface_ref.signal_context())
+                        .await
+                        .unwrap();
+                    // send Collection.ItemChanged signal
+                    Collection::item_changed(
+                        collection_interface_ref.signal_context(),
+                        item.into(),
+                    )
+                    .await
+                    .unwrap();
                 }
             }
+            // update collection locked property
+            collection_interface.set_locked(true).await;
+            // send PropertiesChanged signal
+            collection_interface
+                .locked_changed(collection_interface_ref.signal_context())
+                .await
+                .unwrap();
+
+            // to retrieve the signal_context for the Service objectpath
+            let service_interface_ref = object_server
+                .interface::<_, Service>(OwnedObjectPath::try_from(SERVICE_PATH).unwrap())
+                .await
+                .unwrap();
+
+            // send Service.CollectionChanged signal
+            Service::collection_changed(
+                service_interface_ref.signal_context(),
+                object.clone().into(),
+            )
+            .await
+            .unwrap();
+
+            locked.push(object);
         }
 
         if locked.is_empty() {
