@@ -14,9 +14,7 @@ use tokio::sync::RwLock;
 use zbus::{interface, message::Header, zvariant, ObjectServer, SignalContext};
 use zvariant::{ObjectPath, OwnedObjectPath};
 
-use super::{
-    error::ServiceError, secret::Secret, service_manager::ServiceManager, Result, Service,
-};
+use super::{error::ServiceError, service_manager::ServiceManager, Result, Service};
 use crate::SECRET_COLLECTION_PREFIX;
 
 #[derive(Clone, Debug)]
@@ -77,28 +75,9 @@ impl Collection {
         let value = secret.2;
         let content_type = secret.3;
 
-        let session = self
-            .manager
-            .lock()
-            .unwrap()
-            .session(session.into())
-            .unwrap();
-        let aes_key = session.aes_key();
-
-        let secret = if aes_key.is_none() {
-            Secret::new(session.clone(), value, content_type.as_str())
-        } else {
-            Secret::new_encrypted(
-                session.clone(),
-                value,
-                content_type.as_str(),
-                aes_key.as_ref().unwrap(),
-            )
-        };
-
         let item = self
             .keyring
-            .create_item(label, &attributes, secret.value(), replace)
+            .create_item(label, &attributes, value, replace)
             .await
             .map_err::<ServiceError, _>(From::from)?;
         *self.item_counter.write().await += 1;
