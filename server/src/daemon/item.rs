@@ -179,4 +179,9 @@ impl Item {
     pub(crate) fn collection(&self) -> ObjectPath {
         self.collection.as_ref()
     }
+
+    pub async fn set_locked(&self, locked: bool) {
+        self.locked
+            .store(locked, std::sync::atomic::Ordering::Relaxed);
+    }
 }
