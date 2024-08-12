@@ -8,19 +8,19 @@ use std::{
 
 use oo7::{
     dbus::api::{Properties, SecretInner},
-    portal::{Item, Keyring},
+    portal::{self, Keyring},
 };
 use tokio::sync::RwLock;
 use zbus::{interface, message::Header, zvariant, ObjectServer, SignalContext};
 use zvariant::{ObjectPath, OwnedObjectPath};
 
-use super::{error::ServiceError, service_manager::ServiceManager, Result, Service};
+use super::{error::ServiceError, item, service_manager::ServiceManager, Result, Service};
 use crate::SECRET_COLLECTION_PREFIX;
 
 #[derive(Clone, Debug)]
 pub struct Collection {
     keyring: Arc<Keyring>,
-    items: Arc<RwLock<Vec<super::item::Item>>>,
+    items: Arc<RwLock<Vec<item::Item>>>,
     alias: Arc<RwLock<String>>,
     label: Arc<RwLock<String>>,
     locked: Arc<AtomicBool>,
@@ -50,7 +50,7 @@ impl Collection {
         Ok(ObjectPath::default())
     }
 
-    pub async fn search_items(&self, attributes: HashMap<&str, &str>) -> Result<Vec<Item>> {
+    pub async fn search_items(&self, attributes: HashMap<&str, &str>) -> Result<Vec<portal::Item>> {
         self.keyring
             .search_items(&attributes)
             .await
@@ -82,7 +82,7 @@ impl Collection {
             .map_err::<ServiceError, _>(From::from)?;
         *self.item_counter.write().await += 1;
 
-        let item = super::item::Item::new(
+        let item = item::Item::new(
             item,
             parameters,
             content_type,
@@ -200,11 +200,11 @@ impl Collection {
         self.path.as_ref()
     }
 
-    pub async fn items_read(&self) -> Vec<super::item::Item> {
+    pub async fn items_read(&self) -> Vec<item::Item> {
         self.items.read().await.clone()
     }
 
-    pub async fn set_items(&self, item: super::item::Item) {
+    pub async fn set_items(&self, item: item::Item) {
         self.items.write().await.push(item);
     }
 

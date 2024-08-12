@@ -12,7 +12,7 @@ use oo7::{
         api::{Properties, SecretInner},
         Algorithm,
     },
-    portal::{Item, Keyring, Secret},
+    portal::{self, Keyring, Secret},
     Key,
 };
 use tokio::sync::RwLock;
@@ -132,15 +132,15 @@ impl Service {
     pub async fn search_items(
         &self,
         attributes: HashMap<&str, &str>,
-    ) -> Result<(Vec<Item>, Vec<Item>)> {
+    ) -> Result<(Vec<portal::Item>, Vec<portal::Item>)> {
         let items = self
             .keyring
             .search_items(&attributes)
             .await
             .map_err::<ServiceError, _>(From::from)?;
 
-        let mut unlocked: Vec<Item> = Vec::new();
-        let mut locked: Vec<Item> = Vec::new();
+        let mut unlocked: Vec<portal::Item> = Vec::new();
+        let mut locked: Vec<portal::Item> = Vec::new();
 
         for item in items {
             let attributes = item.attributes();
