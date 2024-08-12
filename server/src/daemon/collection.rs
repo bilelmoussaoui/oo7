@@ -232,4 +232,22 @@ impl Collection {
         self.locked
             .store(locked, std::sync::atomic::Ordering::Relaxed);
     }
+
+    pub async fn dispatch_items(&self, object_server: &ObjectServer, item: portal::Item) {
+        *self.item_counter.write().await += 1;
+
+        let item = item::Item::new(
+            item,
+            Vec::new(), // temporarily
+            String::from("text/plain"),
+            *self.item_counter.read().await,
+            self.path(),
+            Arc::clone(&self.keyring),
+            Arc::clone(&self.manager),
+        )
+        .await;
+        self.set_items(item.clone()).await;
+
+        object_server.at(&item.clone().path(), item).await.unwrap();
+    }
 }
