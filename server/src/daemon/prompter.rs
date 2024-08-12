@@ -18,7 +18,7 @@ use zbus_names::BusName;
 
 use super::{
     collection::Collection,
-    item::Item,
+    item,
     prompt::Prompt,
     secret_exchange::{retrieve_secret, SecretExchange},
     service::Service,
@@ -216,7 +216,7 @@ impl PrompterCallback {
                                     for item in items {
                                         let item_interface_ref = connection
                                             .object_server()
-                                            .interface::<_, Item>(item.clone())
+                                            .interface::<_, item::Item>(item.clone())
                                             .await
                                             .unwrap();
                                         let item_interface = item_interface_ref.get_mut().await;
