@@ -470,7 +470,7 @@ impl Service {
             .insert_collection(&label, login.clone());
 
         let path = OwnedObjectPath::from(login.path());
-        object_server.at(&path, login).await.unwrap();
+        object_server.at(&path, login.clone()).await.unwrap();
 
         // setting up the temporary session collection
         let session = Collection::new(
@@ -485,5 +485,71 @@ impl Service {
 
         let path = OwnedObjectPath::from(session.path());
         object_server.at(&path, session).await.unwrap();
+
+        // dispatch already existing Items in the login Keyring to the objectpaths tree
+        let n_items = service.keyring.n_items().await;
+        if n_items > 0 {
+            let mut items: Vec<portal::Item> = Vec::with_capacity(n_items);
+            for item in service.keyring.items().await {
+                items.push(match item {
+                    Ok(item) => item,
+                    Err(err) => panic!("Item cannot be decrypted: {}", err),
+                })
+            }
+
+            for item in items {
+                // perform dispatching
+                login.dispatch_items(&object_server, item).await;
+            }
+        }
+
+        // unlock everything.
+        // todo: move this block to somewhere else
+        let collection_interface_ref = object_server
+            .interface::<_, Collection>(login.clone().path())
+            .await
+            .unwrap();
+        let collection_interface = collection_interface_ref.get_mut().await;
+
+        let items = collection_interface.items().await;
+        if items.len() > 0 {
+            for item in items {
+                let item_interface_ref = object_server
+                    .interface::<_, item::Item>(item.clone())
+                    .await
+                    .unwrap();
+                let item_interface = item_interface_ref.get_mut().await;
+
+                // update item locked property
+                item_interface.set_locked(false).await;
+                // send PropertiesChanged
+                item_interface
+                    .locked_changed(item_interface_ref.signal_context())
+                    .await
+                    .unwrap();
+                // send Collection.ItemChanged signal
+                Collection::item_changed(collection_interface_ref.signal_context(), item.into())
+                    .await
+                    .unwrap();
+            }
+        }
+        // update the collection locked property
+        collection_interface.set_locked(false).await;
+        // calling zbus generated locked_changed to send PropertiesChanged
+        // signal
+        collection_interface
+            .locked_changed(collection_interface_ref.signal_context())
+            .await
+            .unwrap();
+
+        // to retrieve the signal_context for the Service objectpath
+        let service_interface_ref = object_server
+            .interface::<_, Service>(OwnedObjectPath::try_from(SERVICE_PATH).unwrap())
+            .await
+            .unwrap();
+        // send the Service.CollectionChanged signal
+        Service::collection_changed(service_interface_ref.signal_context(), login.path())
+            .await
+            .unwrap();
     }
 }
