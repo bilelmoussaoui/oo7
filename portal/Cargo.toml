@@ -12,14 +12,12 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
+ashpd = {version = "0.9", git = "https://github.com/bilelmoussaoui/ashpd", features = ["backend", "tracing"]}
 clap.workspace = true
-futures-channel.workspace = true
-futures-util.workspace = true
 oo7.workspace = true
 getrandom = "0.2"
 serde.workspace = true
 tokio = { workspace = true, features = ["io-util", "net", "macros", "rt-multi-thread"] }
 tracing = "0.1"
 tracing-subscriber.workspace = true
-zbus = { workspace = true, features = ["tokio"] }
 zeroize.workspace = true
