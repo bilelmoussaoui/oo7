@@ -136,7 +136,7 @@ impl<'a> Service<'a> {
     /// Find a collection with it label.
     pub async fn with_label(&self, label: &str) -> Result<Option<Collection<'a>>, Error> {
         let collections = self.collections().await?;
-        for collection in collections.into_iter() {
+        for collection in collections {
             if collection.label().await? == label {
                 return Ok(Some(collection));
             }
