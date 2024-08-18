@@ -53,7 +53,11 @@ enum Commands {
         after_help = format!("Will delete all secrets with matching attributes.\n\nExample:\n  {} delete smtp-port=1025", BINARY_NAME)
     )]
     Delete {
-        #[arg(help = "List of attributes. This is a space separated list of pairs of key value", value_parser = parse_key_val::<String, String>)]
+        #[arg(
+            help = "List of attributes. This is a space separated list of pairs of key value",
+            value_parser = parse_key_val::<String, String>,
+            required = true, num_args = 1
+        )]
         attributes: Vec<(String, String)>,
     },
 
@@ -63,7 +67,12 @@ enum Commands {
         after_help = format!("Example:\n  {} lookup smtp-port=1025", BINARY_NAME)
     )]
     Lookup {
-        #[arg(help = "List of attributes. This is a space separated list of pairs of key value", value_parser = parse_key_val::<String, String>)]
+        #[arg(
+            help = "List of attributes. This is a space separated list of pairs of key value",
+            value_parser = parse_key_val::<String, String>,
+            required = true,
+            num_args = 1
+        )]
         attributes: Vec<(String, String)>,
         #[arg(long, help = "Print only the secret.")]
         secret_only: bool,
@@ -83,7 +92,10 @@ enum Commands {
             help = "Whether to list all possible matches or only the first result"
         )]
         all: bool,
-        #[arg(help = "List of attributes. This is a space separated list of pairs of key value", value_parser = parse_key_val::<String, String>)]
+        #[arg(
+            help = "List of attributes. This is a space separated list of pairs of key value",
+            value_parser = parse_key_val::<String, String>
+        )]
         attributes: Vec<(String, String)>,
         #[arg(long, help = "Print only the secret.")]
         secret_only: bool,
@@ -99,7 +111,11 @@ enum Commands {
     Store {
         #[arg(help = "Description for the secret")]
         label: String,
-        #[arg(help = "List of attributes. This is a space separated list of pairs of key value", value_parser = parse_key_val::<String, String>)]
+        #[arg(
+            help = "List of attributes. This is a space separated list of pairs of key value",
+            value_parser = parse_key_val::<String, String>,
+            required = true, num_args = 1
+        )]
         attributes: Vec<(String, String)>,
     },
 
