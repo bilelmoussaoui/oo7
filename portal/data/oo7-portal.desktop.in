@@ -3,5 +3,5 @@ Type=Application
 Name=Secret Portal
 # TRANSLATORS: Don't translate this text (this is icon name)
 Icon=applications-system-symbolic
-Exec=@libexecdir@/oo7-portal
+Exec=@libexecdir@/@bin_name@
 NoDisplay=true

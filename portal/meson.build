@@ -5,6 +5,7 @@ project(
   meson_version: '>= 0.59.0',
 )
 
+dbus_name = 'org.freedesktop.impl.portal.desktop.oo7'
 is_devel = get_option('profile') == 'development'
 
 prefix = get_option('prefix')
@@ -26,8 +27,10 @@ endif
 
 portal_dir = datadir / 'xdg-desktop-portal' / 'portals'
 
-libexecdir_conf = configuration_data()
-libexecdir_conf.set('libexecdir', prefix / libexecdir)
+conf = configuration_data()
+conf.set('libexecdir', prefix / libexecdir)
+conf.set('dbus_name', dbus_name)
+conf.set('bin_name', meson.project_name())
 
 summary({
   'prefix': prefix,
