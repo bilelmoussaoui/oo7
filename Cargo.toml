@@ -16,7 +16,7 @@ categories = ["os::linux-apis", "os", "api-bindings"]
 repository = "https://github.com/bilelmoussaoui/oo7"
 homepage = "https://github.com/bilelmoussaoui/oo7"
 license = "MIT"
-rust-version = "1.75"
+rust-version = "1.80"
 exclude = ["org.freedesktop.Secrets.xml"]
 
 [workspace.dependencies]
