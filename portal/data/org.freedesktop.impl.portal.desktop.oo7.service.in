@@ -1,4 +1,4 @@
 [D-BUS Service]
-Name=org.freedesktop.impl.portal.desktop.oo7
-Exec=@libexecdir@/oo7-portal
-SystemdService=org.freedesktop.impl.portal.desktop.oo7.service
+Name=@dbus_name@
+Exec=@libexecdir@/@bin_name@
+SystemdService=@dbus_name@.service

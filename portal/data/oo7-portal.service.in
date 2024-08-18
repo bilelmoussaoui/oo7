@@ -6,5 +6,5 @@ PartOf=graphical-session.target
 
 [Service]
 Type=dbus
-BusName=org.freedesktop.impl.portal.desktop.oo7
-ExecStart=@libexecdir@/oo7-portal
+BusName=@dbus_name@
+ExecStart=@libexecdir@/@bin_name@
