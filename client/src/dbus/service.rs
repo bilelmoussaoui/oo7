@@ -3,7 +3,10 @@ use std::sync::Arc;
 use futures_util::{Stream, StreamExt};
 use zbus::zvariant::OwnedObjectPath;
 
-use super::{api, Algorithm, Collection, Error, DEFAULT_COLLECTION};
+use super::{
+    api::{self, WindowIdentifier},
+    Algorithm, Collection, Error, DEFAULT_COLLECTION,
+};
 use crate::Key;
 
 /// The entry point of communicating with a [`org.freedesktop.Secrets`](https://specifications.freedesktop.org/secret-service-spec/latest/index.html) implementation.
@@ -126,9 +129,10 @@ impl<'a> Service<'a> {
         &self,
         label: &str,
         alias: Option<&str>,
+        window_id: Option<WindowIdentifier>,
     ) -> Result<Collection<'a>, Error> {
         self.inner
-            .create_collection(label, alias)
+            .create_collection(label, alias, window_id)
             .await
             .map(|collection| self.new_collection(collection))
     }
@@ -193,7 +197,10 @@ mod tests {
     #[tokio::test]
     async fn create_collection() {
         let service = Service::new().await.unwrap();
-        let collection = service.create_collection("somelabel", None).await.unwrap();
+        let collection = service
+            .create_collection("somelabel", None, None)
+            .await
+            .unwrap();
 
         let found_collection = service.with_label("somelabel").await.unwrap();
         assert!(found_collection.is_some());
@@ -203,7 +210,7 @@ mod tests {
             collection.label().await.unwrap()
         );
 
-        collection.delete().await.unwrap();
+        collection.delete(None).await.unwrap();
 
         let found_collection = service.with_label("somelabel").await.unwrap();
         assert!(found_collection.is_none());

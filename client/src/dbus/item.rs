@@ -7,7 +7,10 @@ use tokio::sync::RwLock;
 use zbus::zvariant::ObjectPath;
 use zeroize::Zeroizing;
 
-use super::{api, Algorithm, Error};
+use super::{
+    api::{self, WindowIdentifier},
+    Algorithm, Error,
+};
 use crate::{crypto, AsAttributes, Key};
 
 /// A secret with a label and attributes to identify it.
@@ -122,11 +125,11 @@ impl<'a> Item<'a> {
     }
 
     /// Delete the item.
-    pub async fn delete(&self) -> Result<(), Error> {
+    pub async fn delete(&self, window_id: Option<WindowIdentifier>) -> Result<(), Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            self.inner.delete().await?;
+            self.inner.delete(window_id).await?;
             *self.available.write().await = false;
             Ok(())
         }
@@ -178,21 +181,25 @@ impl<'a> Item<'a> {
     }
 
     /// Unlock the item.
-    pub async fn unlock(&self) -> Result<(), Error> {
+    pub async fn unlock(&self, window_id: Option<WindowIdentifier>) -> Result<(), Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            self.service.unlock(&[self.inner.inner().path()]).await?;
+            self.service
+                .unlock(&[self.inner.inner().path()], window_id)
+                .await?;
             Ok(())
         }
     }
 
     /// Lock the item.
-    pub async fn lock(&self) -> Result<(), Error> {
+    pub async fn lock(&self, window_id: Option<WindowIdentifier>) -> Result<(), Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            self.service.lock(&[self.inner.inner().path()]).await?;
+            self.service
+                .lock(&[self.inner.inner().path()], window_id)
+                .await?;
             Ok(())
         }
     }

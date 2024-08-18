@@ -41,7 +41,7 @@ impl Keyring {
                 Err(portal::Error::PortalNotAvailable) => {
                     #[cfg(feature = "tracing")]
                     tracing::debug!(
-                        "org.freedesktop.portal.Secrets is not available, falling back to the Sercret Service backend"
+                        "org.freedesktop.portal.Secrets is not available, falling back to the Secret Service backend"
                     );
                 }
                 Err(e) => return Err(crate::Error::Portal(e)),
@@ -49,7 +49,7 @@ impl Keyring {
         } else {
             #[cfg(feature = "tracing")]
             tracing::debug!(
-                "Application is not sandboxed, falling back to the Sercret Service backend"
+                "Application is not sandboxed, falling back to the Secret Service backend"
             );
         }
         let service = dbus::Service::new().await?;
@@ -59,7 +59,7 @@ impl Keyring {
                 #[cfg(feature = "tracing")]
                 tracing::debug!("Default collection doesn't exists, trying to create it");
                 service
-                    .create_collection("Login", Some(DEFAULT_COLLECTION))
+                    .create_collection("Login", Some(DEFAULT_COLLECTION), None)
                     .await
             }
             Err(e) => Err(e),
@@ -73,7 +73,7 @@ impl Keyring {
     pub async fn unlock(&self) -> Result<()> {
         // No unlocking is needed for the file backend
         if let Self::DBus(backend) = self {
-            backend.unlock().await?;
+            backend.unlock(None).await?;
         };
         Ok(())
     }
@@ -84,7 +84,7 @@ impl Keyring {
     pub async fn lock(&self) -> Result<()> {
         // No locking is needed for the file backend
         if let Self::DBus(backend) = self {
-            backend.lock().await?;
+            backend.lock(None).await?;
         };
         Ok(())
     }
@@ -95,7 +95,7 @@ impl Keyring {
             Self::DBus(backend) => {
                 let items = backend.search_items(attributes).await?;
                 for item in items {
-                    item.delete().await?;
+                    item.delete(None).await?;
                 }
             }
             Self::File(backend) => {
@@ -139,7 +139,7 @@ impl Keyring {
         match self {
             Self::DBus(backend) => {
                 backend
-                    .create_item(label, attributes, secret, replace, "text/plain")
+                    .create_item(label, attributes, secret, replace, "text/plain", None)
                     .await?;
             }
             Self::File(backend) => {
@@ -305,7 +305,7 @@ impl Item {
     /// The method does nothing if keyring is backed by a file backend.
     pub async fn lock(&self) -> Result<()> {
         if let Self::DBus(item) = self {
-            item.lock().await?;
+            item.lock(None).await?;
         }
         Ok(())
     }
@@ -315,7 +315,7 @@ impl Item {
     /// The method does nothing if keyring is backed by a file backend.
     pub async fn unlock(&self) -> Result<()> {
         if let Self::DBus(item) = self {
-            item.unlock().await?;
+            item.unlock(None).await?;
         }
         Ok(())
     }
@@ -329,7 +329,7 @@ impl Item {
                 backend.delete(&item_guard.attributes()).await?;
             }
             Self::DBus(item) => {
-                item.delete().await?;
+                item.delete(None).await?;
             }
         };
         Ok(())

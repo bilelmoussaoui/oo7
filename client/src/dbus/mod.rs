@@ -20,6 +20,7 @@
 //!         b"password",
 //!         true,
 //!         "text/plain",
+//!         None,
 //!     )
 //!     .await?;
 //!

@@ -181,7 +181,7 @@ async fn store(label: &str, attributes: &impl AsAttributes) -> Result<(), Error>
     let secret = rpassword::read_password().map_err(|_| Error::new("Can't read password"))?;
 
     collection
-        .create_item(label, attributes, &secret, true, "text/plain")
+        .create_item(label, attributes, &secret, true, "text/plain", None)
         .await?;
 
     Ok(())
@@ -227,7 +227,7 @@ async fn delete(attributes: &impl AsAttributes) -> Result<(), Error> {
     let items = collection.search_items(attributes).await?;
 
     for item in items {
-        item.delete().await?;
+        item.delete(None).await?;
     }
 
     Ok(())
@@ -235,14 +235,14 @@ async fn delete(attributes: &impl AsAttributes) -> Result<(), Error> {
 
 async fn lock() -> Result<(), Error> {
     let collection = collection().await?;
-    collection.lock().await?;
+    collection.lock(None).await?;
 
     Ok(())
 }
 
 async fn unlock() -> Result<(), Error> {
     let collection = collection().await?;
-    collection.unlock().await?;
+    collection.unlock(None).await?;
 
     Ok(())
 }
@@ -330,7 +330,7 @@ async fn collection<'a>() -> Result<Collection<'a>, Error> {
         Ok(c) => Ok(c),
         Err(oo7::dbus::Error::NotFound(_)) => {
             service
-                .create_collection("Login", Some(oo7::dbus::DEFAULT_COLLECTION))
+                .create_collection("Login", Some(oo7::dbus::DEFAULT_COLLECTION), None)
                 .await
         }
         Err(e) => Err(e),

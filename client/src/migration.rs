@@ -37,7 +37,7 @@ pub async fn migrate(attributes: Vec<impl AsAttributes>, replace: bool) -> Resul
     file_backend.create_items(new_items).await?;
 
     for item in all_items.iter() {
-        item.delete().await?;
+        item.delete(None).await?;
     }
 
     Ok(())
