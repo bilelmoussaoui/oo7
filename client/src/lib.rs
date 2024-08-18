@@ -14,7 +14,7 @@ compile_error!("You can't enable both openssl_crypto & native_crypto features at
 ))]
 compile_error!("You you have to enable either openssl_crypto or native_crypto feature");
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 mod error;
 mod key;
@@ -59,72 +59,31 @@ pub trait AsAttributes {
     }
 }
 
-impl<K, V> AsAttributes for &[(K, V)]
-where
-    K: AsRef<str>,
-    V: AsRef<str>,
-{
-    fn as_attributes(&self) -> HashMap<&str, &str> {
-        self.iter().map(|(k, v)| (k.as_ref(), v.as_ref())).collect()
-    }
+macro_rules! impl_as_attributes {
+    ($rust_type:ty) => {
+        impl<K, V> AsAttributes for $rust_type
+        where
+            K: AsRef<str>,
+            V: AsRef<str>,
+        {
+            fn as_attributes(&self) -> std::collections::HashMap<&str, &str> {
+                self.iter().map(|(k, v)| (k.as_ref(), v.as_ref())).collect()
+            }
+        }
+
+        impl<K, V> AsAttributes for &$rust_type
+        where
+            K: AsRef<str>,
+            V: AsRef<str>,
+        {
+            fn as_attributes(&self) -> std::collections::HashMap<&str, &str> {
+                self.iter().map(|(k, v)| (k.as_ref(), v.as_ref())).collect()
+            }
+        }
+    };
 }
 
-impl<K, V> AsAttributes for &HashMap<K, V>
-where
-    K: AsRef<str>,
-    V: AsRef<str>,
-{
-    fn as_attributes(&self) -> HashMap<&str, &str> {
-        self.iter().map(|(k, v)| (k.as_ref(), v.as_ref())).collect()
-    }
-}
-
-impl<K, V> AsAttributes for HashMap<K, V>
-where
-    K: AsRef<str>,
-    V: AsRef<str>,
-{
-    fn as_attributes(&self) -> HashMap<&str, &str> {
-        self.iter().map(|(k, v)| (k.as_ref(), v.as_ref())).collect()
-    }
-}
-
-impl<K, V> AsAttributes for BTreeMap<K, V>
-where
-    K: AsRef<str>,
-    V: AsRef<str>,
-{
-    fn as_attributes(&self) -> HashMap<&str, &str> {
-        self.iter().map(|(k, v)| (k.as_ref(), v.as_ref())).collect()
-    }
-}
-
-impl<K, V> AsAttributes for &BTreeMap<K, V>
-where
-    K: AsRef<str>,
-    V: AsRef<str>,
-{
-    fn as_attributes(&self) -> HashMap<&str, &str> {
-        self.iter().map(|(k, v)| (k.as_ref(), v.as_ref())).collect()
-    }
-}
-
-impl<K, V> AsAttributes for Vec<(K, V)>
-where
-    K: AsRef<str>,
-    V: AsRef<str>,
-{
-    fn as_attributes(&self) -> HashMap<&str, &str> {
-        self.iter().map(|(k, v)| (k.as_ref(), v.as_ref())).collect()
-    }
-}
-
-impl<K, V> AsAttributes for &Vec<(K, V)>
-where
-    K: AsRef<str>,
-    V: AsRef<str>,
-{
-    fn as_attributes(&self) -> HashMap<&str, &str> {
-        self.iter().map(|(k, v)| (k.as_ref(), v.as_ref())).collect()
-    }
-}
+impl_as_attributes!([(K, V)]);
+impl_as_attributes!(HashMap<K, V>);
+impl_as_attributes!(std::collections::BTreeMap<K, V>);
+impl_as_attributes!(Vec<(K, V)>);
