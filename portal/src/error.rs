@@ -26,8 +26,8 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl From<ring::error::Unspecified> for Error {
-    fn from(err: ring::error::Unspecified) -> Self {
+impl From<getrandom::Error> for Error {
+    fn from(err: getrandom::Error) -> Self {
         Self::Owned(err.to_string())
     }
 }
