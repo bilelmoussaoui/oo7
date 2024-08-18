@@ -8,7 +8,7 @@ use zbus::{
 
 use super::{
     secret::SecretInner, Collection, Item, Prompt, Properties, Secret, Session, Unlockable,
-    DESTINATION, PATH,
+    WindowIdentifier, DESTINATION, PATH,
 };
 use crate::{
     dbus::{Algorithm, Error, ServiceError},
@@ -118,6 +118,7 @@ impl<'a> Service<'a> {
         &self,
         label: &str,
         alias: Option<&str>,
+        window_id: Option<WindowIdentifier>,
     ) -> Result<Collection<'a>, Error> {
         let properties = Properties::for_collection(label);
         let (collection_path, prompt_path) = self
@@ -131,7 +132,7 @@ impl<'a> Service<'a> {
         let collection_path = if let Some(prompt) =
             Prompt::new(self.inner().connection(), prompt_path).await?
         {
-            let response = prompt.receive_completed().await?;
+            let response = prompt.receive_completed(window_id).await?;
             OwnedObjectPath::try_from(response).map_err::<zbus::zvariant::Error, _>(From::from)?
         } else {
             collection_path
@@ -159,7 +160,11 @@ impl<'a> Service<'a> {
         Ok((unlocked_items, locked_items))
     }
 
-    pub async fn unlock(&self, items: &[impl Unlockable]) -> Result<Vec<OwnedObjectPath>, Error> {
+    pub async fn unlock(
+        &self,
+        items: &[impl Unlockable],
+        window_id: Option<WindowIdentifier>,
+    ) -> Result<Vec<OwnedObjectPath>, Error> {
         let (mut unlocked_item_paths, prompt_path) = self
             .inner()
             .call_method("Unlock", &(items))
@@ -170,7 +175,7 @@ impl<'a> Service<'a> {
         let cnx = self.inner().connection();
 
         if let Some(prompt) = Prompt::new(cnx, prompt_path).await? {
-            let response = prompt.receive_completed().await?;
+            let response = prompt.receive_completed(window_id).await?;
             let locked_paths = Vec::<OwnedObjectPath>::try_from(response)
                 .map_err::<zbus::zvariant::Error, _>(From::from)?;
             unlocked_item_paths.extend(locked_paths);
@@ -178,7 +183,11 @@ impl<'a> Service<'a> {
         Ok(unlocked_item_paths)
     }
 
-    pub async fn lock(&self, items: &[impl Unlockable]) -> Result<Vec<OwnedObjectPath>, Error> {
+    pub async fn lock(
+        &self,
+        items: &[impl Unlockable],
+        window_id: Option<WindowIdentifier>,
+    ) -> Result<Vec<OwnedObjectPath>, Error> {
         let (mut locked_item_paths, prompt_path) = self
             .inner()
             .call_method("Lock", &(items))
@@ -189,7 +198,7 @@ impl<'a> Service<'a> {
         let cnx = self.inner().connection();
 
         if let Some(prompt) = Prompt::new(cnx, prompt_path).await? {
-            let response = prompt.receive_completed().await?;
+            let response = prompt.receive_completed(window_id).await?;
             let locked_paths = Vec::<OwnedObjectPath>::try_from(response)
                 .map_err::<zbus::zvariant::Error, _>(From::from)?;
             locked_item_paths.extend(locked_paths);

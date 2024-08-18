@@ -7,7 +7,7 @@ use zbus::{
     ProxyDefault,
 };
 
-use super::{Item, Prompt, Properties, Secret, Unlockable, DESTINATION};
+use super::{Item, Prompt, Properties, Secret, Unlockable, WindowIdentifier, DESTINATION};
 use crate::{
     dbus::{Error, ServiceError},
     AsAttributes,
@@ -132,7 +132,7 @@ impl<'a> Collection<'a> {
         Ok(Duration::from_secs(time))
     }
 
-    pub async fn delete(&self) -> Result<(), Error> {
+    pub async fn delete(&self, window_id: Option<WindowIdentifier>) -> Result<(), Error> {
         let prompt_path = self
             .inner()
             .call_method("Delete", &())
@@ -141,7 +141,7 @@ impl<'a> Collection<'a> {
             .body()
             .deserialize::<OwnedObjectPath>()?;
         if let Some(prompt) = Prompt::new(self.inner().connection(), prompt_path).await? {
-            let _ = prompt.receive_completed().await?;
+            let _ = prompt.receive_completed(window_id).await?;
         }
         Ok(())
     }
@@ -168,6 +168,7 @@ impl<'a> Collection<'a> {
         attributes: &impl AsAttributes,
         secret: &Secret<'_>,
         replace: bool,
+        window_id: Option<WindowIdentifier>,
     ) -> Result<Item<'a>, Error> {
         let properties = Properties::for_item(label, attributes);
         let (item_path, prompt_path) = self
@@ -179,7 +180,7 @@ impl<'a> Collection<'a> {
             .deserialize::<(OwnedObjectPath, OwnedObjectPath)>()?;
         let cnx = self.inner().connection();
         let item_path = if let Some(prompt) = Prompt::new(cnx, prompt_path).await? {
-            let response = prompt.receive_completed().await?;
+            let response = prompt.receive_completed(window_id).await?;
             OwnedObjectPath::try_from(response).map_err::<zbus::zvariant::Error, _>(From::from)?
         } else {
             item_path

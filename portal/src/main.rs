@@ -49,7 +49,7 @@ async fn send_secret_to_app(app_id: &AppID, fd: std::os::fd::OwnedFd) -> Result<
     let collection = match service.default_collection().await {
         Err(oo7::dbus::Error::NotFound(_)) => {
             service
-                .create_collection("Default", Some(oo7::dbus::DEFAULT_COLLECTION))
+                .create_collection("Default", Some(oo7::dbus::DEFAULT_COLLECTION), None)
                 .await
         }
         e => e,
@@ -70,6 +70,7 @@ async fn send_secret_to_app(app_id: &AppID, fd: std::os::fd::OwnedFd) -> Result<
                 true,
                 // TODO Find a better one.
                 "text/plain",
+                None,
             )
             .await?;
 

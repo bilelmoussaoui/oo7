@@ -7,7 +7,10 @@ use futures_util::{Stream, StreamExt};
 use tokio::sync::RwLock;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 
-use super::{api, Algorithm, Error, Item};
+use super::{
+    api::{self, WindowIdentifier},
+    Algorithm, Error, Item,
+};
 use crate::{AsAttributes, Key};
 
 /// A collection allows to store and retrieve items.
@@ -159,6 +162,7 @@ impl<'a> Collection<'a> {
         secret: impl AsRef<[u8]>,
         replace: bool,
         content_type: &str,
+        window_id: Option<WindowIdentifier>,
     ) -> Result<Item<'a>, Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
@@ -176,7 +180,7 @@ impl<'a> Collection<'a> {
             };
             let item = self
                 .inner
-                .create_item(label, attributes, &secret, replace)
+                .create_item(label, attributes, &secret, replace, window_id)
                 .await?;
 
             Ok(self.new_item(item))
@@ -184,31 +188,35 @@ impl<'a> Collection<'a> {
     }
 
     /// Unlock the collection.
-    pub async fn unlock(&self) -> Result<(), Error> {
+    pub async fn unlock(&self, window_id: Option<WindowIdentifier>) -> Result<(), Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            self.service.unlock(&[self.inner.inner().path()]).await?;
+            self.service
+                .unlock(&[self.inner.inner().path()], window_id)
+                .await?;
             Ok(())
         }
     }
 
     /// Lock the collection.
-    pub async fn lock(&self) -> Result<(), Error> {
+    pub async fn lock(&self, window_id: Option<WindowIdentifier>) -> Result<(), Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            self.service.lock(&[self.inner.inner().path()]).await?;
+            self.service
+                .lock(&[self.inner.inner().path()], window_id)
+                .await?;
             Ok(())
         }
     }
 
     /// Delete the collection.
-    pub async fn delete(&self) -> Result<(), Error> {
+    pub async fn delete(&self, window_id: Option<WindowIdentifier>) -> Result<(), Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            self.inner.delete().await?;
+            self.inner.delete(window_id).await?;
             *self.available.write().await = false;
             Ok(())
         }
@@ -274,7 +282,7 @@ mod tests {
         let collection = match service.default_collection().await {
             Err(dbus::Error::NotFound(_)) => {
                 service
-                    .create_collection("Default", Some(dbus::DEFAULT_COLLECTION))
+                    .create_collection("Default", Some(dbus::DEFAULT_COLLECTION), None)
                     .await
             }
             e => e,
@@ -284,7 +292,7 @@ mod tests {
         let n_search_items = collection.search_items(&attributes).await.unwrap().len();
 
         let item = collection
-            .create_item("A secret", &attributes, secret, true, "text/plain")
+            .create_item("A secret", &attributes, secret, true, "text/plain", None)
             .await
             .unwrap();
 
@@ -297,7 +305,7 @@ mod tests {
             n_search_items + 1
         );
 
-        item.delete().await.unwrap();
+        item.delete(None).await.unwrap();
 
         assert_eq!(collection.items().await.unwrap().len(), n_items);
         assert_eq!(

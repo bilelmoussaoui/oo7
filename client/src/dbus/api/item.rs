@@ -6,7 +6,9 @@ use zbus::{
     ProxyDefault,
 };
 
-use super::{secret::SecretInner, Prompt, Secret, Session, Unlockable, DESTINATION};
+use super::{
+    secret::SecretInner, Prompt, Secret, Session, Unlockable, WindowIdentifier, DESTINATION,
+};
 use crate::{
     dbus::{Error, ServiceError},
     AsAttributes,
@@ -106,7 +108,7 @@ impl<'a> Item<'a> {
         Ok(())
     }
 
-    pub async fn delete(&self) -> Result<(), Error> {
+    pub async fn delete(&self, window_id: Option<WindowIdentifier>) -> Result<(), Error> {
         let prompt_path = self
             .inner()
             .call_method("Delete", &())
@@ -115,7 +117,7 @@ impl<'a> Item<'a> {
             .body()
             .deserialize::<OwnedObjectPath>()?;
         if let Some(prompt) = Prompt::new(self.inner().connection(), prompt_path).await? {
-            let _ = prompt.receive_completed().await?;
+            let _ = prompt.receive_completed(window_id).await?;
         }
         Ok(())
     }
