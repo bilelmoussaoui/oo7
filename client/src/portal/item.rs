@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 use super::{
-    api::{gvariant_encoding, AttributeValue, EncryptedItem},
+    api::{AttributeValue, EncryptedItem, GVARIANT_ENCODING},
     Error,
 };
 use crate::{crypto, AsAttributes, Key};
@@ -104,7 +104,7 @@ impl Item {
     pub(crate) fn encrypt(&self, key: &Key) -> Result<EncryptedItem, Error> {
         key.check_strength()?;
 
-        let decrypted = Zeroizing::new(zvariant::to_bytes(*gvariant_encoding(), &self)?.to_vec());
+        let decrypted = Zeroizing::new(zvariant::to_bytes(*GVARIANT_ENCODING, &self)?.to_vec());
 
         let iv = crypto::generate_iv();
 
@@ -130,7 +130,7 @@ impl TryFrom<&[u8]> for Item {
     type Error = Error;
 
     fn try_from(value: &[u8]) -> Result<Self, Error> {
-        Ok(zvariant::serialized::Data::new(value, *gvariant_encoding())
+        Ok(zvariant::serialized::Data::new(value, *GVARIANT_ENCODING)
             .deserialize()?
             .0)
     }

@@ -9,7 +9,7 @@
 use std::io;
 use std::{
     path::{Path, PathBuf},
-    sync::OnceLock,
+    sync::LazyLock,
 };
 
 #[cfg(feature = "async-std")]
@@ -55,10 +55,8 @@ use crate::{
     AsAttributes, Key,
 };
 
-pub(super) fn gvariant_encoding() -> &'static Context {
-    static ENCODING: OnceLock<Context> = OnceLock::new();
-    ENCODING.get_or_init(|| Context::new_gvariant(Endian::Little, 0))
-}
+pub(crate) static GVARIANT_ENCODING: LazyLock<Context> =
+    LazyLock::new(|| Context::new_gvariant(Endian::Little, 0));
 
 /// Logical contents of a keyring file
 #[derive(Deserialize, Serialize, Type, Debug)]
@@ -230,7 +228,7 @@ impl Keyring {
 
         blob.push(MAJOR_VERSION);
         blob.push(MINOR_VERSION);
-        blob.append(&mut zvariant::to_bytes(*gvariant_encoding(), &self)?.to_vec());
+        blob.append(&mut zvariant::to_bytes(*GVARIANT_ENCODING, &self)?.to_vec());
 
         Ok(blob)
     }
@@ -289,7 +287,7 @@ impl TryFrom<&[u8]> for Keyring {
         }
 
         if let Some(data) = value.get((FILE_HEADER_LEN + 2)..) {
-            let keyring: Self = zvariant::serialized::Data::new(data, *gvariant_encoding())
+            let keyring: Self = zvariant::serialized::Data::new(data, *GVARIANT_ENCODING)
                 .deserialize()?
                 .0;
 
