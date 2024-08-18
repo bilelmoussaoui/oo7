@@ -9,6 +9,7 @@ use oo7::{
     dbus::{Collection, Service},
     AsAttributes,
 };
+use time::{OffsetDateTime, UtcOffset};
 
 const BINARY_NAME: &str = env!("CARGO_BIN_NAME");
 
@@ -116,7 +117,7 @@ struct Cli {
     command: Commands,
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Error> {
     let cli = Cli::parse();
     match cli.command {
@@ -255,14 +256,14 @@ async fn print_item<'a>(
         let mut attributes = item.attributes().await?;
         let created = item.created().await?;
         let modified = item.modified().await?;
+        let local_offset = UtcOffset::current_local_offset().unwrap_or(UtcOffset::UTC);
 
-        let created = chrono::DateTime::<chrono::Utc>::from_timestamp(created.as_secs() as i64, 0)
+        let created = OffsetDateTime::from_unix_timestamp(created.as_secs() as i64)
             .unwrap()
-            .with_timezone(&chrono::Local);
-        let modified =
-            chrono::DateTime::<chrono::Utc>::from_timestamp(modified.as_secs() as i64, 0)
-                .unwrap()
-                .with_timezone(&chrono::Local);
+            .to_offset(local_offset);
+        let modified = OffsetDateTime::from_unix_timestamp(modified.as_secs() as i64)
+            .unwrap()
+            .to_offset(local_offset);
 
         let mut result = format!("[{label}]\n");
 
@@ -282,16 +283,20 @@ async fn print_item<'a>(
             }
         }
 
+        let format =
+            time::format_description::parse("[year]-[month]-[day] [hour]:[minute]:[second]")
+                .unwrap();
+
         writeln!(
             &mut result,
             "created = {}",
-            created.format("%Y-%m-%d %H:%M:%S")
+            created.format(&format).unwrap()
         )
         .unwrap();
         writeln!(
             &mut result,
             "modified = {}",
-            modified.format("%Y-%m-%d %H:%M:%S")
+            modified.format(&format).unwrap()
         )
         .unwrap();
         if let Some(schema) = attributes.remove("xdg:schema") {
