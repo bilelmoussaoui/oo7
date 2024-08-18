@@ -16,7 +16,7 @@ clap.workspace = true
 futures-channel.workspace = true
 futures-util.workspace = true
 oo7.workspace = true
-ring = "0.17.5"
+getrandom = "0.2"
 serde.workspace = true
 tokio = { workspace = true, features = ["io-util", "net", "macros", "rt-multi-thread"] }
 tracing = "0.1"

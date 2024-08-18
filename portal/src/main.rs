@@ -6,7 +6,6 @@ use std::{collections::HashMap, future::pending, os::unix::net::UnixStream};
 use clap::Parser;
 use futures_util::FutureExt;
 use oo7::dbus::Service;
-use ring::rand::SecureRandom;
 use tokio::io::AsyncWriteExt;
 use zbus::{
     zvariant::{self, OwnedObjectPath},
@@ -81,8 +80,8 @@ impl Secret {
 
 fn generate_secret() -> Result<zeroize::Zeroizing<Vec<u8>>, Error> {
     let mut secret = [0; PORTAL_SECRET_SIZE];
-    let rand = ring::rand::SystemRandom::new();
-    rand.fill(&mut secret)?;
+    // Equivalent of `ring::rand::SecureRandom`
+    getrandom::getrandom(&mut secret)?;
     Ok(zeroize::Zeroizing::new(secret.to_vec()))
 }
 
