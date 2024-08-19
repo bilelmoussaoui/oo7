@@ -299,9 +299,10 @@ async fn print_item<'a>(
             }
         }
 
-        let format =
-            time::format_description::parse("[year]-[month]-[day] [hour]:[minute]:[second]")
-                .unwrap();
+        let format = time::format_description::parse_borrowed::<2>(
+            "[year]-[month]-[day] [hour]:[minute]:[second]",
+        )
+        .unwrap();
 
         writeln!(
             &mut result,
