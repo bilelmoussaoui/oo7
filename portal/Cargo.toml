@@ -12,7 +12,7 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
-ashpd = {version = "0.9", git = "https://github.com/bilelmoussaoui/ashpd", features = ["backend", "tracing"]}
+ashpd = {workspace = true, features = ["backend", "tracing"]}
 clap.workspace = true
 oo7.workspace = true
 getrandom = "0.2"

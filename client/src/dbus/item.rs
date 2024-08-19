@@ -1,5 +1,6 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
+use ashpd::WindowIdentifier;
 #[cfg(feature = "async-std")]
 use async_lock::RwLock;
 #[cfg(feature = "tokio")]
@@ -7,10 +8,7 @@ use tokio::sync::RwLock;
 use zbus::zvariant::ObjectPath;
 use zeroize::Zeroizing;
 
-use super::{
-    api::{self, WindowIdentifier},
-    Algorithm, Error,
-};
+use super::{api, Algorithm, Error};
 use crate::{crypto, AsAttributes, Key};
 
 /// A secret with a label and attributes to identify it.

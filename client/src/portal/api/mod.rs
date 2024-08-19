@@ -55,6 +55,19 @@ use crate::{
     AsAttributes, Key,
 };
 
+pub(crate) fn data_dir() -> Option<PathBuf> {
+    std::env::var_os("XDG_DATA_HOME")
+        .and_then(|h| if h.is_empty() { None } else { Some(h) })
+        .map(PathBuf::from)
+        .and_then(|p| if p.is_absolute() { Some(p) } else { None })
+        .or_else(|| {
+            std::env::var_os("HOME")
+                .and_then(|h| if h.is_empty() { None } else { Some(h) })
+                .map(PathBuf::from)
+                .map(|p| p.join(".local/share"))
+        })
+}
+
 pub(crate) static GVARIANT_ENCODING: LazyLock<Context> =
     LazyLock::new(|| Context::new_gvariant(Endian::Little, 0));
 
@@ -234,7 +247,7 @@ impl Keyring {
     }
 
     pub(crate) fn path(name: &str, version: u8) -> Result<PathBuf, Error> {
-        if let Some(mut path) = crate::helpers::data_dir() {
+        if let Some(mut path) = data_dir() {
             path.push("keyrings");
             if version > 0 {
                 path.push(format!("v{}", version));

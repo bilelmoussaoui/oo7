@@ -1,5 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
+use ashpd::WindowIdentifier;
 #[cfg(feature = "async-std")]
 use async_lock::RwLock;
 use futures_util::{Stream, StreamExt};
@@ -7,10 +8,7 @@ use futures_util::{Stream, StreamExt};
 use tokio::sync::RwLock;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 
-use super::{
-    api::{self, WindowIdentifier},
-    Algorithm, Error, Item,
-};
+use super::{api, Algorithm, Error, Item};
 use crate::{AsAttributes, Key};
 
 /// A collection allows to store and retrieve items.

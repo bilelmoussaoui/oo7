@@ -1,7 +1,8 @@
 use std::fmt;
 
+use ashpd::WindowIdentifier;
 use futures_util::StreamExt;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use zbus::{
     zvariant::{ObjectPath, OwnedValue, Type},
     ProxyDefault,
@@ -9,66 +10,6 @@ use zbus::{
 
 use super::DESTINATION;
 use crate::dbus::{Error, ServiceError};
-
-#[derive(Debug, Clone, PartialEq, Eq, Type)]
-#[zvariant(signature = "s")]
-/// A Window Identifier
-pub enum WindowIdentifier {
-    /// X11.
-    X11(std::os::raw::c_ulong),
-    /// Wayland.
-    Wayland(String),
-}
-
-impl fmt::Display for WindowIdentifier {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::X11(xid) => f.write_str(&format!("x11:0x{xid:x}")),
-            Self::Wayland(handle) => f.write_str(&format!("wayland:{handle}")),
-        }
-    }
-}
-
-impl std::str::FromStr for WindowIdentifier {
-    type Err = Error;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (kind, handle) = s
-            .split_once(':')
-            .ok_or_else(|| Error::InvalidWindowIdentifier(s.to_owned()))?;
-        match kind {
-            "x11" => {
-                let handle = handle.trim_start_matches("0x");
-                Ok(Self::X11(
-                    std::os::raw::c_ulong::from_str_radix(handle, 16)
-                        .map_err(|_| Error::InvalidWindowIdentifier(s.to_owned()))?,
-                ))
-            }
-            "wayland" => Ok(Self::Wayland(handle.to_owned())),
-            _ => Err(Error::InvalidWindowIdentifier(s.to_owned())),
-        }
-    }
-}
-
-impl Serialize for WindowIdentifier {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        String::serialize(&self.to_string(), serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for WindowIdentifier {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let handle = String::deserialize(deserializer)?;
-        handle
-            .parse::<Self>()
-            .map_err(|e| serde::de::Error::custom(format!("Invalid Window identifier {e}")))
-    }
-}
 
 #[derive(Type)]
 #[zvariant(signature = "o")]

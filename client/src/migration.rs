@@ -9,7 +9,7 @@ pub async fn migrate(attributes: Vec<impl AsAttributes>, replace: bool) -> Resul
     let service = Service::new().await?;
     let file_backend = match Keyring::load_default().await {
         Ok(portal) => Ok(portal),
-        Err(crate::portal::Error::PortalNotAvailable) => {
+        Err(super::portal::Error::Portal(ashpd::Error::PortalNotFound(_))) => {
             #[cfg(feature = "tracing")]
             tracing::debug!("Portal not available, no migration to do");
             return Ok(());
