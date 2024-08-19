@@ -3,7 +3,7 @@ mod error;
 
 use ashpd::{
     async_trait,
-    zbus::{self, zvariant::OwnedValue, ProxyDefault},
+    zbus::{self, zvariant::OwnedValue},
     AppID,
 };
 use clap::Parser;
@@ -109,9 +109,7 @@ async fn main() -> Result<()> {
 
     let portal = ashpd::backend::secret::SecretInterface::new(Secret, cnx.clone());
     tracing::debug!("Serving `org.freedesktop.impl.portal.Secret`");
-    cnx.object_server()
-        .at(oo7::portal::SecretProxy::PATH.unwrap(), portal)
-        .await?;
+    cnx.object_server().at(ashpd::DESKTOP_PATH, portal).await?;
 
     let mut flags = zbus::fdo::RequestNameFlags::AllowReplacement.into();
     if args.replace {

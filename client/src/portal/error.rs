@@ -27,14 +27,8 @@ pub enum Error {
     NoDataDir,
     /// Target file has changed.
     TargetFileChanged(String),
-    /// Portal DBus communication error.
-    PortalBus(zbus::Error),
     /// Portal request has been cancelled.
-    CancelledPortalRequest,
-    /// If the portal is not available on the host.
-    /// Can happen if the host has an old xdg-desktop-portal
-    /// or no secret service is available to store the secret.
-    PortalNotAvailable,
+    Portal(ashpd::Error),
     /// The addressed index does not exist.
     InvalidItemIndex(usize),
     /// UTF-8 encoding error.
@@ -61,15 +55,15 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl From<zbus::Error> for Error {
-    fn from(value: zbus::Error) -> Self {
-        Self::PortalBus(value)
-    }
-}
-
 impl From<std::str::Utf8Error> for Error {
     fn from(value: std::str::Utf8Error) -> Self {
         Self::Utf8(value)
+    }
+}
+
+impl From<ashpd::Error> for Error {
+    fn from(value: ashpd::Error) -> Self {
+        Self::Portal(value)
     }
 }
 
@@ -99,10 +93,10 @@ impl std::fmt::Display for Error {
             Error::HashedAttributeMac(e) => write!(f, "Failed to validate hashed attribute {e}"),
             Error::NoDataDir => write!(f, "Couldn't retrieve XDG_DATA_DIR"),
             Error::TargetFileChanged(e) => write!(f, "The target file has changed {e}"),
-            Error::PortalBus(e) => write!(f, "Portal communication failed {e}"),
-            Error::CancelledPortalRequest => write!(f, "Portal request was cancelled"),
-            Error::PortalNotAvailable => write!(f, "xdg-desktop-portal is too old on the host or secret service not available to store the secret"),
-            Error::InvalidItemIndex(index) => write!(f, "The addressed item index {index} does not exist"),
+            Error::Portal(e) => write!(f, "Portal communication failed {e}"),
+            Error::InvalidItemIndex(index) => {
+                write!(f, "The addressed item index {index} does not exist")
+            }
             Error::Utf8(e) => write!(f, "UTF-8 encoding error {e}"),
             Error::AlgorithmMismatch(e) => write!(f, "Unknown algorithm {e}"),
         }

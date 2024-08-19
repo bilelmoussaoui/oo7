@@ -1,5 +1,6 @@
 use std::{fmt, time::Duration};
 
+use ashpd::WindowIdentifier;
 use futures_util::{Stream, StreamExt};
 use serde::Serialize;
 use zbus::{
@@ -7,7 +8,7 @@ use zbus::{
     ProxyDefault,
 };
 
-use super::{Item, Prompt, Properties, Secret, Unlockable, WindowIdentifier, DESTINATION};
+use super::{Item, Prompt, Properties, Secret, Unlockable, DESTINATION};
 use crate::{
     dbus::{Error, ServiceError},
     AsAttributes,

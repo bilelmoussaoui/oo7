@@ -1,14 +1,13 @@
 use std::{collections::HashMap, fmt, hash::Hash, time::Duration};
 
+use ashpd::WindowIdentifier;
 use serde::Serialize;
 use zbus::{
     zvariant::{ObjectPath, OwnedObjectPath, Type},
     ProxyDefault,
 };
 
-use super::{
-    secret::SecretInner, Prompt, Secret, Session, Unlockable, WindowIdentifier, DESTINATION,
-};
+use super::{secret::SecretInner, Prompt, Secret, Session, Unlockable, DESTINATION};
 use crate::{
     dbus::{Error, ServiceError},
     AsAttributes,

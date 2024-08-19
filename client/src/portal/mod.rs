@@ -67,9 +67,6 @@ mod secret;
 pub use error::{Error, InvalidItemError, WeakKeyError};
 pub use item::Item;
 pub use secret::Secret;
-#[cfg(feature = "unstable")]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-pub use secret::SecretProxy;
 
 type ItemDefinition = (String, HashMap<String, String>, Zeroizing<Vec<u8>>, bool);
 
@@ -90,7 +87,7 @@ impl Keyring {
     pub async fn load_default() -> Result<Self, Error> {
         #[cfg(feature = "tracing")]
         tracing::debug!("Loading default keyring file");
-        let secret = secret::retrieve().await?;
+        let secret = Secret::from(ashpd::desktop::secret::retrieve().await?);
         Self::load(api::Keyring::default_path()?, secret).await
     }
 

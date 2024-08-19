@@ -34,18 +34,13 @@ pub mod crypto;
 pub mod dbus;
 pub mod portal;
 
-mod helpers;
 mod keyring;
 
+pub use ashpd;
 pub use error::{Error, Result};
 pub use keyring::{Item, Keyring};
 pub use migration::migrate;
 pub use zbus;
-
-/// Checks whether the application is sandboxed or not.
-pub async fn is_sandboxed() -> bool {
-    helpers::is_flatpak().await || helpers::is_snap().await
-}
 
 /// An item/collection attributes.
 pub trait AsAttributes {

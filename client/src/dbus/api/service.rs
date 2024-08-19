@@ -1,5 +1,6 @@
 use std::{collections::HashMap, fmt};
 
+use ashpd::WindowIdentifier;
 use futures_util::{Stream, StreamExt};
 use zbus::{
     zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Type, Value},
@@ -8,7 +9,7 @@ use zbus::{
 
 use super::{
     secret::SecretInner, Collection, Item, Prompt, Properties, Secret, Session, Unlockable,
-    WindowIdentifier, DESTINATION, PATH,
+    DESTINATION, PATH,
 };
 use crate::{
     dbus::{Algorithm, Error, ServiceError},

@@ -30,7 +30,7 @@ pub enum Keyring {
 impl Keyring {
     /// Create a new instance of the Keyring.
     pub async fn new() -> Result<Self> {
-        let is_sandboxed = crate::is_sandboxed().await;
+        let is_sandboxed = ashpd::is_sandboxed().await;
         if is_sandboxed {
             #[cfg(feature = "tracing")]
             tracing::debug!("Application is sandboxed, using the file backend");
@@ -38,7 +38,7 @@ impl Keyring {
             match portal::Keyring::load_default().await {
                 Ok(portal) => return Ok(Self::File(Arc::new(portal))),
                 // Do nothing in this case, we are supposed to fallback to the host keyring
-                Err(portal::Error::PortalNotAvailable) => {
+                Err(super::portal::Error::Portal(ashpd::Error::PortalNotFound(_))) => {
                     #[cfg(feature = "tracing")]
                     tracing::debug!(
                         "org.freedesktop.portal.Secrets is not available, falling back to the Secret Service backend"
