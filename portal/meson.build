@@ -11,6 +11,9 @@ is_devel = get_option('profile') == 'development'
 prefix = get_option('prefix')
 datadir = get_option('datadir')
 dbus_service_dir = get_option('dbus_service_dir')
+if dbus_service_dir == ''
+  dbus_service_dir = datadir / 'dbus-1' / 'services'
+endif
 libexecdir = get_option('libexecdir')
 
 build_systemd_service = get_option('systemd')
