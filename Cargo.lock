@@ -1032,7 +1032,6 @@ dependencies = [
  "clap",
  "getrandom",
  "oo7",
- "serde",
  "tokio",
  "tracing",
  "tracing-subscriber",
