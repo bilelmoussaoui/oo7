@@ -14,7 +14,7 @@ configure_file(
 
 if systemduserunitdir != ''
   configure_file(
-    input: 'oo7-portal.service.in',
+    input: '@0@.service.in'.format(service_name),
     output: '@BASENAME@',
     configuration: conf,
     install_dir: systemduserunitdir,

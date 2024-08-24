@@ -6,6 +6,7 @@ project(
 )
 
 dbus_name = 'org.freedesktop.impl.portal.desktop.oo7'
+service_name = meson.project_name()
 is_devel = get_option('profile') == 'development'
 
 prefix = get_option('prefix')
@@ -33,6 +34,7 @@ portal_dir = datadir / 'xdg-desktop-portal' / 'portals'
 conf = configuration_data()
 conf.set('libexecdir', prefix / libexecdir)
 conf.set('dbus_name', dbus_name)
+conf.set('service_name', service_name)
 conf.set('bin_name', meson.project_name())
 
 summary({
