@@ -120,6 +120,10 @@ impl Keyring {
 
                 let keyring = api::Keyring::try_from(content.as_slice())?;
 
+                if !keyring.verify_secret(&secret) {
+                    return Err(Error::InvalidSecret);
+                }
+
                 (mtime, keyring)
             }
         };
@@ -675,6 +679,42 @@ mod tests {
         keyring.write().await?;
 
         assert!(v1_dir.join("default.keyring").exists());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn load() -> Result<(), Error> {
+        let temp_dir = tempdir()?;
+        let keyring_dir = temp_dir.path().join("keyrings");
+
+        fs::create_dir_all(&keyring_dir).await?;
+
+        let fixture_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("fixtures")
+            .join("default.keyring");
+
+        fs::copy(&fixture_path, &keyring_dir.join("default.keyring")).await?;
+
+        std::env::set_var("XDG_DATA_HOME", &temp_dir.path());
+
+        let password = b"wrong";
+        let secret = Secret::from(password.to_vec());
+        match Keyring::load(keyring_dir.join("default.keyring"), secret).await {
+            Err(err) => {
+                assert!(matches!(err, Error::InvalidSecret));
+            }
+            Ok(_) => assert!(false),
+        };
+
+        let password = b"test";
+        let secret = Secret::from(password.to_vec());
+        match Keyring::load(keyring_dir.join("default.keyring"), secret).await {
+            Err(err) => {
+                assert!(matches!(err, Error::InvalidSecret));
+            }
+            Ok(_) => assert!(true),
+        };
 
         Ok(())
     }

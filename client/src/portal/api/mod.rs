@@ -259,6 +259,31 @@ impl Keyring {
         )
     }
 
+    pub(crate) fn verify_secret(&self, secret: &Secret) -> bool {
+        let key = self.derive_key(secret);
+
+        // if this is a new keyring or a keyring with zero items
+        if self.items.is_empty() {
+            return true;
+        }
+
+        // decrypting the first item may be enough to verify the secret.
+        // but to avoid a scenario where the first item is corrupted,
+        // decrypting all the items here.
+        let mut decrypt_counter = 0;
+        for item in self.items.clone() {
+            if item.decrypt(&key).is_ok() {
+                decrypt_counter += 1;
+            }
+        }
+
+        if decrypt_counter == self.items.len() {
+            return true;
+        }
+
+        false
+    }
+
     // Reset Keyring content
     pub(crate) fn reset(&mut self) {
         let salt = rand::thread_rng().gen::<[u8; DEFAULT_SALT_SIZE]>().to_vec();
