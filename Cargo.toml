@@ -27,7 +27,7 @@ futures-lite = "2.1"
 futures-util = "0.3"
 oo7 = { path = "client", version = "0.3", features = ["unstable", "tracing"]}
 serde = { version = "1.0", features = ["derive"] }
-tokio = { version = "1.17", default-features = false }
+tokio = { version = "1.40", default-features = false }
 tempfile = "3.10"
 tracing = "0.1"
 tracing-subscriber = "0.3"
