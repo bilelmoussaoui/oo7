@@ -454,6 +454,33 @@ impl Keyring {
 
         self.write().await
     }
+
+    /// Verify the secret associated with a keyring.
+    ///
+    /// This function supports all keyring formats (legacy and latest).
+    ///
+    /// # Arguments
+    /// *`name` - The name of the keyring.
+    /// * `secret` - The service key, usually retrieved from the Secrets portal.
+    pub async fn verify_secret(name: &str, secret: Secret) -> bool {
+        #[cfg(feature = "tracing")]
+        tracing::debug!("Trying to verify {} keyring secret", name);
+
+        let mut ret = false;
+
+        match Self::open(name, secret).await {
+            Err(err) => {
+                if matches!(err, Error::InvalidSecret) {
+                    ret = false;
+                }
+            }
+            Ok(_) => {
+                ret = true;
+            }
+        }
+
+        ret
+    }
 }
 
 #[cfg(test)]
@@ -741,6 +768,34 @@ mod tests {
         assert_eq!(item_before.attributes(), item_now.attributes());
 
         fs::remove_file(path).await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn verify_secret() -> Result<(), Error> {
+        let temp_dir = tempdir()?;
+        let keyring_dir = temp_dir.path().join("keyrings");
+
+        fs::create_dir_all(&keyring_dir).await?;
+
+        let fixture_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("fixtures")
+            .join("legacy.keyring");
+
+        fs::copy(&fixture_path, &keyring_dir.join("legacy.keyring")).await?;
+
+        std::env::set_var("XDG_DATA_HOME", &temp_dir.path());
+
+        // test with a wrong secret
+        let password = b"wrong";
+        let secret = Secret::from(password.to_vec());
+        assert_eq!(Keyring::verify_secret("legacy", secret).await, false);
+
+        // test with the correct secret
+        let password = b"test";
+        let secret = Secret::from(password.to_vec());
+        assert!(Keyring::verify_secret("legacy", secret).await);
 
         Ok(())
     }
