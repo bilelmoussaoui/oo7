@@ -1,6 +1,6 @@
 use std::{
     fmt,
-    io::{IsTerminal, Write},
+    io::{BufRead, IsTerminal, Write},
     process::{ExitCode, Termination},
 };
 
@@ -106,7 +106,7 @@ enum Commands {
     #[command(
         name = "store",
         about = "Store a secret",
-        after_help = format!("The contents of the secret will be asked afterwards.\n\nExample:\n  {} store 'My Personal Mail' smtp-port=1025 imap-port=143", BINARY_NAME)
+        after_help = format!("The contents of the secret will be asked afterwards or read from stdin.\n\nExamples:\n  {} store 'My Personal Mail' smtp-port=1025 imap-port=143\n  systemd-ask-password -n | {0} store 'My Secret' lang=en", BINARY_NAME)
     )]
     Store {
         #[arg(help = "Description for the secret")]
@@ -174,11 +174,18 @@ where
 async fn store(label: &str, attributes: &impl AsAttributes) -> Result<(), Error> {
     let collection = collection().await?;
 
-    print!("Type a secret: ");
-    std::io::stdout()
-        .flush()
-        .map_err(|_| Error::new("Could not flush stdout"))?;
-    let secret = rpassword::read_password().map_err(|_| Error::new("Can't read password"))?;
+    let mut stdin = std::io::stdin().lock();
+    let secret = if stdin.is_terminal() {
+        print!("Type a secret: ");
+        std::io::stdout()
+            .flush()
+            .map_err(|_| Error::new("Could not flush stdout"))?;
+        rpassword::read_password().map_err(|_| Error::new("Can't read password"))?
+    } else {
+        let mut secret = String::new();
+        stdin.read_line(&mut secret)?;
+        secret
+    };
 
     collection
         .create_item(label, attributes, &secret, true, "text/plain")
