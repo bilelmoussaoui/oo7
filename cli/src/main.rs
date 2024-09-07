@@ -4,7 +4,7 @@ use std::{
     process::{ExitCode, Termination},
 };
 
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 use oo7::dbus::Service;
 use time::{OffsetDateTime, UtcOffset};
 
@@ -124,9 +124,16 @@ enum Commands {
 }
 
 impl Commands {
-    async fn execute(self) -> Result<(), Error> {
+    async fn execute(self, args: &Arguments) -> Result<(), Error> {
         let service = Service::new().await?;
-        let collection = service.default_collection().await?;
+        let collection = if let Some(alias) = &args.collection {
+            service
+                .with_alias(alias)
+                .await?
+                .ok_or_else(|| Error(format!("Collection '{alias}' not found")))?
+        } else {
+            service.default_collection().await?
+        };
         match self {
             Commands::Delete { attributes } => {
                 let items = collection.search_items(&attributes).await?;
@@ -193,12 +200,27 @@ impl Commands {
 struct Cli {
     #[command(subcommand)]
     command: Commands,
+    #[command(flatten)]
+    args: Arguments,
+}
+
+#[derive(Args)]
+struct Arguments {
+    #[arg(
+        name = "collection",
+        short,
+        long,
+        global = true,
+        help = "Specify a collection. The default collection will be used if not specified"
+    )]
+    collection: Option<String>,
 }
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Error> {
     let cli = Cli::parse();
-    cli.command.execute().await
+    let args = &cli.args;
+    cli.command.execute(args).await
 }
 
 // Source <https://github.com/clap-rs/clap/blob/master/examples/typed-derive.rs#L48>
