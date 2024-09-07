@@ -64,7 +64,7 @@ enum Commands {
     #[command(
         name = "lookup",
         about = "Retrieve a secret",
-        after_help = format!("Example:\n  {} lookup smtp-port=1025", BINARY_NAME)
+        after_help = format!("Examples:\n  {} lookup smtp-port=1025\n  {0} lookup --secret-only mysql-port=1234 | systemd-creds encrypt --name=mysql-password -p - -", BINARY_NAME)
     )]
     Lookup {
         #[arg(
