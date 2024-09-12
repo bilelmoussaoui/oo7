@@ -103,7 +103,7 @@ impl Keyring {
     pub async fn load(path: impl AsRef<Path>, secret: Secret) -> Result<Self, Error> {
         #[cfg(feature = "tracing")]
         tracing::debug!("Trying to load keyring file at {:?}", path.as_ref());
-        let (mtime, keyring) = match fs::File::open(path.as_ref()).await {
+        let (mtime, mut keyring) = match fs::File::open(path.as_ref()).await {
             Err(err) if err.kind() == io::ErrorKind::NotFound => {
                 #[cfg(feature = "tracing")]
                 tracing::debug!("Keyring file not found, creating a new one");
@@ -123,6 +123,14 @@ impl Keyring {
                 (mtime, keyring)
             }
         };
+
+        let key = keyring.derive_key(&secret);
+        for encrypted_item in &mut keyring.items {
+            if encrypted_item.clone().decrypt(&key).is_err() {
+                return Err(Error::IncorrectSecret);
+            }
+        }
+        drop(key);
 
         Ok(Self {
             keyring: Arc::new(RwLock::new(keyring)),
@@ -617,6 +625,36 @@ mod tests {
 
         keyring.write().await?;
         assert!(v1_dir.join("default.keyring").exists());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn open_wrong_password() -> Result<(), Error> {
+        let data_dir = tempdir()?;
+        let v0_dir = data_dir.path().join("keyrings");
+        let v1_dir = v0_dir.join("v1");
+        fs::create_dir_all(&v1_dir).await?;
+
+        let fixture_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("fixtures")
+            .join("default.keyring");
+        fs::copy(&fixture_path, &v1_dir.join("default.keyring")).await?;
+
+        std::env::set_var("XDG_DATA_HOME", &data_dir.path());
+
+        let password = b"wrong";
+        let secret = Secret::from(password.to_vec());
+        let keyring = Keyring::open("default", secret).await;
+
+        assert!(keyring.is_err());
+        assert!(matches!(keyring.unwrap_err(), Error::IncorrectSecret));
+
+        let password = b"test";
+        let secret = Secret::from(password.to_vec());
+        let keyring = Keyring::open("default", secret).await;
+
+        assert!(keyring.is_ok());
 
         Ok(())
     }

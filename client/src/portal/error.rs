@@ -41,6 +41,8 @@ pub enum Error {
     Utf8(std::str::Utf8Error),
     /// Mismatch of algorithms used in legacy keyring file.
     AlgorithmMismatch(u8),
+    /// Incorrect secret
+    IncorrectSecret,
 }
 
 impl From<zvariant::Error> for Error {
@@ -105,6 +107,7 @@ impl std::fmt::Display for Error {
             Error::InvalidItemIndex(index) => write!(f, "The addressed item index {index} does not exist"),
             Error::Utf8(e) => write!(f, "UTF-8 encoding error {e}"),
             Error::AlgorithmMismatch(e) => write!(f, "Unknown algorithm {e}"),
+            Error::IncorrectSecret => write!(f, "Incorrect secret"),
         }
     }
 }
