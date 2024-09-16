@@ -1,5 +1,6 @@
 [package]
 name = "cargo-credential-oo7"
+description = "Cargo credential provider using oo7"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
