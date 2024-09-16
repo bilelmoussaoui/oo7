@@ -25,7 +25,7 @@ impl SecretServiceCredential {
 
         match action {
             cargo_credential::Action::Get(_) => {
-                if items.len() == 0 {
+                if items.is_empty() {
                     return Err(Error::NotFound);
                 }
 
@@ -49,12 +49,11 @@ impl SecretServiceCredential {
             cargo_credential::Action::Login(options) => {
                 let token = cargo_credential::read_token(options, registry)?.expose();
 
-                if let Some(item) = items.get(0) {
+                if let Some(item) = items.first() {
                     item.set_secret(token, "text/utf8")
-                    .await
-                    .map_err(|err| Error::Other(Box::new(err)))?;
+                        .await
+                        .map_err(|err| Error::Other(Box::new(err)))?;
                 } else {
-
                     collection
                         .create_item(
                             &format!("cargo-registry:{}", registry.index_url),
@@ -70,7 +69,7 @@ impl SecretServiceCredential {
                 Ok(CredentialResponse::Login)
             }
             cargo_credential::Action::Logout => {
-                if items.len() == 0 {
+                if items.is_empty() {
                     return Err(Error::NotFound);
                 }
 
