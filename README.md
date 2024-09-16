@@ -6,6 +6,7 @@ James Bond went on a new mission and this time as a [Secret Service provider](ht
 
 The repository consists of the following projects:
 
+- [cargo-credential](./cargo-credential/): a [cargo credential](https://doc.rust-lang.org/stable/cargo/reference/registry-authentication.html#registry-authentication) provider
 - [cli](./cli/): a secret-tool replacement
 - [client](./client/): the client side library
 - [portal](./portal/): [org.freedesktop.impl.portal.Secret](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.impl.portal.Secret.html) implementation

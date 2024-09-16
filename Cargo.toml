@@ -2,6 +2,7 @@
 resolver = "2"
 
 members = [
+ "cargo-credential",
   "client",
   "cli",
   "portal",

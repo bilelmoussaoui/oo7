@@ -1,0 +1,17 @@
+[package]
+name = "cargo-credential-oo7"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+repository.workspace = true
+homepage.workspace = true
+license.workspace = true
+rust-version.workspace = true
+exclude.workspace = true
+
+[dependencies]
+cargo-credential = "0.4"
+oo7.workspace = true
+tokio = {workspace = true, features = ["rt-multi-thread"]}
