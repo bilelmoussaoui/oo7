@@ -12,7 +12,8 @@ use crate::{dbus, portal, AsAttributes, Result};
 /// implementation.
 ///
 /// It will automatically use the file backend if the application is sandboxed
-/// and otherwise falls back to the DBus service.
+/// and otherwise falls back to the DBus service using it [default
+/// collection](crate::dbus::Service::default_collection).
 ///
 /// The File backend requires a [`org.freedesktop.portal.Secret`](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.Secret.html) implementation
 /// to retrieve the key that will be used to encrypt the backend file.
@@ -93,9 +94,6 @@ impl Keyring {
     }
 
     /// Retrieve all the items.
-    ///
-    /// If using the Secret Service, it will retrieve all the items in the
-    /// [`DEFAULT_COLLECTION`].
     pub async fn items(&self) -> Result<Vec<Item>> {
         let items = match self {
             Self::DBus(backend) => {

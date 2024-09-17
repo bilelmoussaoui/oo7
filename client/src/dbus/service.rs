@@ -156,9 +156,6 @@ impl<'a> Service<'a> {
     }
 
     /// Create a new collection.
-    ///
-    /// The alias can only be equal to [`DEFAULT_COLLECTION`] otherwise it must
-    /// not be set.
     pub async fn create_collection(
         &self,
         label: &str,
