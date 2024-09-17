@@ -61,6 +61,7 @@ impl SecretServiceCredential {
                             token,
                             true,
                             "text/utf8",
+                            None,
                         )
                         .await
                         .map_err(|err| Error::Other(Box::new(err)))?;
@@ -74,7 +75,7 @@ impl SecretServiceCredential {
                 }
 
                 items[0]
-                    .delete()
+                    .delete(None)
                     .await
                     .map_err(|err| Error::Other(Box::new(err)))?;
                 Ok(CredentialResponse::Logout)
