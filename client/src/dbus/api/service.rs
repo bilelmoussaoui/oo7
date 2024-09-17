@@ -118,13 +118,13 @@ impl<'a> Service<'a> {
     pub async fn create_collection(
         &self,
         label: &str,
-        alias: Option<&str>,
+        alias: &str,
         window_id: Option<WindowIdentifier>,
     ) -> Result<Collection<'a>, Error> {
         let properties = Properties::for_collection(label);
         let (collection_path, prompt_path) = self
             .inner()
-            .call_method("CreateCollection", &(properties, alias.unwrap_or_default()))
+            .call_method("CreateCollection", &(properties, alias))
             .await
             .map_err::<ServiceError, _>(From::from)?
             .body()

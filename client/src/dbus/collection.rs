@@ -277,15 +277,10 @@ mod tests {
         attributes.insert("type", value);
         let secret = "a password".as_bytes();
 
-        let collection = match service.default_collection().await {
-            Err(dbus::Error::NotFound(_)) => {
-                service
-                    .create_collection("Default", Some(dbus::DEFAULT_COLLECTION), None)
-                    .await
-            }
-            e => e,
-        }
-        .unwrap();
+        let collection = service
+            .with_alias_or_create(dbus::DEFAULT_COLLECTION, "Default", None)
+            .await
+            .unwrap();
         let n_items = collection.items().await.unwrap().len();
         let n_search_items = collection.search_items(&attributes).await.unwrap().len();
 

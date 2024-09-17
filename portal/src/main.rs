@@ -46,14 +46,9 @@ fn generate_secret() -> Result<zeroize::Zeroizing<Vec<u8>>> {
 /// Generates, stores and send the secret back to the fd stream
 async fn send_secret_to_app(app_id: &AppID, fd: std::os::fd::OwnedFd) -> Result<()> {
     let service = Service::new().await?;
-    let collection = match service.default_collection().await {
-        Err(oo7::dbus::Error::NotFound(_)) => {
-            service
-                .create_collection("Default", Some(oo7::dbus::DEFAULT_COLLECTION), None)
-                .await
-        }
-        e => e,
-    }?;
+    let collection = service
+        .with_alias_or_create(oo7::dbus::DEFAULT_COLLECTION, "Default", None)
+        .await?;
     let attributes = HashMap::from([("app_id", app_id)]);
 
     let secret = if let Some(item) = collection.search_items(&attributes).await?.first() {

@@ -53,17 +53,9 @@ impl Keyring {
             );
         }
         let service = dbus::Service::new().await?;
-        let collection = match service.default_collection().await {
-            Ok(c) => Ok(c),
-            Err(dbus::Error::NotFound(_)) => {
-                #[cfg(feature = "tracing")]
-                tracing::debug!("Default collection doesn't exists, trying to create it");
-                service
-                    .create_collection("Login", Some(DEFAULT_COLLECTION), None)
-                    .await
-            }
-            Err(e) => Err(e),
-        }?;
+        let collection = service
+            .with_alias_or_create(DEFAULT_COLLECTION, "Default", None)
+            .await?;
         Ok(Self::DBus(collection))
     }
 

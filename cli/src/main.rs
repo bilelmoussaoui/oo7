@@ -334,15 +334,9 @@ async fn print_item<'a>(
 
 async fn collection<'a>() -> Result<Collection<'a>, Error> {
     let service = Service::new().await?;
-    let collection = match service.default_collection().await {
-        Ok(c) => Ok(c),
-        Err(oo7::dbus::Error::NotFound(_)) => {
-            service
-                .create_collection("Login", Some(oo7::dbus::DEFAULT_COLLECTION), None)
-                .await
-        }
-        Err(e) => Err(e),
-    }?;
+    let collection = service
+        .with_alias_or_create(oo7::dbus::DEFAULT_COLLECTION, "Default", None)
+        .await?;
 
     Ok(collection)
 }

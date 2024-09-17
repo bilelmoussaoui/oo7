@@ -97,6 +97,19 @@ impl<'a> Service<'a> {
             .ok_or_else(|| Error::NotFound(DEFAULT_COLLECTION.to_owned()))
     }
 
+    pub async fn with_alias_or_create(
+        &self,
+        alias: &str,
+        label: &str,
+        window_id: Option<WindowIdentifier>,
+    ) -> Result<Collection<'a>, Error> {
+        match self.with_alias(alias).await {
+            Ok(Some(collection)) => Ok(collection),
+            Ok(None) => self.create_collection(label, alias, window_id).await,
+            Err(err) => Err(err),
+        }
+    }
+
     /// Find a collection with it alias.
     ///
     /// Applications should make use of [`Service::default_collection`] instead.
@@ -126,7 +139,7 @@ impl<'a> Service<'a> {
     pub async fn create_collection(
         &self,
         label: &str,
-        alias: Option<&str>,
+        alias: &str,
         window_id: Option<WindowIdentifier>,
     ) -> Result<Collection<'a>, Error> {
         self.inner
@@ -196,7 +209,7 @@ mod tests {
     async fn create_collection() {
         let service = Service::new().await.unwrap();
         let collection = service
-            .create_collection("somelabel", None, None)
+            .create_collection("somelabel", "Some Label", None)
             .await
             .unwrap();
 
