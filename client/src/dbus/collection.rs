@@ -265,7 +265,7 @@ impl<'a> Collection<'a> {
 mod tests {
     use std::collections::HashMap;
 
-    use crate::dbus::{self, Service};
+    use crate::dbus::Service;
 
     async fn create_item(service: Service<'_>, encrypted: bool) {
         let mut attributes = HashMap::new();
@@ -277,10 +277,7 @@ mod tests {
         attributes.insert("type", value);
         let secret = "a password".as_bytes();
 
-        let collection = service
-            .with_alias_or_create(dbus::DEFAULT_COLLECTION, "Default", None)
-            .await
-            .unwrap();
+        let collection = service.default_collection().await.unwrap();
         let n_items = collection.items().await.unwrap().len();
         let n_search_items = collection.search_items(&attributes).await.unwrap().len();
 

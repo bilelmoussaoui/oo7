@@ -6,10 +6,7 @@ use async_lock::RwLock;
 use tokio::sync::RwLock;
 use zeroize::Zeroizing;
 
-use crate::{
-    dbus::{self, DEFAULT_COLLECTION},
-    portal, AsAttributes, Result,
-};
+use crate::{dbus, portal, AsAttributes, Result};
 
 /// A [Secret Service](crate::dbus) or [file](crate::portal) backed keyring
 /// implementation.
@@ -53,9 +50,7 @@ impl Keyring {
             );
         }
         let service = dbus::Service::new().await?;
-        let collection = service
-            .with_alias_or_create(DEFAULT_COLLECTION, "Default", None)
-            .await?;
+        let collection = service.default_collection().await?;
         Ok(Self::DBus(collection))
     }
 

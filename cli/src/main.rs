@@ -334,9 +334,7 @@ async fn print_item<'a>(
 
 async fn collection<'a>() -> Result<Collection<'a>, Error> {
     let service = Service::new().await?;
-    let collection = service
-        .with_alias_or_create(oo7::dbus::DEFAULT_COLLECTION, "Default", None)
-        .await?;
+    let collection = service.default_collection().await?;
 
     Ok(collection)
 }

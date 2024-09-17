@@ -4,7 +4,7 @@ use ashpd::WindowIdentifier;
 use futures_util::{Stream, StreamExt};
 use zbus::zvariant::OwnedObjectPath;
 
-use super::{api, Algorithm, Collection, Error, DEFAULT_COLLECTION};
+use super::{api, Algorithm, Collection, Error};
 use crate::Key;
 
 /// The entry point of communicating with a [`org.freedesktop.Secrets`](https://specifications.freedesktop.org/secret-service-spec/latest/index.html) implementation.
@@ -36,6 +36,16 @@ pub struct Service<'a> {
 }
 
 impl<'a> Service<'a> {
+    /// The default collection alias.
+    ///
+    /// In general, you are supposed to use [`Service::default_collection`].
+    pub const DEFAULT_COLLECTION: &'static str = "default";
+
+    /// A session collection.
+    ///
+    /// The collection is cleared when the user ends the session.
+    pub const SESSION_COLLECTION: &'static str = "session";
+
     /// Create a new instance of the Service, an encrypted communication would
     /// be attempted first and would fall back to a plain one if that fails.
     pub async fn new() -> Result<Service<'a>, Error> {
@@ -90,11 +100,24 @@ impl<'a> Service<'a> {
         })
     }
 
-    /// Retrieve the default collection.
+    /// Retrieve the default collection if any or create one.
+    ///
+    /// The created collection label is set to `Default`. If you want to
+    /// translate the string, use [Self::with_alias_or_create] instead.
     pub async fn default_collection(&self) -> Result<Collection<'a>, Error> {
-        self.with_alias(DEFAULT_COLLECTION)
-            .await?
-            .ok_or_else(|| Error::NotFound(DEFAULT_COLLECTION.to_owned()))
+        // TODO: Figure how to make those labels translatable
+        self.with_alias_or_create(Self::DEFAULT_COLLECTION, "Default", None)
+            .await
+    }
+
+    /// Retrieve the session collection if any or create one.
+    ///
+    /// The created collection label is set to `Default`. If you want to
+    /// translate the string, use [Self::with_alias_or_create] instead.
+    pub async fn session_collection(&self) -> Result<Collection<'a>, Error> {
+        // TODO: Figure how to make those labels translatable
+        self.with_alias_or_create(Self::SESSION_COLLECTION, "Session", None)
+            .await
     }
 
     pub async fn with_alias_or_create(

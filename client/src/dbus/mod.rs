@@ -33,16 +33,6 @@
 //! # }
 //! ```
 
-/// The default collection alias.
-///
-/// In general, you are supposed to use [`Service::default_collection`].
-pub const DEFAULT_COLLECTION: &str = "default";
-
-/// A session collection.
-///
-/// The collection is cleared when the user ends the session.
-pub const SESSION_COLLECTION: &str = "session";
-
 /// Barebone DBus API of the Secret Service specifications.
 ///
 /// The API is not supposed to be used by the applications in general unless
