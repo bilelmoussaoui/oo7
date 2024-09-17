@@ -5,10 +5,7 @@ use std::{
 };
 
 use clap::{Parser, Subcommand};
-use oo7::{
-    dbus::{Collection, Service},
-    AsAttributes,
-};
+use oo7::dbus::Service;
 use time::{OffsetDateTime, UtcOffset};
 
 const BINARY_NAME: &str = env!("CARGO_BIN_NAME");
@@ -126,6 +123,71 @@ enum Commands {
     Unlock,
 }
 
+impl Commands {
+    async fn execute(self) -> Result<(), Error> {
+        let service = Service::new().await?;
+        let collection = service.default_collection().await?;
+        match self {
+            Commands::Delete { attributes } => {
+                let items = collection.search_items(&attributes).await?;
+
+                for item in items {
+                    item.delete(None).await?;
+                }
+            }
+            Commands::Lookup {
+                attributes,
+                secret_only,
+                hex,
+            } => {
+                let items = collection.search_items(&attributes).await?;
+
+                if let Some(item) = items.first() {
+                    print_item(item, secret_only, hex).await?;
+                }
+            }
+            Commands::Search {
+                all,
+                attributes,
+                secret_only,
+                hex,
+            } => {
+                let items = collection.search_items(&attributes).await?;
+
+                if all {
+                    for item in items {
+                        print_item(&item, secret_only, hex).await?;
+                    }
+                } else if let Some(item) = items.first() {
+                    print_item(item, secret_only, hex).await?;
+                }
+            }
+            Commands::Store { label, attributes } => {
+                let mut stdin = std::io::stdin().lock();
+                let secret = if stdin.is_terminal() {
+                    print!("Type a secret: ");
+                    std::io::stdout()
+                        .flush()
+                        .map_err(|_| Error::new("Could not flush stdout"))?;
+                    rpassword::read_password().map_err(|_| Error::new("Can't read password"))?
+                } else {
+                    let mut secret = String::new();
+                    stdin.read_line(&mut secret)?;
+                    secret
+                };
+
+                collection
+                    .create_item(&label, &attributes, &secret, true, "text/plain", None)
+                    .await?;
+            }
+            Commands::Lock => collection.lock(None).await?,
+
+            Commands::Unlock => collection.unlock(None).await?,
+        };
+        Ok(())
+    }
+}
+
 #[derive(Parser)]
 #[clap(version, about, long_about = None)]
 struct Cli {
@@ -136,23 +198,7 @@ struct Cli {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Error> {
     let cli = Cli::parse();
-    match cli.command {
-        Commands::Store { label, attributes } => store(&label, &attributes).await,
-        Commands::Lookup {
-            attributes,
-            secret_only,
-            hex,
-        } => lookup(&attributes, secret_only, hex).await,
-        Commands::Search {
-            attributes,
-            all,
-            secret_only,
-            hex,
-        } => search(&attributes, all, secret_only, hex).await,
-        Commands::Delete { attributes } => delete(&attributes).await,
-        Commands::Lock => lock().await,
-        Commands::Unlock => unlock().await,
-    }
+    cli.command.execute().await
 }
 
 // Source <https://github.com/clap-rs/clap/blob/master/examples/typed-derive.rs#L48>
@@ -169,89 +215,6 @@ where
         .find('=')
         .ok_or_else(|| format!("Invalid KEY=value: no `=` found in `{s}`"))?;
     Ok((s[..pos].parse()?, s[pos + 1..].parse()?))
-}
-
-async fn store(label: &str, attributes: &impl AsAttributes) -> Result<(), Error> {
-    let collection = collection().await?;
-
-    let mut stdin = std::io::stdin().lock();
-    let secret = if stdin.is_terminal() {
-        print!("Type a secret: ");
-        std::io::stdout()
-            .flush()
-            .map_err(|_| Error::new("Could not flush stdout"))?;
-        rpassword::read_password().map_err(|_| Error::new("Can't read password"))?
-    } else {
-        let mut secret = String::new();
-        stdin.read_line(&mut secret)?;
-        secret
-    };
-
-    collection
-        .create_item(label, attributes, &secret, true, "text/plain", None)
-        .await?;
-
-    Ok(())
-}
-
-async fn lookup(
-    attributes: &impl AsAttributes,
-    secret_only: bool,
-    as_hex: bool,
-) -> Result<(), Error> {
-    let collection = collection().await?;
-    let items = collection.search_items(attributes).await?;
-
-    if let Some(item) = items.first() {
-        print_item(item, secret_only, as_hex).await?;
-    }
-
-    Ok(())
-}
-
-async fn search(
-    attributes: &impl AsAttributes,
-    all: bool,
-    secret_only: bool,
-    as_hex: bool,
-) -> Result<(), Error> {
-    let collection = collection().await?;
-    let items = collection.search_items(attributes).await?;
-
-    if all {
-        for item in items {
-            print_item(&item, secret_only, as_hex).await?;
-        }
-    } else if let Some(item) = items.first() {
-        print_item(item, secret_only, as_hex).await?;
-    }
-
-    Ok(())
-}
-
-async fn delete(attributes: &impl AsAttributes) -> Result<(), Error> {
-    let collection = collection().await?;
-    let items = collection.search_items(attributes).await?;
-
-    for item in items {
-        item.delete(None).await?;
-    }
-
-    Ok(())
-}
-
-async fn lock() -> Result<(), Error> {
-    let collection = collection().await?;
-    collection.lock(None).await?;
-
-    Ok(())
-}
-
-async fn unlock() -> Result<(), Error> {
-    let collection = collection().await?;
-    collection.unlock(None).await?;
-
-    Ok(())
 }
 
 async fn print_item<'a>(
@@ -330,11 +293,4 @@ async fn print_item<'a>(
         print!("{result}");
     }
     Ok(())
-}
-
-async fn collection<'a>() -> Result<Collection<'a>, Error> {
-    let service = Service::new().await?;
-    let collection = service.default_collection().await?;
-
-    Ok(collection)
 }
