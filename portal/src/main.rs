@@ -71,7 +71,9 @@ async fn send_secret_to_app(app_id: &AppID, fd: std::os::fd::OwnedFd) -> Result<
     };
 
     // Write the secret to the FD.
-    let mut stream = tokio::net::UnixStream::from_std(UnixStream::from(fd))?;
+    let std_stream = UnixStream::from(fd);
+    std_stream.set_nonblocking(true)?;
+    let mut stream = tokio::net::UnixStream::from_std(std_stream)?;
     stream.write_all(&secret).await?;
 
     Ok(())
