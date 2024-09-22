@@ -563,7 +563,9 @@ mod tests {
         let attributes = items[0].attributes();
         assert_eq!(attributes.len(), 1);
         assert_eq!(
-            attributes.get("xdg:schema").map(|v| v.as_ref()),
+            attributes
+                .get(crate::XDG_SCHEMA_ATTRIBUTE)
+                .map(|v| v.as_ref()),
             Some("org.gnome.keyring.Note")
         );
 
@@ -702,7 +704,7 @@ mod tests {
         keyring
             .create_item(
                 "foo",
-                &HashMap::from([("xdg:schema", "org.gnome.keyring.Note")]),
+                &HashMap::from([(crate::XDG_SCHEMA_ATTRIBUTE, "org.gnome.keyring.Note")]),
                 b"foo",
                 false,
             )

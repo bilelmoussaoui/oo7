@@ -42,6 +42,12 @@ pub use keyring::{Item, Keyring};
 pub use migration::migrate;
 pub use zbus;
 
+/// A schema attribute.
+///
+/// Currently the key, is not really used but would allow
+/// to map a Rust struct of simple types to an item attributes with type check.
+pub const XDG_SCHEMA_ATTRIBUTE: &str = "xdg:schema";
+
 /// An item/collection attributes.
 pub trait AsAttributes {
     fn as_attributes(&self) -> HashMap<&str, &str>;

@@ -308,7 +308,7 @@ async fn print_item<'a>(
             modified.format(&format).unwrap()
         )
         .unwrap();
-        if let Some(schema) = attributes.remove("xdg:schema") {
+        if let Some(schema) = attributes.remove(oo7::XDG_SCHEMA_ATTRIBUTE) {
             writeln!(&mut result, "schema = {schema} ").unwrap();
         }
         writeln!(&mut result, "attributes = {attributes:?} ").unwrap();
