@@ -7,7 +7,6 @@ use std::{
 };
 
 use oo7::portal::{Keyring, Secret};
-use tokio;
 use zbus::{
     fdo, interface,
     message::Header,
@@ -41,7 +40,7 @@ pub struct PrompterCallback {
 impl PrompterCallback {
     pub async fn prompt_ready(
         &self,
-        reply: &str,
+        _reply: &str,
         properties: HashMap<String, OwnedValue>,
         exchange: &str,
         #[zbus(connection)] connection: &zbus::Connection,
@@ -212,7 +211,7 @@ impl PrompterCallback {
                                 let collection_interface = collection_interface_ref.get_mut().await;
 
                                 let items = collection_interface.items().await;
-                                if items.len() > 0 {
+                                if !items.is_empty() {
                                     for item in items {
                                         let item_interface_ref = connection
                                             .object_server()

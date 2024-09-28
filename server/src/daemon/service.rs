@@ -226,7 +226,7 @@ impl Service {
             }
 
             let items = collection_interface.items().await;
-            if items.len() > 0 {
+            if !items.is_empty() {
                 for item in items {
                     let item_interface_ref = object_server
                         .interface::<_, item::Item>(item.clone())
@@ -323,10 +323,8 @@ impl Service {
                 if interface.alias().await == name {
                     objectpath = collection.path().to_owned();
                 }
-            } else {
-                if interface.label().await == name {
-                    objectpath = collection.path().to_owned();
-                }
+            } else if interface.label().await == name {
+                objectpath = collection.path().to_owned();
             }
         }
 
@@ -499,7 +497,7 @@ impl Service {
 
             for item in items {
                 // perform dispatching
-                login.dispatch_items(&object_server, item).await;
+                login.dispatch_items(object_server, item).await;
             }
         }
 
@@ -512,7 +510,7 @@ impl Service {
         let collection_interface = collection_interface_ref.get_mut().await;
 
         let items = collection_interface.items().await;
-        if items.len() > 0 {
+        if !items.is_empty() {
             for item in items {
                 let item_interface_ref = object_server
                     .interface::<_, item::Item>(item.clone())
