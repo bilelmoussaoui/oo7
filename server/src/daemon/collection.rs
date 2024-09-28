@@ -64,13 +64,12 @@ impl Collection {
         replace: bool,
         #[zbus(header)] header: Header<'_>,
         #[zbus(connection)] connection: &zbus::Connection,
-        #[zbus(object_server)] object_server: &ObjectServer,
         #[zbus(signal_context)] ctxt: SignalContext<'_>,
     ) -> Result<(OwnedObjectPath, ObjectPath)> {
         let label = properties.label();
         let attributes = properties.attributes().unwrap();
 
-        let session = secret.0;
+        let _session = secret.0;
         let parameters = secret.1;
         let value = secret.2;
         let content_type = secret.3;
@@ -95,7 +94,11 @@ impl Collection {
         let path = OwnedObjectPath::from(item.path());
         tracing::info!("Item: created: {}", path);
 
-        object_server.at(&path, item.clone()).await.unwrap();
+        connection
+            .object_server()
+            .at(&path, item.clone())
+            .await
+            .unwrap();
 
         let connection_out = Arc::new(connection.to_owned());
         let collection_path = header.path().unwrap().to_owned();
