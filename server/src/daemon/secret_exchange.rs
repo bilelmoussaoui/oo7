@@ -74,7 +74,6 @@ fn decode(exchange: &str) -> Result<HashMap<&str, Vec<u8>>, base64::DecodeError>
     let (_, exchange) = exchange.split_once(PROTOCOL).unwrap(); // to remove PROTOCOL prefix
     let pairs = exchange.split("\n").collect::<Vec<_>>();
     let mut map: HashMap<&str, Vec<u8>> = HashMap::new();
-    let mut encoded: Vec<u8> = Vec::new();
 
     for pair in pairs {
         if pair.is_empty() {
@@ -82,7 +81,7 @@ fn decode(exchange: &str) -> Result<HashMap<&str, Vec<u8>>, base64::DecodeError>
             break;
         }
         let (key, value) = pair.split_once("=").unwrap();
-        encoded = BASE64_STANDARD.decode(value)?;
+        let encoded = BASE64_STANDARD.decode(value)?;
         map.insert(key, encoded);
     }
 
@@ -93,12 +92,10 @@ fn decode(exchange: &str) -> Result<HashMap<&str, Vec<u8>>, base64::DecodeError>
 pub(crate) fn retrieve_secret(exchange: &str, aes_key: &str) -> Option<Zeroizing<Vec<u8>>> {
     let decoded = decode(exchange).unwrap();
     let secret = decoded.get(SECRET);
-    if secret.is_none() {
-        // if we cancel an ongoing prompt call, the final exchange won't have the secret
-        // or iv. this check is implemented to avoid `Option::unwrap()` on a `None`
-        // value
-        return None;
-    }
+
+    // if we cancel an ongoing prompt call, the final exchange won't have the secret
+    // or IV. The following is to avoid `Option::unwrap()` on a `None` value
+    secret?;
 
     let secret = secret.unwrap();
     if secret.len() != CIPHER_TEXT_LEN {
