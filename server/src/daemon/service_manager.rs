@@ -1,14 +1,20 @@
 use std::{collections::HashMap, sync::RwLock};
 
-use zbus::zvariant::{ObjectPath, OwnedObjectPath};
+use futures_util::stream::StreamExt;
+use zbus::{
+    zvariant::{ObjectPath, OwnedObjectPath},
+    Connection, MatchRule, MessageStream,
+};
 
 use super::{collection::Collection, session::Session};
+use crate::daemon;
 
 #[derive(Debug, Default)]
 pub struct ServiceManager {
     sessions: HashMap<OwnedObjectPath, Session>,
     collections: HashMap<String, Collection>,
     collections_to_unlock: Vec<OwnedObjectPath>,
+    peers: HashMap<String, OwnedObjectPath>,
     unlock_request_sender: RwLock<String>,
     unlock_prompt_path: RwLock<OwnedObjectPath>,
     prompts_counter: RwLock<i32>,
@@ -70,6 +76,18 @@ impl ServiceManager {
         *self.unlock_prompt_path.write().unwrap() = path.into();
     }
 
+    pub fn peer(&self, peer: String) -> Option<OwnedObjectPath> {
+        self.peers.get(&peer).cloned()
+    }
+
+    pub fn insert_peer(&mut self, peer: String, path: ObjectPath<'_>) {
+        self.peers.insert(peer, path.into());
+    }
+
+    pub fn remove_peer(&mut self, peer: String) {
+        self.peers.remove(&peer);
+    }
+
     pub fn prompts_counter(&self) -> i32 {
         *self.prompts_counter.read().unwrap()
     }
@@ -101,5 +119,38 @@ impl ServiceManager {
 
     pub fn set_prompt_dismissed(&mut self, dismissed: bool) {
         self.prompt_dismissed = dismissed;
+    }
+
+    pub async fn watch_peer_connections(connection: &Connection) -> daemon::Result<()> {
+        // monitor client disconnects
+
+        let rule = MatchRule::builder()
+            .msg_type(zbus::message::Type::Signal)
+            .sender("org.freedesktop.DBus")?
+            .interface("org.freedesktop.DBus")?
+            .member("NameOwnerChanged")?
+            .add_arg("org.gnome.seahorse.Application")?
+            .build();
+
+        let mut stream = MessageStream::for_match_rule(rule, connection, Some(1)).await?;
+
+        while let Some(Ok(message)) = stream.next().await {
+            let Ok((_, old_owner, new_owner)) =
+                message.body().deserialize::<(String, String, String)>()
+            else {
+                continue;
+            };
+            if new_owner == "" {
+                // a peer is disconnecting, remove session info
+                // https://github.com/GNOME/gnome-keyring/blob/4132075144c7bb21b897570dd53b005ac38250aa/daemon/dbus/gkd-secret-service.c#L936
+                tracing::info!("A peer is disconnected.");
+                // todo: clean up
+                println!("------------------ {old_owner}");
+            } else {
+                tracing::info!("A peer connected.");
+            }
+        }
+
+        Ok(())
     }
 }

@@ -446,6 +446,8 @@ impl Service {
         // loading login.keyring into the objects tree
         Service::init_collections(&object_server, self).await;
 
+        ServiceManager::watch_peer_connections(&cnx).await?;
+
         Ok(())
     }
 
