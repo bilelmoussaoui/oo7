@@ -50,11 +50,16 @@ impl Collection {
         Ok(ObjectPath::default())
     }
 
-    pub async fn search_items(&self, attributes: HashMap<&str, &str>) -> Result<Vec<portal::Item>> {
-        self.keyring
-            .search_items(&attributes)
-            .await
-            .map_err(From::from)
+    pub async fn search_items(&self, attributes: HashMap<String, String>) -> Vec<OwnedObjectPath> {
+        let mut paths: Vec<OwnedObjectPath> = Vec::with_capacity(self.items.read().await.len());
+
+        for item in self.items.read().await.iter() {
+            if attributes == item.attributes().await {
+                paths.push(item.path().into());
+            }
+        }
+
+        paths
     }
 
     pub async fn create_item(
