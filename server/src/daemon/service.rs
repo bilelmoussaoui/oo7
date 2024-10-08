@@ -438,12 +438,13 @@ impl Service {
             .await?;
 
         // loading login.keyring into the objects tree
-        Service::init_login(&object_server, self).await;
+        Service::init_collections(&object_server, self).await;
 
         Ok(())
     }
 
-    pub async fn init_login(object_server: &ObjectServer, service: Service) {
+    pub async fn init_collections(object_server: &ObjectServer, service: Service) {
+        // todo: add multiple collections support
         let path = format!("{}/{}", env::var("HOME").unwrap(), LOGIN_KEYRING_PATH);
         let created = fs::metadata(path)
             .unwrap()
@@ -451,6 +452,7 @@ impl Service {
             .unwrap()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap();
+
         let login = Collection::new(
             LOGIN_KEYRING,
             "default",
@@ -458,8 +460,8 @@ impl Service {
             service.keyring.clone(),
             service.manager.clone(),
         );
-
         service.collections.write().await.push(login.clone());
+
         let label = login.label().await;
         service
             .manager
@@ -478,28 +480,10 @@ impl Service {
             service.keyring.clone(),
             service.manager.clone(),
         );
-
         service.collections.write().await.push(session.clone());
 
         let path = OwnedObjectPath::from(session.path());
         object_server.at(&path, session).await.unwrap();
-
-        // dispatch already existing Items in the login Keyring to the objectpaths tree
-        let n_items = service.keyring.n_items().await;
-        if n_items > 0 {
-            let mut items: Vec<portal::Item> = Vec::with_capacity(n_items);
-            for item in service.keyring.items().await {
-                items.push(match item {
-                    Ok(item) => item,
-                    Err(err) => panic!("Item cannot be decrypted: {}", err),
-                })
-            }
-
-            for item in items {
-                // perform dispatching
-                login.dispatch_items(object_server, item).await;
-            }
-        }
 
         // unlock everything.
         // todo: move this block to somewhere else
@@ -549,5 +533,22 @@ impl Service {
         Service::collection_changed(service_interface_ref.signal_context(), login.path())
             .await
             .unwrap();
+
+        // dispatch already existing Items in the login Keyring to the objectpaths tree
+        let n_items = service.keyring.n_items().await;
+        if n_items > 0 {
+            let mut items: Vec<portal::Item> = Vec::with_capacity(n_items);
+            for item in service.keyring.items().await {
+                items.push(match item {
+                    Ok(item) => item,
+                    Err(err) => panic!("Item cannot be decrypted: {}", err),
+                })
+            }
+
+            for item in items {
+                // perform dispatching
+                login.dispatch_items(object_server, item).await;
+            }
+        }
     }
 }
