@@ -16,7 +16,7 @@ use crate::dbus::{Error, ServiceError};
 #[doc(alias = "org.freedesktop.Secret.Prompt")]
 pub struct Prompt<'a>(zbus::Proxy<'a>);
 
-impl<'a> ProxyDefault for Prompt<'a> {
+impl ProxyDefault for Prompt<'_> {
     const INTERFACE: Option<&'static str> = Some("org.freedesktop.Secret.Prompt");
     const DESTINATION: Option<&'static str> = Some(DESTINATION);
     const PATH: Option<&'static str> = None;
@@ -96,7 +96,7 @@ impl<'a> Prompt<'a> {
     }
 }
 
-impl<'a> Serialize for Prompt<'a> {
+impl Serialize for Prompt<'_> {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -105,7 +105,7 @@ impl<'a> Serialize for Prompt<'a> {
     }
 }
 
-impl<'a> fmt::Debug for Prompt<'a> {
+impl fmt::Debug for Prompt<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Prompt")
             .field(&self.inner().path().as_str())

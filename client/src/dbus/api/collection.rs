@@ -19,7 +19,7 @@ use crate::{
 #[doc(alias = "org.freedesktop.Secret.Collection")]
 pub struct Collection<'a>(zbus::Proxy<'a>);
 
-impl<'a> ProxyDefault for Collection<'a> {
+impl ProxyDefault for Collection<'_> {
     const INTERFACE: Option<&'static str> = Some("org.freedesktop.Secret.Collection");
     const DESTINATION: Option<&'static str> = Some(DESTINATION);
     const PATH: Option<&'static str> = None;
@@ -190,7 +190,7 @@ impl<'a> Collection<'a> {
     }
 }
 
-impl<'a> Serialize for Collection<'a> {
+impl Serialize for Collection<'_> {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -199,7 +199,7 @@ impl<'a> Serialize for Collection<'a> {
     }
 }
 
-impl<'a> fmt::Debug for Collection<'a> {
+impl fmt::Debug for Collection<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Collection")
             .field(&self.inner().path().as_str())
@@ -207,4 +207,4 @@ impl<'a> fmt::Debug for Collection<'a> {
     }
 }
 
-impl<'a> Unlockable for Collection<'a> {}
+impl Unlockable for Collection<'_> {}

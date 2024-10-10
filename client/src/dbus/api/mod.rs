@@ -5,9 +5,9 @@ pub(crate) const PATH: &str = "/org/freedesktop/secrets";
 /// locked or unlocked. Like [`Collection`] or [`Item`].
 pub trait Unlockable: serde::Serialize + zbus::zvariant::Type {}
 
-impl<'a> Unlockable for zbus::zvariant::ObjectPath<'a> {}
+impl Unlockable for zbus::zvariant::ObjectPath<'_> {}
 impl Unlockable for zbus::zvariant::OwnedObjectPath {}
-impl<'a> Unlockable for &zbus::zvariant::ObjectPath<'a> {}
+impl Unlockable for &zbus::zvariant::ObjectPath<'_> {}
 impl Unlockable for &zbus::zvariant::OwnedObjectPath {}
 
 mod collection;

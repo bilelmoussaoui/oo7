@@ -86,7 +86,7 @@ impl<'a> Secret<'a> {
     }
 }
 
-impl<'a> Serialize for Secret<'a> {
+impl Serialize for Secret<'_> {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,

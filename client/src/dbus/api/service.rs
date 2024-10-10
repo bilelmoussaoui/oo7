@@ -21,7 +21,7 @@ use crate::{
 #[doc(alias = "org.freedesktop.secrets")]
 pub struct Service<'a>(zbus::Proxy<'a>);
 
-impl<'a> ProxyDefault for Service<'a> {
+impl ProxyDefault for Service<'_> {
     const INTERFACE: Option<&'static str> = Some("org.freedesktop.Secret.Service");
     const DESTINATION: Option<&'static str> = Some(DESTINATION);
     const PATH: Option<&'static str> = Some(PATH);
@@ -264,7 +264,7 @@ impl<'a> Service<'a> {
     }
 }
 
-impl<'a> fmt::Debug for Service<'a> {
+impl fmt::Debug for Service<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Service")
             .field(&self.inner().path().as_str())

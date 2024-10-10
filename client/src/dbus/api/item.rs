@@ -18,7 +18,7 @@ use crate::{
 #[doc(alias = "org.freedesktop.Secret.Item")]
 pub struct Item<'a>(zbus::Proxy<'a>);
 
-impl<'a> ProxyDefault for Item<'a> {
+impl ProxyDefault for Item<'_> {
     const INTERFACE: Option<&'static str> = Some("org.freedesktop.Secret.Item");
     const DESTINATION: Option<&'static str> = Some(DESTINATION);
     const PATH: Option<&'static str> = None;
@@ -143,7 +143,7 @@ impl<'a> Item<'a> {
     }
 }
 
-impl<'a> Serialize for Item<'a> {
+impl Serialize for Item<'_> {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -152,21 +152,21 @@ impl<'a> Serialize for Item<'a> {
     }
 }
 
-impl<'a> PartialEq for Item<'a> {
+impl PartialEq for Item<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.inner().path() == other.inner().path()
     }
 }
 
-impl<'a> Eq for Item<'a> {}
+impl Eq for Item<'_> {}
 
-impl<'a> Hash for Item<'a> {
+impl Hash for Item<'_> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.inner().path().hash(state);
     }
 }
 
-impl<'a> fmt::Debug for Item<'a> {
+impl fmt::Debug for Item<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Item")
             .field(&self.inner().path().as_str())
@@ -174,4 +174,4 @@ impl<'a> fmt::Debug for Item<'a> {
     }
 }
 
-impl<'a> Unlockable for Item<'a> {}
+impl Unlockable for Item<'_> {}

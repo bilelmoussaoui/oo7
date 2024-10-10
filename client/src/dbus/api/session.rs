@@ -14,7 +14,7 @@ use crate::dbus::{Error, ServiceError};
 #[doc(alias = "org.freedesktop.Secret.Session")]
 pub struct Session<'a>(zbus::Proxy<'a>);
 
-impl<'a> ProxyDefault for Session<'a> {
+impl ProxyDefault for Session<'_> {
     const INTERFACE: Option<&'static str> = Some("org.freedesktop.Secret.Session");
     const DESTINATION: Option<&'static str> = Some(DESTINATION);
     const PATH: Option<&'static str> = None;
@@ -52,7 +52,7 @@ impl<'a> Session<'a> {
     }
 }
 
-impl<'a> Serialize for Session<'a> {
+impl Serialize for Session<'_> {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -61,7 +61,7 @@ impl<'a> Serialize for Session<'a> {
     }
 }
 
-impl<'a> fmt::Debug for Session<'a> {
+impl fmt::Debug for Session<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Session")
             .field(&self.inner().path().as_str())
