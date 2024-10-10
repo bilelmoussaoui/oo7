@@ -79,6 +79,8 @@ impl Collection {
         let value = secret.2;
         let content_type = secret.3;
 
+        println!("create_item: {:?}", parameters);
+
         let item = self
             .keyring
             .create_item(label, &attributes, value, replace)
