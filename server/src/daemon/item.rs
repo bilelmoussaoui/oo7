@@ -69,8 +69,20 @@ impl Item {
     pub async fn secret(&self, session: ObjectPath<'_>) -> Result<(SecretInner,)> {
         let inner = self.inner.read().await;
         let secret = inner.secret();
-        let parameters = self.parameters();
+        let mut parameters = self.parameters(); // iv
         let content_type = self.content_type();
+
+        println!("get_secret: {:?}", parameters);
+
+        if parameters.is_empty() {
+            parameters = &[
+                130, 63, 115, 49, 45, 32, 141, 179, 131, 232, 253, 146, 31, 219, 166, 26,
+            ];
+
+            tracing::error!("parameters cannot be empty");
+            // return Err(ServiceError::NoSuchObject);
+        }
+
         match self.manager.lock().unwrap().session(session) {
             Some(session) => Ok((SecretInner(
                 session.path().into(),
