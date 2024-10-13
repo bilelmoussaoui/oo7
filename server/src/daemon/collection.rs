@@ -7,6 +7,7 @@ use std::{
 };
 
 use oo7::{
+    crypto,
     dbus::api::{Properties, SecretInner},
     portal::{self, Keyring},
 };
@@ -74,23 +75,31 @@ impl Collection {
         let label = properties.label();
         let attributes = properties.attributes().unwrap();
 
-        let _session = secret.0;
-        let parameters = secret.1;
+        let session = secret.0;
+        let iv = secret.1;
         let value = secret.2;
         let content_type = secret.3;
 
-        println!("create_item: {:?}", parameters);
+        let session = self.manager.lock().unwrap().session(session.into());
+        if session.is_none() {
+            tracing::info!("The session does not exist");
+            return Err(ServiceError::NoSession);
+            // todo: may be create a new session here
+        }
+
+        let session = session.unwrap();
+        let key = session.aes_key();
+        let secret = crypto::decrypt(value, key, iv);
 
         let item = self
             .keyring
-            .create_item(label, &attributes, value, replace)
+            .create_item(label, &attributes, secret, replace)
             .await
             .map_err::<ServiceError, _>(From::from)?;
         *self.item_counter.write().await += 1;
 
         let item = item::Item::new(
             item,
-            parameters,
             content_type,
             *self.item_counter.read().await,
             self.path(),
@@ -248,7 +257,6 @@ impl Collection {
 
         let item = item::Item::new(
             item,
-            Vec::new(), // temporarily
             String::from("text/plain"),
             *self.item_counter.read().await,
             self.path(),
