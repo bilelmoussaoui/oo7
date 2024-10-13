@@ -11,7 +11,7 @@ use crate::SECRET_SESSION_PREFIX;
 
 #[derive(Debug, Clone)]
 pub struct Session {
-    aes_key: Arc<Option<Key>>,
+    aes_key: Option<Arc<Key>>,
     manager: Arc<Mutex<ServiceManager>>,
     pub path: OwnedObjectPath,
 }
@@ -32,12 +32,12 @@ impl Session {
 
 impl Session {
     pub fn new(
-        aes_key: Option<Key>,
+        aes_key: Option<Arc<Key>>,
         manager: Arc<Mutex<ServiceManager>>,
         sessions_counter: i32,
     ) -> Self {
         Self {
-            aes_key: Arc::new(aes_key),
+            aes_key,
             path: OwnedObjectPath::try_from(format!(
                 "{}s{}",
                 SECRET_SESSION_PREFIX, sessions_counter
@@ -47,8 +47,8 @@ impl Session {
         }
     }
 
-    pub fn aes_key(&self) -> &Option<Key> {
-        self.aes_key.as_ref()
+    pub fn aes_key(&self) -> &Arc<Key> {
+        self.aes_key.as_ref().unwrap()
     }
 
     pub fn path(&self) -> ObjectPath<'_> {
