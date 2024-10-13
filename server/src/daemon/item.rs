@@ -83,6 +83,8 @@ impl Item {
 
         let secret = &crypto::encrypt(secret, key, iv.clone());
 
+        tracing::info!("GetSecret called for item: {}", self.path);
+
         Ok((SecretInner(
             session.path().into(),
             iv,
@@ -94,6 +96,8 @@ impl Item {
     pub async fn set_secret(&self, secret: Vec<u8>) {
         let mut inner = self.inner.write().await;
         inner.set_secret(secret);
+
+        tracing::info!("SetSecret called for item: {}. secret updated", self.path);
     }
 
     #[zbus(property, name = "Locked")]
