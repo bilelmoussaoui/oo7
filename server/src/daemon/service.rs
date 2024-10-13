@@ -64,7 +64,7 @@ impl Service {
 
         *self.sessions_counter.write().await += 1;
         let session = Session::new(
-            aes_key,
+            Some(Arc::new(aes_key.unwrap())),
             Arc::clone(&self.manager),
             *self.sessions_counter.read().await,
         );
