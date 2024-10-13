@@ -200,6 +200,8 @@ impl Service {
             .at(prompt.path().to_owned(), prompt.to_owned())
             .await?;
 
+        tracing::info!("Collection: /org/freedesktop/secrets/collection/login is unlocked");
+
         Ok((unlocked, prompt.path().to_owned()))
     }
 
@@ -282,6 +284,8 @@ impl Service {
         // a prompt isn't required here. returning an empty objectpath: '/' is enough
         let prompt = ObjectPath::default();
 
+        tracing::info!("Collection: /org/freedesktop/secrets/collection/login is locked");
+
         Ok((locked, prompt))
     }
 
@@ -363,6 +367,8 @@ impl Service {
                 interface.set_alias(alias).await;
 
                 let _ = Service::collection_changed(&ctxt, collection.path()).await;
+
+                tracing::info!("Collection: {} alias updated", collection.path());
 
                 Ok(())
             }

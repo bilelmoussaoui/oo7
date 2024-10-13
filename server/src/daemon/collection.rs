@@ -108,13 +108,14 @@ impl Collection {
         )
         .await;
         let path = OwnedObjectPath::from(item.path());
-        tracing::info!("Item: created: {}", path);
 
         connection
             .object_server()
             .at(&path, item.clone())
             .await
             .unwrap();
+
+        tracing::info!("Item: created: {}", path);
 
         let connection_out = Arc::new(connection.to_owned());
         let collection_path = header.path().unwrap().to_owned();
