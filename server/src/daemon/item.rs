@@ -6,6 +6,7 @@ use std::{
 };
 
 use oo7::{
+    crypto,
     dbus::api::SecretInner,
     portal::{self, Keyring},
 };
@@ -20,7 +21,6 @@ use super::{collection::Collection, error::ServiceError, service_manager::Servic
 #[derive(Clone, Debug)]
 pub struct Item {
     inner: Arc<RwLock<portal::Item>>,
-    parameters: Vec<u8>,
     content_type: String,
     path: OwnedObjectPath,
     collection: OwnedObjectPath,
@@ -69,32 +69,26 @@ impl Item {
     pub async fn secret(&self, session: ObjectPath<'_>) -> Result<(SecretInner,)> {
         let inner = self.inner.read().await;
         let secret = inner.secret();
-        let mut parameters = self.parameters(); // iv
         let content_type = self.content_type();
 
-        println!("get_secret: {:?}", parameters);
-
-        if parameters.is_empty() {
-            parameters = &[
-                130, 63, 115, 49, 45, 32, 141, 179, 131, 232, 253, 146, 31, 219, 166, 26,
-            ];
-
-            tracing::error!("parameters cannot be empty");
-            // return Err(ServiceError::NoSuchObject);
+        let session = self.manager.lock().unwrap().session(session);
+        if session.is_none() {
+            tracing::error!("The session does not exist");
+            return Err(ServiceError::NoSession);
         }
 
-        match self.manager.lock().unwrap().session(session) {
-            Some(session) => Ok((SecretInner(
-                session.path().into(),
-                parameters.to_vec(),
-                secret.to_vec(),
-                content_type.to_owned(),
-            ),)),
-            None => {
-                tracing::error!("The session does not exist");
-                Err(ServiceError::NoSession)
-            }
-        }
+        let session = session.unwrap();
+        let iv = crypto::generate_iv();
+        let key = session.aes_key();
+
+        let secret = &crypto::encrypt(secret, key, iv.clone());
+
+        Ok((SecretInner(
+            session.path().into(),
+            iv,
+            secret.to_vec(),
+            content_type.to_owned(),
+        ),))
     }
 
     pub async fn set_secret(&self, secret: Vec<u8>) {
@@ -156,7 +150,6 @@ impl Item {
 impl Item {
     pub async fn new(
         item: portal::Item,
-        parameters: Vec<u8>,
         content_type: String,
         item_counter: i32,
         collection_path: ObjectPath<'_>,
@@ -169,7 +162,6 @@ impl Item {
             inner: Arc::new(RwLock::new(item)),
             collection: collection_path.into(),
             locked: Arc::new(AtomicBool::new(false)),
-            parameters,
             content_type,
             keyring,
             manager,
@@ -178,10 +170,6 @@ impl Item {
 
     pub(crate) fn path(&self) -> ObjectPath {
         self.path.as_ref()
-    }
-
-    pub(crate) fn parameters(&self) -> &[u8] {
-        &self.parameters
     }
 
     pub(crate) fn content_type(&self) -> &str {
