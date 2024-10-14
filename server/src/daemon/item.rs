@@ -93,11 +93,27 @@ impl Item {
         ),))
     }
 
-    pub async fn set_secret(&self, secret: Vec<u8>) {
+    pub async fn set_secret(&self, secret: SecretInner) -> Result<()> {
+        let session = secret.0;
+        let iv = secret.1;
+        let value = secret.2;
+
+        let session = self.manager.lock().unwrap().session(session.into());
+        if session.is_none() {
+            tracing::info!("The session does not exist");
+            return Err(ServiceError::NoSession);
+        }
+
+        let session = session.unwrap();
+        let key = session.aes_key();
+        let secret = crypto::decrypt(value, key, iv);
+
         let mut inner = self.inner.write().await;
         inner.set_secret(secret);
 
         tracing::info!("SetSecret called for item: {}. secret updated", self.path);
+
+        Ok(())
     }
 
     #[zbus(property, name = "Locked")]
