@@ -38,6 +38,10 @@ jobs:
         run: |
           cargo build --manifest-path ./cli/Cargo.toml
 
+      - name: Build Server
+        run: |
+          cargo build --manifest-path ./server/Cargo.toml
+
       - name: Build Portal
         run: |
           cargo build --manifest-path ./portal/Cargo.toml
