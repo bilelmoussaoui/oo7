@@ -1,0 +1,17 @@
+[package]
+name = "oo7-daemon"
+edition.workspace = true
+exclude.workspace = true
+homepage.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+oo7 = { workspace = true, features = ["unstable"] }
+serde.workspace = true
+tokio = { workspace = true, features = ["full"] }
+tracing = "0.1"
+tracing-subscriber.workspace = true
+zbus.workspace = true

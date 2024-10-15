@@ -10,6 +10,7 @@ The repository consists of the following projects:
 - [cli](./cli/): a secret-tool replacement
 - [client](./client/): the client side library
 - [portal](./portal/): [org.freedesktop.impl.portal.Secret](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.impl.portal.Secret.html) implementation
+- [server](./server/): [org.freedesktop.secrets](https://specifications.freedesktop.org/secret-service-spec/latest/) server implementation
 
 ## License
 
