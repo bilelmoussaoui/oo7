@@ -38,11 +38,7 @@ pub fn encrypt(data: impl AsRef<[u8]>, key: &Key, iv: impl AsRef<[u8]>) -> Vec<u
     blob
 }
 
-pub(crate) fn decrypt(
-    blob: impl AsRef<[u8]>,
-    key: &Key,
-    iv: impl AsRef<[u8]>,
-) -> Zeroizing<Vec<u8>> {
+pub fn decrypt(blob: impl AsRef<[u8]>, key: &Key, iv: impl AsRef<[u8]>) -> Zeroizing<Vec<u8>> {
     let mut data = blob.as_ref().to_vec();
 
     DecAlg::new_from_slices(key.as_ref(), iv.as_ref())

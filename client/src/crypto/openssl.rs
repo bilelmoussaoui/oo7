@@ -56,11 +56,7 @@ fn decrypt_with_padding(
     data
 }
 
-pub(crate) fn decrypt(
-    blob: impl AsRef<[u8]>,
-    key: &Key,
-    iv: impl AsRef<[u8]>,
-) -> Zeroizing<Vec<u8>> {
+pub fn decrypt(blob: impl AsRef<[u8]>, key: &Key, iv: impl AsRef<[u8]>) -> Zeroizing<Vec<u8>> {
     decrypt_with_padding(blob, key, iv, true)
 }
 
