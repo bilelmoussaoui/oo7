@@ -2,6 +2,7 @@ mod collection;
 mod item;
 mod prompt;
 mod service;
+mod service_manager;
 mod session;
 
 use service::{Result, Service};
