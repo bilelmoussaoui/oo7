@@ -1,30 +1,76 @@
 // org.freedesktop.Secret.Service
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
-use oo7::dbus::{
-    api::{Properties, SecretInner},
-    Algorithm, ServiceError,
+use oo7::{
+    dbus::{
+        api::{Properties, SecretInner},
+        Algorithm, ServiceError,
+    },
+    Key,
 };
+use tokio::sync::{Mutex, RwLock};
 use zbus::{
     proxy::ProxyDefault,
     zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Value},
 };
 
+use crate::{service_manager::ServiceManager, session::Session};
+
 pub type Result<T> = std::result::Result<T, ServiceError>;
 
 #[derive(Debug, Default)]
-pub struct Service {}
+pub struct Service {
+    manager: Arc<Mutex<ServiceManager>>,
+    session_index: RwLock<i32>,
+}
 
 #[zbus::interface(name = "org.freedesktop.Secret.Service")]
 impl Service {
     #[zbus(out_args("output", "result"))]
     pub async fn open_session(
         &self,
-        _algorithm: Algorithm,
-        _input: Value<'_>,
+        algorithm: Algorithm,
+        input: Value<'_>,
+        #[zbus(object_server)] object_server: &zbus::ObjectServer,
     ) -> Result<(OwnedValue, OwnedObjectPath)> {
-        todo!()
+        let (public_key, aes_key) = match algorithm {
+            Algorithm::Plain => (None, None),
+            Algorithm::Encrypted => {
+                let client_public_key = Key::from(input);
+                let private_key = Key::generate_private_key();
+                (
+                    Some(Key::generate_public_key(&private_key)),
+                    Some(Key::generate_aes_key(&private_key, &client_public_key)),
+                )
+            }
+        };
+
+        let mut session_index = *self.session_index.read().await;
+        session_index += 1;
+        let session = Session::new(
+            aes_key.map(Arc::new),
+            Arc::clone(&self.manager),
+            session_index,
+        );
+        *self.session_index.write().await = session_index;
+        let path = session.path().clone();
+
+        {
+            let session = Arc::new(session.clone());
+            self.manager
+                .lock()
+                .await
+                .insert_session(path.clone(), Arc::clone(&session));
+        }
+
+        object_server.at(&path, session).await?;
+
+        let service_key = public_key
+            .map(|k| OwnedValue::from(&k))
+            .unwrap_or_else(|| Value::new::<Vec<u8>>(vec![]).try_to_owned().unwrap());
+
+        Ok((service_key, path))
     }
 
     #[zbus(out_args("collection", "prompt"))]
