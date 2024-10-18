@@ -13,7 +13,7 @@ pub struct ServiceManager {
 }
 
 impl ServiceManager {
-    pub fn n_sessions(&mut self) -> usize {
+    pub fn n_sessions(&self) -> usize {
         self.sessions.len()
     }
 
