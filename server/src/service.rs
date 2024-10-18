@@ -13,15 +13,17 @@ use tokio::sync::{Mutex, RwLock};
 use zbus::{
     proxy::Defaults,
     zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Value},
+    Connection,
 };
 
 use crate::{service_manager::ServiceManager, session::Session};
 
 pub type Result<T> = std::result::Result<T, ServiceError>;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Service {
     manager: Arc<Mutex<ServiceManager>>,
+    connection: Connection,
     session_index: RwLock<i32>,
 }
 
@@ -126,18 +128,25 @@ impl Service {
 }
 
 impl Service {
-    pub async fn run() -> Result<()> {
-        let connection = zbus::connection::Builder::session()?
-            .name(oo7::dbus::api::Service::DESTINATION.as_deref().unwrap())?
-            .build()
+    pub async fn new() -> Result<Self> {
+        Ok(Self {
+            manager: Default::default(),
+            session_index: RwLock::new(0),
+            connection: zbus::connection::Builder::session()?
+                .name(oo7::dbus::api::Service::DESTINATION.as_deref().unwrap())?
+                .build()
+                .await?,
+        })
+    }
+
+    pub async fn run(self) -> Result<()> {
+        let connection = self.connection.clone();
+        let object_server = connection.object_server();
+
+        object_server
+            .at(oo7::dbus::api::Service::PATH.as_deref().unwrap(), self)
             .await?;
-        connection
-            .object_server()
-            .at(
-                oo7::dbus::api::Service::PATH.as_deref().unwrap(),
-                Self::default(),
-            )
-            .await?;
+
         Ok(())
     }
 }

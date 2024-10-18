@@ -14,7 +14,8 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     tracing::info!("Starting {}", BINARY_NAME);
 
-    Service::run().await?;
+    let service = Service::new().await?;
+    service.run().await?;
 
     std::future::pending::<()>().await;
 
