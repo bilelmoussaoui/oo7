@@ -1,5 +1,8 @@
-pub(crate) const DESTINATION: &str = "org.freedesktop.secrets";
-pub(crate) const PATH: &str = "/org/freedesktop/secrets";
+pub(crate) const DESTINATION: zbus::names::BusName<'static> = zbus::names::BusName::WellKnown(
+    zbus::names::WellKnownName::from_static_str_unchecked("org.freedesktop.secrets"),
+);
+pub(crate) const PATH: zbus::zvariant::ObjectPath<'static> =
+    zbus::zvariant::ObjectPath::from_static_str_unchecked("/org/freedesktop/secrets");
 
 /// A common trait implemented by objects that can be
 /// locked or unlocked. Like [`Collection`] or [`Item`].

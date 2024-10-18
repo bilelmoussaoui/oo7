@@ -54,7 +54,7 @@ impl Key {
 
 impl From<&Key> for zvariant::Value<'_> {
     fn from(key: &Key) -> Self {
-        let mut array = zvariant::Array::new(u8::signature());
+        let mut array = zvariant::Array::new(u8::SIGNATURE);
         for byte in key.as_ref() {
             array
                 .append(zvariant::Value::U8(*byte))

@@ -1,10 +1,7 @@
 use std::fmt;
 
 use serde::Serialize;
-use zbus::{
-    zvariant::{ObjectPath, Type},
-    ProxyDefault,
-};
+use zbus::zvariant::{ObjectPath, Type};
 
 use super::DESTINATION;
 use crate::dbus::{Error, ServiceError};
@@ -14,10 +11,12 @@ use crate::dbus::{Error, ServiceError};
 #[doc(alias = "org.freedesktop.Secret.Session")]
 pub struct Session<'a>(zbus::Proxy<'a>);
 
-impl ProxyDefault for Session<'_> {
-    const INTERFACE: Option<&'static str> = Some("org.freedesktop.Secret.Session");
-    const DESTINATION: Option<&'static str> = Some(DESTINATION);
-    const PATH: Option<&'static str> = None;
+impl zbus::proxy::Defaults for Session<'_> {
+    const INTERFACE: &'static Option<zbus::names::InterfaceName<'static>> = &Some(
+        zbus::names::InterfaceName::from_static_str_unchecked("org.freedesktop.Secret.Session"),
+    );
+    const DESTINATION: &'static Option<zbus::names::BusName<'static>> = &Some(DESTINATION);
+    const PATH: &'static Option<ObjectPath<'static>> = &None;
 }
 
 impl<'a> From<zbus::Proxy<'a>> for Session<'a> {
@@ -32,7 +31,7 @@ impl<'a> Session<'a> {
         P: TryInto<ObjectPath<'a>>,
         P::Error: Into<zbus::Error>,
     {
-        zbus::ProxyBuilder::new(connection)
+        zbus::proxy::Builder::new(connection)
             .path(object_path)?
             .build()
             .await

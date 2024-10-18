@@ -62,7 +62,7 @@ impl Serialize for Properties {
         } else {
             let mut map = serializer.serialize_map(Some(2))?;
             map.serialize_entry(ITEM_PROPERTY_LABEL, &Value::from(&self.label))?;
-            let mut dict = zbus::zvariant::Dict::new(String::signature(), String::signature());
+            let mut dict = zbus::zvariant::Dict::new(String::SIGNATURE, String::SIGNATURE);
 
             if let Some(attributes) = &self.attributes {
                 for (key, value) in attributes {
@@ -143,6 +143,6 @@ mod tests {
 
     #[test]
     fn signature() {
-        assert_eq!(Properties::signature(), "a{sv}");
+        assert_eq!(Properties::SIGNATURE, "a{sv}");
     }
 }

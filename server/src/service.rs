@@ -11,7 +11,7 @@ use oo7::{
 };
 use tokio::sync::{Mutex, RwLock};
 use zbus::{
-    proxy::ProxyDefault,
+    proxy::Defaults,
     zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Value},
 };
 
@@ -128,12 +128,15 @@ impl Service {
 impl Service {
     pub async fn run() -> Result<()> {
         let connection = zbus::connection::Builder::session()?
-            .name(oo7::dbus::api::Service::DESTINATION.unwrap())?
+            .name(oo7::dbus::api::Service::DESTINATION.as_deref().unwrap())?
             .build()
             .await?;
         connection
             .object_server()
-            .at(oo7::dbus::api::Service::PATH.unwrap(), Self::default())
+            .at(
+                oo7::dbus::api::Service::PATH.as_deref().unwrap(),
+                Self::default(),
+            )
             .await?;
         Ok(())
     }

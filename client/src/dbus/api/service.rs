@@ -2,10 +2,7 @@ use std::{collections::HashMap, fmt};
 
 use ashpd::WindowIdentifier;
 use futures_util::{Stream, StreamExt};
-use zbus::{
-    zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Type, Value},
-    ProxyDefault,
-};
+use zbus::zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Type, Value};
 
 use super::{
     secret::SecretInner, Collection, Item, Prompt, Properties, Secret, Session, Unlockable,
@@ -21,10 +18,12 @@ use crate::{
 #[doc(alias = "org.freedesktop.secrets")]
 pub struct Service<'a>(zbus::Proxy<'a>);
 
-impl ProxyDefault for Service<'_> {
-    const INTERFACE: Option<&'static str> = Some("org.freedesktop.Secret.Service");
-    const DESTINATION: Option<&'static str> = Some(DESTINATION);
-    const PATH: Option<&'static str> = Some(PATH);
+impl zbus::proxy::Defaults for Service<'_> {
+    const INTERFACE: &'static Option<zbus::names::InterfaceName<'static>> = &Some(
+        zbus::names::InterfaceName::from_static_str_unchecked("org.freedesktop.Secret.Service"),
+    );
+    const DESTINATION: &'static Option<zbus::names::BusName<'static>> = &Some(DESTINATION);
+    const PATH: &'static Option<ObjectPath<'static>> = &Some(PATH);
 }
 
 impl<'a> From<zbus::Proxy<'a>> for Service<'a> {
@@ -35,8 +34,7 @@ impl<'a> From<zbus::Proxy<'a>> for Service<'a> {
 
 impl<'a> Service<'a> {
     pub async fn new(connection: &zbus::Connection) -> Result<Service<'a>, Error> {
-        zbus::ProxyBuilder::new(connection)
-            .cache_properties(zbus::CacheProperties::No)
+        zbus::proxy::Builder::new(connection)
             .build()
             .await
             .map_err(From::from)

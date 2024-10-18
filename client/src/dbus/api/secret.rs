@@ -106,6 +106,6 @@ mod tests {
 
     #[test]
     fn signature() {
-        assert_eq!(Secret::signature(), "(oayays)");
+        assert_eq!(Secret::SIGNATURE, "(oayays)");
     }
 }
