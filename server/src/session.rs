@@ -30,7 +30,8 @@ impl Session {
 }
 
 impl Session {
-    pub fn new(aes_key: Option<Arc<Key>>, manager: Arc<Mutex<ServiceManager>>, index: i32) -> Self {
+    pub async fn new(aes_key: Option<Arc<Key>>, manager: Arc<Mutex<ServiceManager>>) -> Self {
+        let index = manager.lock().await.n_sessions() + 1;
         Self {
             path: OwnedObjectPath::try_from(format!("/org/freedesktop/secrets/session/s{index}"))
                 .unwrap(),

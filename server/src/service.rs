@@ -9,7 +9,7 @@ use oo7::{
     },
     Key,
 };
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::Mutex;
 use zbus::{
     proxy::Defaults,
     zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Value},
@@ -22,7 +22,6 @@ pub type Result<T> = std::result::Result<T, ServiceError>;
 #[derive(Debug)]
 pub struct Service {
     manager: Arc<Mutex<ServiceManager>>,
-    session_index: RwLock<i32>,
     #[allow(unused)]
     connection: zbus::Connection,
 }
@@ -48,14 +47,7 @@ impl Service {
             }
         };
 
-        let mut session_index = *self.session_index.read().await;
-        session_index += 1;
-        let session = Session::new(
-            aes_key.map(Arc::new),
-            Arc::clone(&self.manager),
-            session_index,
-        );
-        *self.session_index.write().await = session_index;
+        let session = Session::new(aes_key.map(Arc::new), Arc::clone(&self.manager)).await;
         let path = session.path().clone();
 
         {
@@ -135,7 +127,6 @@ impl Service {
             .await?;
         let service = Self {
             manager: Default::default(),
-            session_index: Default::default(),
             connection: connection.clone(),
         };
 

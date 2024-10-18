@@ -13,6 +13,10 @@ pub struct ServiceManager {
 }
 
 impl ServiceManager {
+    pub fn n_sessions(&mut self) -> usize {
+        self.sessions.len()
+    }
+
     pub fn insert_session(&mut self, path: OwnedObjectPath, session: Arc<Session>) {
         self.sessions.insert(path, session);
     }
