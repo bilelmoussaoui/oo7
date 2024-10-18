@@ -19,10 +19,12 @@ use crate::{service_manager::ServiceManager, session::Session};
 
 pub type Result<T> = std::result::Result<T, ServiceError>;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Service {
     manager: Arc<Mutex<ServiceManager>>,
     session_index: RwLock<i32>,
+    #[allow(unused)]
+    connection: zbus::Connection,
 }
 
 #[zbus::interface(name = "org.freedesktop.Secret.Service")]
@@ -131,12 +133,15 @@ impl Service {
             .name(oo7::dbus::api::Service::DESTINATION.as_deref().unwrap())?
             .build()
             .await?;
+        let service = Self {
+            manager: Default::default(),
+            session_index: Default::default(),
+            connection: connection.clone(),
+        };
+
         connection
             .object_server()
-            .at(
-                oo7::dbus::api::Service::PATH.as_deref().unwrap(),
-                Self::default(),
-            )
+            .at(oo7::dbus::api::Service::PATH.as_deref().unwrap(), service)
             .await?;
         Ok(())
     }
