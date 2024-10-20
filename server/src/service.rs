@@ -15,12 +15,15 @@ use zbus::{
     zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Value},
 };
 
-use crate::{service_manager::ServiceManager, session::Session};
+use crate::{collection::Collection, service_manager::ServiceManager, session::Session};
 
 pub type Result<T> = std::result::Result<T, ServiceError>;
 
 #[derive(Debug)]
 pub struct Service {
+    // Properties
+    collections: Mutex<Vec<OwnedObjectPath>>,
+    // Other attributes
     manager: Arc<Mutex<ServiceManager>>,
     #[allow(unused)]
     connection: zbus::Connection,
@@ -125,15 +128,41 @@ impl Service {
             .name(oo7::dbus::api::Service::DESTINATION.as_deref().unwrap())?
             .build()
             .await?;
+        let object_server = connection.object_server();
         let service = Self {
+            collections: Default::default(),
             manager: Default::default(),
             connection: connection.clone(),
         };
+        let collections = service.fetch_collections().await;
 
-        connection
-            .object_server()
+        object_server
             .at(oo7::dbus::api::Service::PATH.as_deref().unwrap(), service)
             .await?;
+
+        for collection in collections {
+            object_server
+                .at(collection.path().clone(), collection)
+                .await?;
+        }
+
         Ok(())
+    }
+
+    async fn fetch_collections(&self) -> Vec<Collection> {
+        let mut collections = Vec::new();
+        // todo: create default collection
+
+        // create temporary session collection
+        let session_collection = Collection::new("session", "session", Arc::clone(&self.manager));
+        collections.push(session_collection);
+
+        let mut lock = self.collections.lock().await;
+        for collection in &collections {
+            lock.push(collection.path().clone());
+        }
+        drop(lock);
+
+        collections
     }
 }
