@@ -74,7 +74,7 @@ type ItemDefinition = (String, HashMap<String, String>, Zeroizing<Vec<u8>>, bool
 #[derive(Debug)]
 pub struct Keyring {
     keyring: Arc<RwLock<api::Keyring>>,
-    path: PathBuf,
+    path: Option<PathBuf>,
     /// Times are stored before reading the file to detect
     /// file changes before writing
     mtime: Mutex<Option<std::time::SystemTime>>,
@@ -131,8 +131,20 @@ impl Keyring {
 
         Ok(Self {
             keyring: Arc::new(RwLock::new(keyring)),
-            path: path.as_ref().to_path_buf(),
+            path: Some(path.as_ref().to_path_buf()),
             mtime: Mutex::new(mtime),
+            key: Default::default(),
+            secret: Mutex::new(Arc::new(secret)),
+        })
+    }
+
+    /// Creates a temporary backend, that is never stored on disk.
+    pub async fn temporary(secret: Secret) -> Result<Self, Error> {
+        let keyring = api::Keyring::new();
+        Ok(Self {
+            keyring: Arc::new(RwLock::new(keyring)),
+            path: None,
+            mtime: Default::default(),
             key: Default::default(),
             secret: Mutex::new(Arc::new(secret)),
         })
@@ -149,7 +161,7 @@ impl Keyring {
         match api::Keyring::try_from(content.as_slice()) {
             Ok(keyring) => Ok(Self {
                 keyring: Arc::new(RwLock::new(keyring)),
-                path: path.as_ref().to_path_buf(),
+                path: Some(path.as_ref().to_path_buf()),
                 mtime: Default::default(),
                 key: Default::default(),
                 secret: Mutex::new(Arc::new(secret)),
@@ -171,7 +183,7 @@ impl Keyring {
 
                 Ok(Self {
                     keyring: Arc::new(RwLock::new(keyring)),
-                    path: path.as_ref().to_path_buf(),
+                    path: Some(path.as_ref().to_path_buf()),
                     mtime: Default::default(),
                     key: Default::default(),
                     secret: Mutex::new(Arc::new(secret)),
@@ -207,7 +219,7 @@ impl Keyring {
         } else {
             Ok(Self {
                 keyring: Arc::new(RwLock::new(api::Keyring::new())),
-                path: v1_path,
+                path: Some(v1_path),
                 mtime: Default::default(),
                 key: Default::default(),
                 secret: Mutex::new(Arc::new(secret)),
@@ -362,8 +374,9 @@ impl Keyring {
 
         #[cfg(feature = "tracing")]
         tracing::debug!("Writing keyring back to the file");
-        keyring.dump(&self.path, *self.mtime.lock().await).await?;
-
+        if let Some(ref path) = self.path {
+            keyring.dump(path, *self.mtime.lock().await).await?;
+        }
         Ok(())
     }
 
@@ -376,9 +389,14 @@ impl Keyring {
             let mut keyring = self.keyring.write().await;
             #[cfg(feature = "tracing")]
             tracing::debug!("Current modified time {:?}", mtime);
-            keyring.dump(&self.path, *mtime).await?;
+            if let Some(ref path) = self.path {
+                keyring.dump(path, *mtime).await?;
+            }
         };
-        if let Ok(modified) = fs::metadata(&self.path).await?.modified() {
+        let Some(ref path) = self.path else {
+            return Ok(());
+        };
+        if let Ok(modified) = fs::metadata(path).await?.modified() {
             #[cfg(feature = "tracing")]
             tracing::debug!("New modified time {:?}", modified);
             *mtime = Some(modified);
