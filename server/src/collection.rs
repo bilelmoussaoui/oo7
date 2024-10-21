@@ -6,7 +6,10 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use oo7::dbus::api::{Properties, SecretInner};
+use oo7::{
+    dbus::api::{Properties, SecretInner},
+    portal::Keyring,
+};
 use tokio::sync::{Mutex, RwLock};
 use zbus::{interface, zvariant};
 use zvariant::{ObjectPath, OwnedObjectPath};
@@ -25,6 +28,8 @@ pub struct Collection {
     modified: Mutex<Duration>,
     // Other attributes
     alias: Mutex<String>,
+    #[allow(unused)]
+    keyring: Arc<Keyring>,
     manager: Arc<Mutex<ServiceManager>>,
     n_items: RwLock<i32>,
     path: OwnedObjectPath,
@@ -54,7 +59,12 @@ impl Collection {
 }
 
 impl Collection {
-    pub fn new(label: &str, alias: &str, manager: Arc<Mutex<ServiceManager>>) -> Self {
+    pub fn new(
+        label: &str,
+        alias: &str,
+        keyring: Arc<Keyring>,
+        manager: Arc<Mutex<ServiceManager>>,
+    ) -> Self {
         let created = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap();
@@ -72,6 +82,7 @@ impl Collection {
             ))
             .unwrap(),
             created,
+            keyring,
             manager,
         }
     }

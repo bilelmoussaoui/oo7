@@ -7,6 +7,7 @@ use oo7::{
         api::{Properties, SecretInner},
         Algorithm, ServiceError,
     },
+    portal::{Keyring, Secret},
     Key,
 };
 use tokio::sync::Mutex;
@@ -24,9 +25,10 @@ pub struct Service {
     // Properties
     collections: Mutex<Vec<OwnedObjectPath>>,
     // Other attributes
-    manager: Arc<Mutex<ServiceManager>>,
     #[allow(unused)]
-    connection: zbus::Connection,
+    keyring: Arc<Keyring>,
+    manager: Arc<Mutex<ServiceManager>>,
+    connection: Mutex<Option<zbus::Connection>>,
 }
 
 #[zbus::interface(name = "org.freedesktop.Secret.Service")]
@@ -123,21 +125,36 @@ impl Service {
 }
 
 impl Service {
-    pub async fn run() -> Result<()> {
+    pub async fn new(secret: Option<Secret>) -> Self {
+        if secret.is_none() {
+            // todo: may be create a temporary Keyring here
+            panic!("Keyring secret can't be empty");
+        } else {
+            Self {
+                collections: Default::default(),
+                manager: Default::default(),
+                connection: Default::default(),
+                keyring: Arc::new(match Keyring::open("login", secret.unwrap()).await {
+                    Ok(keyring) => keyring,
+                    Err(err) => panic!("Failed to unlock login keyring: {}", err),
+                }),
+            }
+        }
+    }
+
+    pub async fn run(self) -> Result<()> {
         let connection = zbus::connection::Builder::session()?
             .name(oo7::dbus::api::Service::DESTINATION.as_deref().unwrap())?
             .build()
             .await?;
         let object_server = connection.object_server();
-        let service = Self {
-            collections: Default::default(),
-            manager: Default::default(),
-            connection: connection.clone(),
-        };
-        let collections = service.fetch_collections().await;
+        let collections = self.fetch_collections().await;
+        {
+            *self.connection.lock().await = Some(connection.clone());
+        }
 
         object_server
-            .at(oo7::dbus::api::Service::PATH.as_deref().unwrap(), service)
+            .at(oo7::dbus::api::Service::PATH.as_deref().unwrap(), self)
             .await?;
 
         for collection in collections {
@@ -151,10 +168,21 @@ impl Service {
 
     async fn fetch_collections(&self) -> Vec<Collection> {
         let mut collections = Vec::new();
-        // todo: create default collection
-
+        // create login collection
+        let login_collection = Collection::new(
+            "login",
+            "default",
+            Arc::clone(&self.keyring),
+            Arc::clone(&self.manager),
+        );
+        collections.push(login_collection);
         // create temporary session collection
-        let session_collection = Collection::new("session", "session", Arc::clone(&self.manager));
+        let session_collection = Collection::new(
+            "session",
+            "session",
+            Arc::clone(&self.keyring),
+            Arc::clone(&self.manager),
+        );
         collections.push(session_collection);
 
         let mut lock = self.collections.lock().await;
