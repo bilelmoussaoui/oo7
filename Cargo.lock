@@ -2089,9 +2089,9 @@ dependencies = [
 
 [[package]]
 name = "zvariant"
-version = "5.0.0"
+version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b909387da6d5787949f780919b5149d7f29f2f03f75eb883a67206e780b48fab"
+checksum = "c690a1da8858fd4377b8cc3134a753b0bea1d8ebd78ad6e5897fab821c5e184e"
 dependencies = [
  "endi",
  "enumflags2",
@@ -2104,9 +2104,9 @@ dependencies = [
 
 [[package]]
 name = "zvariant_derive"
-version = "5.0.0"
+version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67fb722e4d5e0d88a4c370c17abf3e2323c549d9580b4c2d775f475a45b34307"
+checksum = "83b6ddc1fed08493e4f2bd9350e7d00a3383467228735f3f169a9f8820fde755"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
