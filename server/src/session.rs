@@ -2,11 +2,10 @@
 
 use std::sync::Arc;
 
-use oo7::Key;
+use oo7::{dbus::ServiceError, Key};
 use tokio::sync::Mutex;
 use zbus::{interface, zvariant::OwnedObjectPath};
 
-use super::Result;
 use crate::service_manager::ServiceManager;
 
 #[derive(Debug, Clone)]
@@ -21,7 +20,7 @@ impl Session {
     pub async fn close(
         &self,
         #[zbus(object_server)] object_server: &zbus::ObjectServer,
-    ) -> Result<()> {
+    ) -> Result<(), ServiceError> {
         self.manager.lock().await.remove_session(&self.path);
         object_server.remove::<Self, _>(&self.path).await?;
 
