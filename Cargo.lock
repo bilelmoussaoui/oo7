@@ -1086,7 +1086,9 @@ dependencies = [
 name = "oo7-daemon"
 version = "0.3.0"
 dependencies = [
+ "clap",
  "oo7",
+ "rpassword",
  "serde",
  "tokio",
  "tracing",

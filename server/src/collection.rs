@@ -6,12 +6,17 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use oo7::dbus::api::{Properties, SecretInner};
+use oo7::{
+    dbus::{
+        api::{Properties, SecretInner},
+        ServiceError,
+    },
+    portal::Keyring,
+};
 use tokio::sync::{Mutex, RwLock};
 use zbus::{interface, zvariant};
 use zvariant::{ObjectPath, OwnedObjectPath};
 
-use super::Result;
 use crate::{item, service_manager::ServiceManager};
 
 #[derive(Debug)]
@@ -25,6 +30,8 @@ pub struct Collection {
     modified: Mutex<Duration>,
     // Other attributes
     alias: Mutex<String>,
+    #[allow(unused)]
+    keyring: Arc<Keyring>,
     manager: Arc<Mutex<ServiceManager>>,
     n_items: RwLock<i32>,
     path: OwnedObjectPath,
@@ -33,12 +40,15 @@ pub struct Collection {
 #[interface(name = "org.freedesktop.Secret.Collection")]
 impl Collection {
     #[zbus(out_args("prompt"))]
-    pub async fn delete(&self) -> Result<ObjectPath> {
+    pub async fn delete(&self) -> Result<ObjectPath, ServiceError> {
         todo!()
     }
 
     #[zbus(out_args("results"))]
-    pub async fn search_items(&self, _attributes: HashMap<String, String>) -> Vec<OwnedObjectPath> {
+    pub async fn search_items(
+        &self,
+        _attributes: HashMap<String, String>,
+    ) -> Result<Vec<OwnedObjectPath>, ServiceError> {
         todo!()
     }
 
@@ -48,13 +58,18 @@ impl Collection {
         _properties: Properties,
         _secret: SecretInner,
         _replace: bool,
-    ) -> Result<(OwnedObjectPath, ObjectPath)> {
+    ) -> Result<(OwnedObjectPath, ObjectPath), ServiceError> {
         todo!()
     }
 }
 
 impl Collection {
-    pub fn new(label: &str, alias: &str, manager: Arc<Mutex<ServiceManager>>) -> Self {
+    pub fn new(
+        label: &str,
+        alias: &str,
+        manager: Arc<Mutex<ServiceManager>>,
+        keyring: Arc<Keyring>,
+    ) -> Self {
         let created = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap();
@@ -73,6 +88,7 @@ impl Collection {
             .unwrap(),
             created,
             manager,
+            keyring,
         }
     }
 

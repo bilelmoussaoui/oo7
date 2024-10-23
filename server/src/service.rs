@@ -7,6 +7,7 @@ use oo7::{
         api::{Properties, SecretInner},
         Algorithm, ServiceError,
     },
+    portal::{Keyring, Secret},
     Key,
 };
 use tokio::sync::Mutex;
@@ -15,14 +16,14 @@ use zbus::{
     zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Value},
 };
 
-use crate::{collection::Collection, service_manager::ServiceManager, session::Session};
+use crate::{
+    collection::Collection, error::Error, service_manager::ServiceManager, session::Session,
+};
 
-pub type Result<T> = std::result::Result<T, ServiceError>;
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Service {
     // Properties
-    collections: Mutex<Vec<OwnedObjectPath>>,
+    collections: Arc<Mutex<Vec<OwnedObjectPath>>>,
     // Other attributes
     manager: Arc<Mutex<ServiceManager>>,
     #[allow(unused)]
@@ -37,7 +38,7 @@ impl Service {
         algorithm: Algorithm,
         input: Value<'_>,
         #[zbus(object_server)] object_server: &zbus::ObjectServer,
-    ) -> Result<(OwnedValue, OwnedObjectPath)> {
+    ) -> Result<(OwnedValue, OwnedObjectPath), ServiceError> {
         let (public_key, aes_key) = match algorithm {
             Algorithm::Plain => (None, None),
             Algorithm::Encrypted => {
@@ -75,7 +76,7 @@ impl Service {
         &self,
         _properties: Properties,
         _alias: &str,
-    ) -> Result<(OwnedObjectPath, ObjectPath)> {
+    ) -> Result<(OwnedObjectPath, ObjectPath), ServiceError> {
         todo!()
     }
 
@@ -83,7 +84,7 @@ impl Service {
     pub async fn search_items(
         &self,
         _attributes: HashMap<&str, &str>,
-    ) -> Result<(Vec<OwnedObjectPath>, Vec<OwnedObjectPath>)> {
+    ) -> Result<(Vec<OwnedObjectPath>, Vec<OwnedObjectPath>), ServiceError> {
         todo!()
     }
 
@@ -91,7 +92,7 @@ impl Service {
     pub async fn unlock(
         &mut self,
         _objects: Vec<OwnedObjectPath>,
-    ) -> Result<(Vec<OwnedObjectPath>, ObjectPath)> {
+    ) -> Result<(Vec<OwnedObjectPath>, ObjectPath), ServiceError> {
         todo!()
     }
 
@@ -99,7 +100,7 @@ impl Service {
     pub async fn lock(
         &mut self,
         _objects: Vec<OwnedObjectPath>,
-    ) -> Result<(Vec<OwnedObjectPath>, ObjectPath)> {
+    ) -> Result<(Vec<OwnedObjectPath>, ObjectPath), ServiceError> {
         todo!()
     }
 
@@ -108,22 +109,26 @@ impl Service {
         &self,
         _items: Vec<OwnedObjectPath>,
         _session: ObjectPath<'_>,
-    ) -> Result<HashMap<OwnedObjectPath, SecretInner>> {
+    ) -> Result<HashMap<OwnedObjectPath, SecretInner>, ServiceError> {
         todo!()
     }
 
     #[zbus(out_args("collection"))]
-    pub async fn read_alias(&self, _name: &str) -> Result<ObjectPath> {
+    pub async fn read_alias(&self, _name: &str) -> Result<ObjectPath, ServiceError> {
         todo!()
     }
 
-    pub async fn set_alias(&self, _name: &str, _collection: ObjectPath<'_>) -> Result<()> {
+    pub async fn set_alias(
+        &self,
+        _name: &str,
+        _collection: ObjectPath<'_>,
+    ) -> Result<(), ServiceError> {
         todo!()
     }
 }
 
 impl Service {
-    pub async fn run() -> Result<()> {
+    pub async fn run(secret: Option<Secret>) -> Result<(), Error> {
         let connection = zbus::connection::Builder::session()?
             .name(oo7::dbus::api::Service::DESTINATION.as_deref().unwrap())?
             .build()
@@ -134,35 +139,42 @@ impl Service {
             manager: Default::default(),
             connection: connection.clone(),
         };
-        let collections = service.fetch_collections().await;
 
         object_server
-            .at(oo7::dbus::api::Service::PATH.as_deref().unwrap(), service)
+            .at(
+                oo7::dbus::api::Service::PATH.as_deref().unwrap(),
+                service.clone(),
+            )
             .await?;
 
-        for collection in collections {
+        let mut collections = service.collections.lock().await;
+
+        if let Some(secret) = secret {
+            let collection = Collection::new(
+                "login",
+                "default",
+                Arc::clone(&service.manager),
+                Arc::new(Keyring::open("login", secret).await?),
+            );
+            collections.push(collection.path().clone());
             object_server
                 .at(collection.path().clone(), collection)
                 .await?;
         }
 
+        let collection = Collection::new(
+            "session",
+            "session",
+            Arc::clone(&service.manager),
+            Arc::new(Keyring::temporary(Secret::random()).await?),
+        );
+        collections.push(collection.path().clone());
+        object_server
+            .at(collection.path().clone(), collection)
+            .await?;
+
+        drop(collections);
+
         Ok(())
-    }
-
-    async fn fetch_collections(&self) -> Vec<Collection> {
-        let mut collections = Vec::new();
-        // todo: create default collection
-
-        // create temporary session collection
-        let session_collection = Collection::new("session", "session", Arc::clone(&self.manager));
-        collections.push(session_collection);
-
-        let mut lock = self.collections.lock().await;
-        for collection in &collections {
-            lock.push(collection.path().clone());
-        }
-        drop(lock);
-
-        collections
     }
 }
