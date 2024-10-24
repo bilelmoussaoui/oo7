@@ -115,16 +115,62 @@ impl Service {
     }
 
     #[zbus(out_args("collection"))]
-    pub async fn read_alias(&self, _name: &str) -> Result<ObjectPath, ServiceError> {
-        todo!()
+    pub async fn read_alias(
+        &self,
+        name: &str,
+        #[zbus(object_server)] object_server: &zbus::ObjectServer,
+    ) -> Result<OwnedObjectPath, ServiceError> {
+        let collections = self.collections.lock().await;
+
+        for collection in collections.iter() {
+            let collection_ifce_ref = object_server.interface::<_, Collection>(collection).await?;
+            let collection = collection_ifce_ref.get_mut().await;
+
+            if collection.alias().await == name {
+                tracing::info!(
+                    "Collection: {} found for alias: {}.",
+                    collection.path(),
+                    name
+                );
+                return Ok(collection.path().clone());
+            }
+        }
+
+        tracing::info!("Collection with alias {} does not exist.", name);
+
+        Ok(OwnedObjectPath::default())
     }
 
     pub async fn set_alias(
         &self,
-        _name: &str,
-        _collection: ObjectPath<'_>,
+        name: &str,
+        collection: OwnedObjectPath,
+        #[zbus(object_server)] object_server: &zbus::ObjectServer,
     ) -> Result<(), ServiceError> {
-        todo!()
+        let collections = self.collections.lock().await;
+
+        for path in collections.iter() {
+            if path == &collection {
+                let collection_ifce_ref = object_server.interface::<_, Collection>(path).await?;
+                let collection = collection_ifce_ref.get_mut().await;
+
+                collection.set_alias(name).await;
+
+                tracing::info!(
+                    "Collection: {} alias updated to {}.",
+                    collection.path(),
+                    name
+                );
+                return Ok(());
+            }
+        }
+
+        tracing::info!("Collection: {} does not exist.", collection);
+
+        Err(ServiceError::NoSuchObject(format!(
+            "The collection: {} does not exist.",
+            collection,
+        )))
     }
 
     #[zbus(property, name = "Collections")]
