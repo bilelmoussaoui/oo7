@@ -95,4 +95,16 @@ impl Collection {
     pub fn path(&self) -> &OwnedObjectPath {
         &self.path
     }
+
+    pub async fn label(&self) -> String {
+        self.label.lock().await.clone()
+    }
+
+    pub async fn set_alias(&self, alias: String) {
+        *self.alias.lock().await = alias;
+    }
+
+    pub async fn alias(&self) -> String {
+        self.alias.lock().await.clone()
+    }
 }
