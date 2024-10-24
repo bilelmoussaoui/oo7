@@ -13,7 +13,7 @@ pub enum ServiceError {
     /// Session does not exist.
     NoSession,
     /// Collection/Item does not exist.
-    NoSuchObject,
+    NoSuchObject(String),
 }
 
 /// DBus backend specific errors.
