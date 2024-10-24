@@ -9,11 +9,11 @@ pub enum ServiceError {
     /// ZBus specific error.
     ZBus(zbus::Error),
     /// Collection/Item is locked.
-    IsLocked,
+    IsLocked(String),
     /// Session does not exist.
-    NoSession,
+    NoSession(String),
     /// Collection/Item does not exist.
-    NoSuchObject,
+    NoSuchObject(String),
 }
 
 /// DBus backend specific errors.
