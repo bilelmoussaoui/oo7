@@ -114,16 +114,61 @@ impl Service {
     }
 
     #[zbus(out_args("collection"))]
-    pub async fn read_alias(&self, _name: &str) -> Result<ObjectPath, ServiceError> {
-        todo!()
+    pub async fn read_alias(
+        &self,
+        name: &str,
+        #[zbus(object_server)] object_server: &zbus::ObjectServer,
+    ) -> Result<ObjectPath, ServiceError> {
+        let mut objectpath = ObjectPath::default();
+        for collection in self.collections.lock().await.iter() {
+            let collection_ifce_ref = object_server.interface::<_, Collection>(collection).await?;
+            let collection = collection_ifce_ref.get_mut().await;
+
+            if collection.alias().await == name || collection.label().await == name {
+                objectpath = ObjectPath::from(collection.path().clone());
+            }
+        }
+
+        Ok(objectpath)
     }
 
     pub async fn set_alias(
         &self,
-        _name: &str,
-        _collection: ObjectPath<'_>,
+        name: &str,
+        collection: ObjectPath<'_>,
+        #[zbus(object_server)] object_server: &zbus::ObjectServer,
     ) -> Result<(), ServiceError> {
-        todo!()
+        if name != "default" {
+            return Err(ServiceError::ZBus(zbus::Error::Failure(String::from(
+                "Only the 'default' alias is supported",
+            ))));
+        }
+
+        let collections = self.collections.lock().await;
+
+        if !collections
+            .to_vec()
+            .contains(&OwnedObjectPath::from(collection.clone()))
+        {
+            return Err(ServiceError::NoSuchObject(String::from(
+                "The collection does not exist",
+            )));
+        }
+
+        for path in collections.iter() {
+            if **path == collection {
+                let collection_ifce_ref = object_server.interface::<_, Collection>(path).await?;
+                let collection = collection_ifce_ref.get_mut().await;
+
+                collection.set_alias(String::from(name)).await;
+            }
+        }
+
+        tracing::info!("Collection: {} alias updated to {}.", collection, name);
+
+        drop(collections);
+
+        Ok(())
     }
 }
 
