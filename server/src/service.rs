@@ -125,6 +125,11 @@ impl Service {
     ) -> Result<(), ServiceError> {
         todo!()
     }
+
+    #[zbus(property, name = "Collections")]
+    pub async fn collections(&self) -> Vec<OwnedObjectPath> {
+        self.collections.lock().await.clone()
+    }
 }
 
 impl Service {
