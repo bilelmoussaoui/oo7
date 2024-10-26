@@ -12,6 +12,7 @@ use oo7::{
 };
 use tokio::sync::Mutex;
 use zbus::{
+    object_server::SignalEmitter,
     proxy::Defaults,
     zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Value},
 };
@@ -130,6 +131,24 @@ impl Service {
     pub async fn collections(&self) -> Vec<OwnedObjectPath> {
         self.collections.lock().await.clone()
     }
+
+    #[zbus(signal, name = "CollectionCreated")]
+    async fn collection_created(
+        signal_emitter: &SignalEmitter<'_>,
+        collection: OwnedObjectPath,
+    ) -> zbus::Result<()>;
+
+    #[zbus(signal, name = "CollectionDeleted")]
+    async fn collection_deleted(
+        signal_emitter: &SignalEmitter<'_>,
+        collection: OwnedObjectPath,
+    ) -> zbus::Result<()>;
+
+    #[zbus(signal, name = "CollectionChanged")]
+    async fn collection_changed(
+        signal_emitter: &SignalEmitter<'_>,
+        collection: OwnedObjectPath,
+    ) -> zbus::Result<()>;
 }
 
 impl Service {

@@ -14,7 +14,7 @@ use oo7::{
     portal::Keyring,
 };
 use tokio::sync::{Mutex, RwLock};
-use zbus::{interface, zvariant};
+use zbus::{interface, object_server::SignalEmitter, zvariant};
 use zvariant::{ObjectPath, OwnedObjectPath};
 
 use crate::{item, service_manager::ServiceManager};
@@ -96,6 +96,24 @@ impl Collection {
     pub async fn modified_at(&self) -> u64 {
         self.modified.lock().await.as_secs()
     }
+
+    #[zbus(signal, name = "ItemCreated")]
+    async fn item_created(
+        signal_emitter: &SignalEmitter<'_>,
+        item: OwnedObjectPath,
+    ) -> zbus::Result<()>;
+
+    #[zbus(signal, name = "ItemDeleted")]
+    async fn item_deleted(
+        signal_emitter: &SignalEmitter<'_>,
+        item: OwnedObjectPath,
+    ) -> zbus::Result<()>;
+
+    #[zbus(signal, name = "ItemChanged")]
+    async fn item_changed(
+        signal_emitter: &SignalEmitter<'_>,
+        item: OwnedObjectPath,
+    ) -> zbus::Result<()>;
 }
 
 impl Collection {
