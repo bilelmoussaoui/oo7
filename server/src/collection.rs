@@ -61,6 +61,41 @@ impl Collection {
     ) -> Result<(OwnedObjectPath, ObjectPath), ServiceError> {
         todo!()
     }
+
+    #[zbus(property, name = "Items")]
+    pub async fn items(&self) -> Vec<OwnedObjectPath> {
+        self.items
+            .lock()
+            .await
+            .iter()
+            .map(|item| OwnedObjectPath::from(item.path()))
+            .collect()
+    }
+
+    #[zbus(property, name = "Label")]
+    pub async fn label(&self) -> String {
+        self.label.lock().await.clone()
+    }
+
+    #[zbus(property, name = "Label")]
+    pub async fn set_label(&self, label: &str) {
+        *self.label.lock().await = label.to_owned();
+    }
+
+    #[zbus(property, name = "Locked")]
+    pub async fn is_locked(&self) -> bool {
+        self.locked.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    #[zbus(property, name = "Created")]
+    pub fn created_at(&self) -> u64 {
+        self.created.as_secs()
+    }
+
+    #[zbus(property, name = "Modified")]
+    pub async fn modified_at(&self) -> u64 {
+        self.modified.lock().await.as_secs()
+    }
 }
 
 impl Collection {

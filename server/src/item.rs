@@ -1,10 +1,12 @@
 // org.freedesktop.Secret.Item
 
 use oo7::dbus::{api::SecretInner, ServiceError};
-use zbus::zvariant::ObjectPath;
+use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 
 #[derive(Debug)]
-pub struct Item {}
+pub struct Item {
+    path: OwnedObjectPath,
+}
 
 #[zbus::interface(name = "org.freedesktop.Secret.Item")]
 impl Item {
@@ -20,5 +22,11 @@ impl Item {
 
     pub async fn set_secret(&self, _secret: SecretInner) -> Result<(), ServiceError> {
         todo!()
+    }
+}
+
+impl Item {
+    pub fn path(&self) -> ObjectPath<'_> {
+        self.path.as_ref()
     }
 }
