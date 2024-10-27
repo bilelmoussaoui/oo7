@@ -107,17 +107,16 @@ async fn main() -> Result<()> {
         env!("CARGO_PKG_VERSION")
     );
 
-    let cnx = zbus::Connection::session().await?;
-
-    let portal = ashpd::backend::secret::SecretInterface::new(Secret, cnx.clone());
-    tracing::debug!("Serving `org.freedesktop.impl.portal.Secret`");
-    cnx.object_server().at(ashpd::DESKTOP_PATH, portal).await?;
-
     let mut flags = zbus::fdo::RequestNameFlags::AllowReplacement.into();
     if args.replace {
         flags |= zbus::fdo::RequestNameFlags::ReplaceExisting;
     }
-    cnx.request_name_with_flags(PORTAL_NAME, flags).await?;
+
+    ashpd::backend::Builder::new(PORTAL_NAME)?
+        .secret(Secret)
+        .with_flags(flags)
+        .build()
+        .await?;
 
     loop {
         pending::<()>().await;

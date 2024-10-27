@@ -3,6 +3,7 @@ pub enum Error {
     Rand(getrandom::Error),
     Oo7(oo7::dbus::Error),
     Io(std::io::Error),
+    Portal(ashpd::PortalError),
 }
 
 impl std::fmt::Display for Error {
@@ -11,6 +12,7 @@ impl std::fmt::Display for Error {
             Error::Rand(e) => f.write_fmt(format_args!("Rand error {e}")),
             Error::Oo7(e) => f.write_fmt(format_args!("DBus error: {e}")),
             Error::Io(e) => f.write_fmt(format_args!("IO error: {e}")),
+            Error::Portal(e) => f.write_fmt(format_args!("Portal error: {e}")),
         }
     }
 }
@@ -18,9 +20,10 @@ impl std::fmt::Display for Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Error::Rand(_) => None,
-            Error::Oo7(e) => Some(e),
-            Error::Io(e) => Some(e),
+            Self::Rand(_) => None,
+            Self::Oo7(e) => Some(e),
+            Self::Io(e) => Some(e),
+            Self::Portal(e) => Some(e),
         }
     }
 }
@@ -46,6 +49,12 @@ impl From<oo7::zbus::Error> for Error {
 impl From<std::io::Error> for Error {
     fn from(value: std::io::Error) -> Self {
         Self::Io(value)
+    }
+}
+
+impl From<ashpd::PortalError> for Error {
+    fn from(value: ashpd::PortalError) -> Self {
+        Self::Portal(value)
     }
 }
 
