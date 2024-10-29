@@ -2,17 +2,29 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use zbus::zvariant::OwnedObjectPath;
+use zbus::{zvariant::OwnedObjectPath, Connection};
 
 use crate::session::Session;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ServiceManager {
+    connection: Connection,
     // sessions mapped to their corresponding object path on the bus
     sessions: HashMap<OwnedObjectPath, Arc<Session>>,
 }
 
 impl ServiceManager {
+    pub fn new(connection: Connection) -> Self {
+        Self {
+            sessions: Default::default(),
+            connection,
+        }
+    }
+
+    pub fn object_server(&self) -> &zbus::ObjectServer {
+        self.connection.object_server()
+    }
+
     pub fn n_sessions(&self) -> usize {
         self.sessions.len()
     }

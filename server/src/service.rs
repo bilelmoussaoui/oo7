@@ -27,8 +27,6 @@ pub struct Service {
     collections: Arc<Mutex<Vec<OwnedObjectPath>>>,
     // Other attributes
     manager: Arc<Mutex<ServiceManager>>,
-    #[allow(unused)]
-    connection: zbus::Connection,
 }
 
 #[zbus::interface(name = "org.freedesktop.Secret.Service")]
@@ -206,8 +204,7 @@ impl Service {
         let object_server = connection.object_server();
         let service = Self {
             collections: Default::default(),
-            manager: Default::default(),
-            connection: connection.clone(),
+            manager: Arc::new(Mutex::new(ServiceManager::new(connection.clone()))),
         };
 
         object_server
