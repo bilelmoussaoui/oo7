@@ -14,14 +14,13 @@ use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 
 use crate::service_manager::ServiceManager;
 
-#[derive(Debug)]
-#[allow(unused)]
+#[derive(Debug, Clone)]
 pub struct Item {
     // Properties
-    locked: AtomicBool,
-    inner: Mutex<oo7::portal::Item>,
+    locked: Arc<AtomicBool>,
+    inner: Arc<Mutex<oo7::portal::Item>>,
     // Other attributes
-    manager: Arc<Mutex<ServiceManager>>,
+    _manager: Arc<Mutex<ServiceManager>>,
     path: OwnedObjectPath,
 }
 
@@ -92,10 +91,10 @@ impl Item {
         item_index: u32,
     ) -> Self {
         Self {
-            locked: AtomicBool::new(locked),
-            inner: Mutex::new(item),
+            locked: Arc::new(AtomicBool::new(locked)),
+            inner: Arc::new(Mutex::new(item)),
             path: OwnedObjectPath::try_from(format!("{}/{}", collection_path, item_index)).unwrap(),
-            manager,
+            _manager: manager,
         }
     }
 

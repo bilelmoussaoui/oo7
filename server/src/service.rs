@@ -24,7 +24,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct Service {
     // Properties
-    collections: Arc<Mutex<Vec<OwnedObjectPath>>>,
+    collections: Arc<Mutex<Vec<Collection>>>,
     // Other attributes
     manager: Arc<Mutex<ServiceManager>>,
 }
@@ -113,17 +113,10 @@ impl Service {
     }
 
     #[zbus(out_args("collection"))]
-    pub async fn read_alias(
-        &self,
-        name: &str,
-        #[zbus(object_server)] object_server: &zbus::ObjectServer,
-    ) -> Result<OwnedObjectPath, ServiceError> {
+    pub async fn read_alias(&self, name: &str) -> Result<OwnedObjectPath, ServiceError> {
         let collections = self.collections.lock().await;
 
         for collection in collections.iter() {
-            let collection_ifce_ref = object_server.interface::<_, Collection>(collection).await?;
-            let collection = collection_ifce_ref.get().await;
-
             if collection.alias().await == name {
                 tracing::info!(
                     "Collection: {} found for alias: {}.",
@@ -143,22 +136,14 @@ impl Service {
         &self,
         name: &str,
         collection: OwnedObjectPath,
-        #[zbus(object_server)] object_server: &zbus::ObjectServer,
     ) -> Result<(), ServiceError> {
         let collections = self.collections.lock().await;
 
-        for path in collections.iter() {
-            if path == &collection {
-                let collection_ifce_ref = object_server.interface::<_, Collection>(path).await?;
-                let collection = collection_ifce_ref.get().await;
+        for other_collection in collections.iter() {
+            if other_collection.path() == &collection {
+                other_collection.set_alias(name).await;
 
-                collection.set_alias(name).await;
-
-                tracing::info!(
-                    "Collection: {} alias updated to {}.",
-                    collection.path(),
-                    name
-                );
+                tracing::info!("Collection: {} alias updated to {}.", collection, name);
                 return Ok(());
             }
         }
@@ -173,7 +158,12 @@ impl Service {
 
     #[zbus(property, name = "Collections")]
     pub async fn collections(&self) -> Vec<OwnedObjectPath> {
-        self.collections.lock().await.clone()
+        self.collections
+            .lock()
+            .await
+            .iter()
+            .map(|c| c.path().to_owned())
+            .collect()
     }
 
     #[zbus(signal, name = "CollectionCreated")]
@@ -224,7 +214,7 @@ impl Service {
                 Arc::clone(&service.manager),
                 Arc::new(Keyring::open("login", secret).await?),
             );
-            collections.push(collection.path().clone());
+            collections.push(collection.clone());
             collection.dispatch_items().await?;
             object_server
                 .at(collection.path().clone(), collection)
@@ -238,7 +228,7 @@ impl Service {
             Arc::clone(&service.manager),
             Arc::new(Keyring::temporary(Secret::random()).await?),
         );
-        collections.push(collection.path().clone());
+        collections.push(collection.clone());
         object_server
             .at(collection.path().clone(), collection)
             .await?;

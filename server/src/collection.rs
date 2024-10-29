@@ -19,21 +19,20 @@ use zvariant::{ObjectPath, OwnedObjectPath};
 
 use crate::{error::Error, item, service_manager::ServiceManager};
 
-#[derive(Debug)]
-#[allow(unused)]
+#[derive(Debug, Clone)]
 pub struct Collection {
     // Properties
-    items: Mutex<Vec<OwnedObjectPath>>,
-    label: Mutex<String>,
-    locked: AtomicBool,
+    items: Arc<Mutex<Vec<item::Item>>>,
+    label: Arc<Mutex<String>>,
+    locked: Arc<AtomicBool>,
     created: Duration,
-    modified: Mutex<Duration>,
+    modified: Arc<Mutex<Duration>>,
     // Other attributes
-    alias: Mutex<String>,
+    alias: Arc<Mutex<String>>,
     #[allow(unused)]
     keyring: Arc<Keyring>,
     manager: Arc<Mutex<ServiceManager>>,
-    item_index: RwLock<u32>,
+    item_index: Arc<RwLock<u32>>,
     path: OwnedObjectPath,
 }
 
@@ -64,7 +63,12 @@ impl Collection {
 
     #[zbus(property, name = "Items")]
     pub async fn items(&self) -> Vec<OwnedObjectPath> {
-        self.items.lock().await.clone()
+        self.items
+            .lock()
+            .await
+            .iter()
+            .map(|i| i.path().to_owned())
+            .collect()
     }
 
     #[zbus(property, name = "Label")]
@@ -125,11 +129,11 @@ impl Collection {
 
         Self {
             items: Default::default(),
-            label: Mutex::new(label.to_owned()),
-            locked: AtomicBool::new(locked),
-            modified: Mutex::new(created),
-            alias: Mutex::new(alias.to_owned()),
-            item_index: RwLock::new(0),
+            label: Arc::new(Mutex::new(label.to_owned())),
+            locked: Arc::new(AtomicBool::new(locked)),
+            modified: Arc::new(Mutex::new(created)),
+            alias: Arc::new(Mutex::new(alias.to_owned())),
+            item_index: Arc::new(RwLock::new(0)),
             path: OwnedObjectPath::try_from(format!(
                 "/org/freedesktop/secrets/collection/{}",
                 label
@@ -170,7 +174,7 @@ impl Collection {
             );
             n_items += 1;
 
-            items.push(item.path().clone());
+            items.push(item.clone());
             object_server.at(item.path().clone(), item).await?;
         }
 
