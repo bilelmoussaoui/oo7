@@ -17,13 +17,13 @@ use tokio::sync::{Mutex, RwLock};
 use zbus::{interface, object_server::SignalEmitter, zvariant};
 use zvariant::{ObjectPath, OwnedObjectPath};
 
-use crate::{item, service_manager::ServiceManager};
+use crate::{error::Error, item, service_manager::ServiceManager};
 
 #[derive(Debug)]
 #[allow(unused)]
 pub struct Collection {
     // Properties
-    items: Mutex<Vec<item::Item>>,
+    items: Mutex<Vec<OwnedObjectPath>>,
     label: Mutex<String>,
     locked: AtomicBool,
     created: Duration,
@@ -33,7 +33,7 @@ pub struct Collection {
     #[allow(unused)]
     keyring: Arc<Keyring>,
     manager: Arc<Mutex<ServiceManager>>,
-    n_items: RwLock<i32>,
+    item_index: RwLock<u32>,
     path: OwnedObjectPath,
 }
 
@@ -64,12 +64,7 @@ impl Collection {
 
     #[zbus(property, name = "Items")]
     pub async fn items(&self) -> Vec<OwnedObjectPath> {
-        self.items
-            .lock()
-            .await
-            .iter()
-            .map(|item| OwnedObjectPath::from(item.path()))
-            .collect()
+        self.items.lock().await.clone()
     }
 
     #[zbus(property, name = "Label")]
@@ -120,6 +115,7 @@ impl Collection {
     pub fn new(
         label: &str,
         alias: &str,
+        locked: bool,
         manager: Arc<Mutex<ServiceManager>>,
         keyring: Arc<Keyring>,
     ) -> Self {
@@ -130,10 +126,10 @@ impl Collection {
         Self {
             items: Default::default(),
             label: Mutex::new(label.to_owned()),
-            locked: AtomicBool::new(true),
+            locked: AtomicBool::new(locked),
             modified: Mutex::new(created),
             alias: Mutex::new(alias.to_owned()),
-            n_items: RwLock::new(0),
+            item_index: RwLock::new(0),
             path: OwnedObjectPath::try_from(format!(
                 "/org/freedesktop/secrets/collection/{}",
                 label
@@ -155,5 +151,31 @@ impl Collection {
 
     pub async fn alias(&self) -> String {
         self.alias.lock().await.clone()
+    }
+
+    pub async fn dispatch_items(&self) -> Result<(), Error> {
+        let keyring_items = self.keyring.items().await;
+        let mut items = self.items.lock().await;
+        let service_manager = self.manager.lock().await;
+        let object_server = service_manager.object_server();
+        let mut n_items = 1;
+
+        for keyring_item in keyring_items {
+            let item = item::Item::new(
+                keyring_item.map_err(Error::InvalidItem)?,
+                self.is_locked().await,
+                Arc::clone(&self.manager),
+                self.path.clone(),
+                n_items,
+            );
+            n_items += 1;
+
+            items.push(item.path().clone());
+            object_server.at(item.path().clone(), item).await?;
+        }
+
+        *self.item_index.write().await = n_items;
+
+        Ok(())
     }
 }
