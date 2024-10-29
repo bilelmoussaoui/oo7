@@ -122,7 +122,7 @@ impl Service {
 
         for collection in collections.iter() {
             let collection_ifce_ref = object_server.interface::<_, Collection>(collection).await?;
-            let collection = collection_ifce_ref.get_mut().await;
+            let collection = collection_ifce_ref.get().await;
 
             if collection.alias().await == name {
                 tracing::info!(
@@ -150,7 +150,7 @@ impl Service {
         for path in collections.iter() {
             if path == &collection {
                 let collection_ifce_ref = object_server.interface::<_, Collection>(path).await?;
-                let collection = collection_ifce_ref.get_mut().await;
+                let collection = collection_ifce_ref.get().await;
 
                 collection.set_alias(name).await;
 
