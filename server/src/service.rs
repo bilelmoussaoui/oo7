@@ -2,6 +2,7 @@
 
 use std::{collections::HashMap, sync::Arc};
 
+use enumflags2::BitFlags;
 use oo7::{
     dbus::{
         api::{Properties, SecretInner},
@@ -186,10 +187,16 @@ impl Service {
 }
 
 impl Service {
-    pub async fn run(secret: Option<Secret>) -> Result<(), Error> {
-        let connection = zbus::connection::Builder::session()?
-            .name(oo7::dbus::api::Service::DESTINATION.as_deref().unwrap())?
-            .build()
+    pub async fn run(
+        secret: Option<Secret>,
+        flags: BitFlags<zbus::fdo::RequestNameFlags>,
+    ) -> Result<(), Error> {
+        let connection = zbus::Connection::session().await?;
+        connection
+            .request_name_with_flags(
+                oo7::dbus::api::Service::DESTINATION.as_deref().unwrap(),
+                flags,
+            )
             .await?;
         let object_server = connection.object_server();
         let service = Self {

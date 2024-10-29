@@ -1071,6 +1071,7 @@ name = "oo7-daemon"
 version = "0.3.0"
 dependencies = [
  "clap",
+ "enumflags2",
  "oo7",
  "rpassword",
  "serde",

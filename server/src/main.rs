@@ -24,6 +24,8 @@ struct Args {
         help = "Read a password from stdin, and use it to unlock the login keyring."
     )]
     login: bool,
+    #[arg(short, long, help = "Replace a running instance.")]
+    replace: bool,
 }
 
 #[tokio::main]
@@ -41,9 +43,14 @@ async fn main() -> Result<(), Error> {
         secret = Some(Secret::from(password.into_bytes()));
     }
 
+    let mut flags = zbus::fdo::RequestNameFlags::AllowReplacement.into();
+    if args.replace {
+        flags |= zbus::fdo::RequestNameFlags::ReplaceExisting;
+    }
+
     tracing::info!("Starting {}", BINARY_NAME);
 
-    Service::run(secret).await?;
+    Service::run(secret, flags).await?;
 
     std::future::pending::<()>().await;
 
