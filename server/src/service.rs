@@ -220,10 +220,12 @@ impl Service {
             let collection = Collection::new(
                 "login",
                 "default",
+                false,
                 Arc::clone(&service.manager),
                 Arc::new(Keyring::open("login", secret).await?),
             );
             collections.push(collection.path().clone());
+            collection.dispatch_items().await?;
             object_server
                 .at(collection.path().clone(), collection)
                 .await?;
@@ -232,6 +234,7 @@ impl Service {
         let collection = Collection::new(
             "session",
             "session",
+            false,
             Arc::clone(&service.manager),
             Arc::new(Keyring::temporary(Secret::random()).await?),
         );
@@ -239,8 +242,6 @@ impl Service {
         object_server
             .at(collection.path().clone(), collection)
             .await?;
-
-        drop(collections);
 
         Ok(())
     }

@@ -10,6 +10,8 @@ pub enum Error {
     IO(std::io::Error),
     // Empty password error
     EmptyPassword,
+    // Invalid item error
+    InvalidItem(oo7::portal::InvalidItemError),
 }
 
 impl From<zbus::Error> for Error {
@@ -37,6 +39,7 @@ impl fmt::Display for Error {
             Self::Zbus(err) => write!(f, "Zbus error {err}"),
             Self::IO(err) => write!(f, "IO error {err}"),
             Self::EmptyPassword => write!(f, "Login password can't be empty"),
+            Self::InvalidItem(err) => write!(f, "Item cannot be decrypted {err}"),
         }
     }
 }

@@ -1,15 +1,27 @@
 // org.freedesktop.Secret.Item
 
-use std::{collections::HashMap, sync::atomic::AtomicBool};
+use std::{
+    collections::HashMap,
+    sync::{atomic::AtomicBool, Arc},
+};
 
-use oo7::dbus::{api::SecretInner, ServiceError};
+use oo7::{
+    dbus::{api::SecretInner, ServiceError},
+    portal,
+};
 use tokio::sync::Mutex;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 
+use crate::service_manager::ServiceManager;
+
 #[derive(Debug)]
+#[allow(unused)]
 pub struct Item {
+    // Properties
     locked: AtomicBool,
     inner: Mutex<oo7::portal::Item>,
+    // Other attributes
+    manager: Arc<Mutex<ServiceManager>>,
     path: OwnedObjectPath,
 }
 
@@ -72,7 +84,22 @@ impl Item {
 }
 
 impl Item {
-    pub fn path(&self) -> ObjectPath<'_> {
-        self.path.as_ref()
+    pub fn new(
+        item: portal::Item,
+        locked: bool,
+        manager: Arc<Mutex<ServiceManager>>,
+        collection_path: OwnedObjectPath,
+        item_index: u32,
+    ) -> Self {
+        Self {
+            locked: AtomicBool::new(locked),
+            inner: Mutex::new(item),
+            path: OwnedObjectPath::try_from(format!("{}/{}", collection_path, item_index)).unwrap(),
+            manager,
+        }
+    }
+
+    pub fn path(&self) -> &OwnedObjectPath {
+        &self.path
     }
 }
