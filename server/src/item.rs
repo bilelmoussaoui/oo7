@@ -88,7 +88,7 @@ impl Item {
         item: portal::Item,
         locked: bool,
         manager: Arc<Mutex<ServiceManager>>,
-        collection_path: OwnedObjectPath,
+        collection_path: &OwnedObjectPath,
         item_index: u32,
     ) -> Self {
         Self {

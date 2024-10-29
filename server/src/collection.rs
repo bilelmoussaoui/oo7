@@ -165,7 +165,7 @@ impl Collection {
                 keyring_item.map_err(Error::InvalidItem)?,
                 self.is_locked().await,
                 Arc::clone(&self.manager),
-                self.path.clone(),
+                &self.path,
                 n_items,
             );
             n_items += 1;
