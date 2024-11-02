@@ -4,7 +4,6 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use async_lock::RwLock;
 #[cfg(feature = "tokio")]
 use tokio::sync::RwLock;
-use zeroize::Zeroizing;
 
 use crate::{dbus, file, AsAttributes, Result, Secret};
 
@@ -265,7 +264,7 @@ impl Item {
     }
 
     /// Retrieves the stored secret.
-    pub async fn secret(&self) -> Result<Zeroizing<Vec<u8>>> {
+    pub async fn secret(&self) -> Result<Secret> {
         let secret = match self {
             Self::File(item, _) => item.read().await.secret(),
             Self::DBus(item) => item.secret().await?,
@@ -366,7 +365,7 @@ mod tests {
         assert_eq!(items.len(), 1);
         let item = items.remove(0);
         assert_eq!(item.label().await?, "my item");
-        assert_eq!(*item.secret().await?, b"my_secret");
+        assert_eq!(item.secret().await?, Secret::blob("my_secret"));
         let attrs = item.attributes().await?;
         assert_eq!(attrs.len(), 1);
         assert_eq!(attrs.get("key").unwrap(), "value");
@@ -378,7 +377,7 @@ mod tests {
         assert_eq!(items.len(), 1);
         let item = items.remove(0);
         assert_eq!(item.label().await?, "my item");
-        assert_eq!(*item.secret().await?, b"my_secret");
+        assert_eq!(item.secret().await?, Secret::blob("my_secret"));
         let attrs = item.attributes().await?;
         assert_eq!(attrs.len(), 2);
         assert_eq!(attrs.get("key").unwrap(), "changed_value");

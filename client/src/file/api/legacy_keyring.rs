@@ -247,13 +247,12 @@ mod tests {
             .join("legacy.keyring");
         let blob = std::fs::read(path)?;
         let keyring = Keyring::try_from(blob.as_slice())?;
-        let password = b"test";
-        let secret = Secret::from(password.to_vec());
+        let secret = Secret::blob("test");
         let items = keyring.decrypt_items(&secret)?;
 
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].label(), "foo");
-        assert_eq!(items[0].secret().as_ref(), b"foo".to_vec());
+        assert_eq!(items[0].secret(), Secret::blob("foo"));
         let attributes = items[0].attributes();
         assert_eq!(attributes.len(), 1);
         assert_eq!(

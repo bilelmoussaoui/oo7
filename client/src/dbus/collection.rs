@@ -269,18 +269,18 @@ mod tests {
             "plain-type-test"
         };
         attributes.insert("type", value);
-        let secret = "a password";
+        let secret = crate::Secret::text("a password");
 
         let collection = service.default_collection().await.unwrap();
         let n_items = collection.items().await.unwrap().len();
         let n_search_items = collection.search_items(&attributes).await.unwrap().len();
 
         let item = collection
-            .create_item("A secret", &attributes, secret, true, None)
+            .create_item("A secret", &attributes, secret.clone(), true, None)
             .await
             .unwrap();
 
-        assert_eq!(*item.secret().await.unwrap(), secret.as_bytes());
+        assert_eq!(item.secret().await.unwrap(), secret);
         assert_eq!(item.attributes().await.unwrap()["type"], value);
 
         assert_eq!(collection.items().await.unwrap().len(), n_items + 1);

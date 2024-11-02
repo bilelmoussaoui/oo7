@@ -76,8 +76,8 @@ impl Item {
     }
 
     /// Retrieve the currently stored secret.
-    pub fn secret(&self) -> Zeroizing<Vec<u8>> {
-        Zeroizing::new(self.secret.clone())
+    pub fn secret(&self) -> Secret {
+        Secret::blob(&self.secret)
     }
 
     /// Store a new secret.

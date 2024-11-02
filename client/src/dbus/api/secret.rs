@@ -5,7 +5,12 @@ use zbus::zvariant::{OwnedObjectPath, Type};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use super::Session;
-use crate::{crypto, dbus::Error, Key, Secret};
+use crate::{
+    crypto,
+    dbus::Error,
+    secret::{BLOB_CONTENT_TYPE, TEXT_CONTENT_TYPE},
+    Key, Secret,
+};
 
 #[derive(Debug, Serialize, Deserialize, Type)]
 #[zvariant(signature = "(oayays)")]
@@ -59,6 +64,23 @@ impl<'a> DBusSecret<'a> {
             value: inner.2,
             content_type: inner.3,
         })
+    }
+
+    pub(crate) fn decrypt(&self, key: Option<&Arc<Key>>) -> Result<Secret, Error> {
+        let value = match key {
+            Some(key) => &crypto::decrypt(&self.value, key, &self.parameters),
+            None => &self.value,
+        };
+
+        match self.content_type.as_str() {
+            TEXT_CONTENT_TYPE => Ok(Secret::Text(String::from_utf8(value.to_vec())?)),
+            BLOB_CONTENT_TYPE => Ok(Secret::blob(value)),
+            e => {
+                #[cfg(feature = "tracing")]
+                tracing::warn!("Unsupported content-type {e}, falling back to blob");
+                Ok(Secret::blob(value))
+            }
+        }
     }
 
     /// Session used to encode the secret

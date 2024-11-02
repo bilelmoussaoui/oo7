@@ -14,13 +14,13 @@
 //! let collection = service.default_collection().await?;
 //! // Store a secret
 //! collection
-//!     .create_item("My App's secret", &attributes, b"password", true, None)
+//!     .create_item("My App's secret", &attributes, "password", true, None)
 //!     .await?;
 //!
 //! // Retrieve it later thanks to it attributes
 //! let items = collection.search_items(&attributes).await?;
 //! let item = items.first().unwrap();
-//! assert_eq!(*item.secret().await?, b"password");
+//! assert_eq!(item.secret().await?, oo7::Secret::text("password"));
 //!
 //! #   Ok(())
 //! # }

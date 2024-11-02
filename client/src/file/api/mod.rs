@@ -341,7 +341,7 @@ mod tests {
 
         keyring
             .items
-            .push(Item::new("Label", &needle, b"MyPassword").encrypt(&key)?);
+            .push(Item::new("Label", &needle, Secret::blob("MyPassword")).encrypt(&key)?);
 
         assert_eq!(keyring.search_items(&needle, &key)?.len(), 1);
 
@@ -363,7 +363,7 @@ mod tests {
             Item::new(
                 "My Label",
                 &HashMap::from([("my-tag", "my tag value")]),
-                "A Password".as_bytes(),
+                "A Password",
             )
             .encrypt(&key)?,
         );
@@ -375,7 +375,7 @@ mod tests {
         let loaded_items =
             loaded_keyring.search_items(&HashMap::from([("my-tag", "my tag value")]), &key)?;
 
-        assert_eq!(*loaded_items[0].secret(), "A Password".as_bytes());
+        assert_eq!(loaded_items[0].secret(), Secret::blob("A Password"));
 
         let _silent = std::fs::remove_file("/tmp/test.keyring");
 

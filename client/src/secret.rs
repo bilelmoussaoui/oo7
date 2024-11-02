@@ -1,7 +1,10 @@
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
+pub(crate) const TEXT_CONTENT_TYPE: &str = "text/plain";
+pub(crate) const BLOB_CONTENT_TYPE: &str = "application/octet-stream";
+
 /// A safe wrapper around a combination of (secret, content-type).
-#[derive(Debug, Clone, Zeroize, ZeroizeOnDrop)]
+#[derive(Debug, Clone, PartialEq, Eq, Zeroize, ZeroizeOnDrop)]
 pub enum Secret {
     /// Corresponds to `text/plain`
     Text(String),
@@ -32,8 +35,8 @@ impl Secret {
 
     pub fn content_type(&self) -> &'static str {
         match self {
-            Self::Text(_) => "text/plain",
-            Self::Blob(_) => "application/octet-stream",
+            Self::Text(_) => TEXT_CONTENT_TYPE,
+            Self::Blob(_) => BLOB_CONTENT_TYPE,
         }
     }
 

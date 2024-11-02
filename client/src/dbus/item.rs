@@ -6,10 +6,9 @@ use async_lock::RwLock;
 #[cfg(feature = "tokio")]
 use tokio::sync::RwLock;
 use zbus::zvariant::ObjectPath;
-use zeroize::Zeroizing;
 
 use super::{api, Algorithm, Error};
-use crate::{crypto, AsAttributes, Key, Secret};
+use crate::{AsAttributes, Key, Secret};
 
 /// A secret with a label and attributes to identify it.
 ///
@@ -134,23 +133,14 @@ impl<'a> Item<'a> {
     }
 
     /// Retrieve the currently stored secret.
-    pub async fn secret(&self) -> Result<Zeroizing<Vec<u8>>, Error> {
+    pub async fn secret(&self) -> Result<Secret, Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            let secret = self.inner.secret(&self.session).await?;
-
-            let value = match self.algorithm {
-                Algorithm::Plain => Zeroizing::new(secret.value.to_owned()),
-                Algorithm::Encrypted => {
-                    let iv = &secret.parameters;
-                    // Safe unwrap as it is encrypted
-                    let aes_key = self.aes_key.as_ref().unwrap();
-
-                    crypto::decrypt(&secret.value, aes_key, iv)
-                }
-            };
-            Ok(value)
+            self.inner
+                .secret(&self.session)
+                .await?
+                .decrypt(self.aes_key.as_ref())
         }
     }
 

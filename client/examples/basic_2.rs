@@ -14,7 +14,7 @@ async fn main() -> oo7::Result<()> {
     KEYRING
         .get()
         .unwrap()
-        .create_item("Some Label", &attributes, b"secret", true)
+        .create_item("Some Label", &attributes, "secret", true)
         .await?;
 
     let items = KEYRING.get().unwrap().search_items(&attributes).await?;

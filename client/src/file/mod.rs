@@ -11,7 +11,7 @@
 //!     .create_item(
 //!         "My Label",
 //!         &HashMap::from([("account", "alice")]),
-//!         b"My Password",
+//!         "My Password",
 //!         true,
 //!     )
 //!     .await?;
@@ -19,7 +19,7 @@
 //! let items = keyring
 //!     .search_items(&HashMap::from([("account", "alice")]))
 //!     .await?;
-//! assert_eq!(*items[0].secret(), b"My Password");
+//! assert_eq!(items[0].secret(), oo7::Secret::blob("My Password"));
 //!
 //! keyring
 //!     .delete(&HashMap::from([("account", "alice")]))
@@ -48,7 +48,6 @@ use tokio::{
     io::AsyncReadExt,
     sync::{Mutex, RwLock},
 };
-use zeroize::Zeroizing;
 
 use crate::{AsAttributes, Key, Secret};
 
@@ -66,7 +65,7 @@ mod item;
 pub use error::{Error, InvalidItemError, WeakKeyError};
 pub use item::Item;
 
-type ItemDefinition = (String, HashMap<String, String>, Zeroizing<Vec<u8>>, bool);
+type ItemDefinition = (String, HashMap<String, String>, Secret, bool);
 
 /// File backed keyring.
 #[derive(Debug)]
@@ -575,7 +574,7 @@ mod tests {
         let items = items.expect("unable to retrieve items");
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].label(), "foo");
-        assert_eq!(items[0].secret().as_ref(), b"foo".to_vec());
+        assert_eq!(items[0].secret(), Secret::blob("foo"));
         let attributes = items[0].attributes();
         assert_eq!(attributes.len(), 1);
         assert_eq!(
@@ -604,8 +603,7 @@ mod tests {
 
         assert!(!v1_dir.join("default.keyring").exists());
 
-        let password = b"test";
-        let secret = Secret::from(password.to_vec());
+        let secret = Secret::blob("test");
         let keyring = Keyring::open("default", secret).await?;
 
         check_items(&keyring).await?;
@@ -630,8 +628,7 @@ mod tests {
 
         std::env::set_var("XDG_DATA_HOME", data_dir.path());
 
-        let password = b"test";
-        let secret = Secret::from(password.to_vec());
+        let secret = Secret::blob("test");
         let keyring = Keyring::open("default", secret).await?;
 
         assert!(!v1_dir.join("default.keyring").exists());
@@ -658,15 +655,13 @@ mod tests {
 
         std::env::set_var("XDG_DATA_HOME", data_dir.path());
 
-        let password = b"wrong";
-        let secret = Secret::from(password.to_vec());
+        let secret = Secret::blob("wrong");
         let keyring = Keyring::open("default", secret).await;
 
         assert!(keyring.is_err());
         assert!(matches!(keyring.unwrap_err(), Error::IncorrectSecret));
 
-        let password = b"test";
-        let secret = Secret::from(password.to_vec());
+        let secret = Secret::blob("test");
         let keyring = Keyring::open("default", secret).await;
 
         assert!(keyring.is_ok());
@@ -688,8 +683,7 @@ mod tests {
 
         std::env::set_var("XDG_DATA_HOME", data_dir.path());
 
-        let password = b"test";
-        let secret = Secret::from(password.to_vec());
+        let secret = Secret::blob("test");
         let keyring = Keyring::open("default", secret).await?;
 
         assert!(v1_dir.join("default.keyring").exists());
@@ -711,8 +705,7 @@ mod tests {
 
         std::env::set_var("XDG_DATA_HOME", data_dir.path());
 
-        let password = b"test";
-        let secret = Secret::from(password.to_vec());
+        let secret = Secret::blob("test");
         let keyring = Keyring::open("default", secret).await?;
 
         assert!(!v1_dir.join("default.keyring").exists());
@@ -742,11 +735,11 @@ mod tests {
             .create_item("test", &attributes, "password", false)
             .await?;
 
-        let new_secret = Secret::from(b"password".to_vec());
-        keyring.change_secret(new_secret).await?;
+        let secret = Secret::blob("new_secret");
+        keyring.change_secret(secret).await?;
 
-        let new_secret = Secret::from(b"password".to_vec());
-        let keyring = Keyring::load(&path, new_secret).await?;
+        let secret = Secret::blob("new_secret");
+        let keyring = Keyring::load(&path, secret).await?;
         let item_now = keyring.lookup_item(&attributes).await?.unwrap();
 
         assert_eq!(item_before.label(), item_now.label());
