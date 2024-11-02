@@ -288,7 +288,7 @@ impl Service {
             "session",
             false,
             service.clone(),
-            Arc::new(Keyring::temporary(Secret::random()).await?),
+            Arc::new(Keyring::temporary(Secret::random().unwrap()).await?),
         );
         collections.push(collection.clone());
         object_server

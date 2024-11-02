@@ -1175,6 +1175,7 @@ dependencies = [
  "endi",
  "futures-lite",
  "futures-util",
+ "getrandom",
  "hkdf",
  "hmac",
  "md-5",
@@ -1228,7 +1229,6 @@ version = "0.3.0"
 dependencies = [
  "ashpd",
  "clap",
- "getrandom",
  "oo7",
  "tokio",
  "tracing",

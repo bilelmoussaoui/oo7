@@ -1,8 +1,7 @@
-use rand::Rng;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 /// A safe wrapper around a combination of (secret, content-type).
-#[derive(Debug, Zeroize, ZeroizeOnDrop)]
+#[derive(Debug, Clone, Zeroize, ZeroizeOnDrop)]
 pub enum Secret {
     /// Corresponds to `text/plain`
     Text(String),
@@ -12,8 +11,12 @@ pub enum Secret {
 
 impl Secret {
     /// Generate a random secret, used when creating a session collection.
-    pub fn random() -> Self {
-        Self::Blob(rand::thread_rng().gen::<[u8; 8]>().to_vec())
+    pub fn random() -> Result<Self, getrandom::Error> {
+        let mut secret = [0; 64];
+        // Equivalent of `ring::rand::SecureRandom`
+        getrandom::getrandom(&mut secret)?;
+
+        Ok(Self::blob(secret))
     }
 
     /// Create a text secret, stored with `text/plain` content type.
