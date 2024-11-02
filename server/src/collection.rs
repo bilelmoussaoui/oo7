@@ -8,7 +8,7 @@ use std::{
 
 use oo7::{
     dbus::{
-        api::{Properties, SecretInner},
+        api::{DBusSecretInner, Properties},
         ServiceError,
     },
     file::Keyring,
@@ -76,12 +76,12 @@ impl Collection {
     pub async fn create_item(
         &self,
         properties: Properties,
-        secret: SecretInner,
+        secret: DBusSecretInner,
         replace: bool,
         #[zbus(object_server)] object_server: &zbus::ObjectServer,
         #[zbus(signal_emitter)] signal_emitter: zbus::object_server::SignalEmitter<'_>,
     ) -> Result<(OwnedObjectPath, OwnedObjectPath), ServiceError> {
-        let SecretInner(session, iv, secret, _content_type) = secret;
+        let DBusSecretInner(session, iv, secret, _content_type) = secret;
         let label = properties.label();
         // Safe to unwrap as an item always has attributes
         let attributes = properties.attributes().unwrap();

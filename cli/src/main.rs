@@ -184,7 +184,7 @@ impl Commands {
                 };
 
                 collection
-                    .create_item(&label, &attributes, &secret, true, "text/plain", None)
+                    .create_item(&label, &attributes, secret, true, None)
                     .await?;
             }
             Commands::Lock => collection.lock(None).await?,

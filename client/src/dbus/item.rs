@@ -9,7 +9,7 @@ use zbus::zvariant::ObjectPath;
 use zeroize::Zeroizing;
 
 use super::{api, Algorithm, Error};
-use crate::{crypto, AsAttributes, Key};
+use crate::{crypto, AsAttributes, Key, Secret};
 
 /// A secret with a label and attributes to identify it.
 ///
@@ -159,19 +159,13 @@ impl<'a> Item<'a> {
     /// # Arguments
     ///
     /// * `secret` - The secret to store.
-    /// * `content_type` - The content type of the secret, usually something
-    ///   like `text/plain`.
     #[doc(alias = "SetSecret")]
-    pub async fn set_secret(
-        &self,
-        secret: impl AsRef<[u8]>,
-        content_type: &str,
-    ) -> Result<(), Error> {
+    pub async fn set_secret(&self, secret: impl Into<Secret>) -> Result<(), Error> {
         let secret = match self.algorithm {
-            Algorithm::Plain => api::Secret::new(Arc::clone(&self.session), secret, content_type),
+            Algorithm::Plain => api::DBusSecret::new(Arc::clone(&self.session), secret),
             Algorithm::Encrypted => {
                 let aes_key = self.aes_key.as_ref().unwrap();
-                api::Secret::new_encrypted(Arc::clone(&self.session), secret, content_type, aes_key)
+                api::DBusSecret::new_encrypted(Arc::clone(&self.session), secret, aes_key)
             }
         };
         self.inner.set_secret(&secret).await?;

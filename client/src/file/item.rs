@@ -7,7 +7,7 @@ use super::{
     api::{AttributeValue, EncryptedItem, GVARIANT_ENCODING},
     Error,
 };
-use crate::{crypto, AsAttributes, Key};
+use crate::{crypto, AsAttributes, Key, Secret};
 
 /// An item stored in the file backend.
 #[derive(Deserialize, Serialize, zvariant::Type, Clone, Debug, Zeroize, ZeroizeOnDrop)]
@@ -27,7 +27,7 @@ impl Item {
     pub(crate) fn new(
         label: impl ToString,
         attributes: &impl AsAttributes,
-        secret: impl AsRef<[u8]>,
+        secret: impl Into<Secret>,
     ) -> Self {
         let now = std::time::SystemTime::UNIX_EPOCH
             .elapsed()
@@ -43,7 +43,7 @@ impl Item {
             label: label.to_string(),
             created: now,
             modified: now,
-            secret: secret.as_ref().to_vec(),
+            secret: secret.into().as_bytes().to_vec(),
         }
     }
 
@@ -81,12 +81,12 @@ impl Item {
     }
 
     /// Store a new secret.
-    pub fn set_secret(&mut self, secret: impl AsRef<[u8]>) {
+    pub fn set_secret(&mut self, secret: impl Into<Secret>) {
         self.modified = std::time::SystemTime::UNIX_EPOCH
             .elapsed()
             .unwrap()
             .as_secs();
-        self.secret = secret.as_ref().to_vec();
+        self.secret = secret.into().as_bytes().to_vec();
     }
 
     /// The UNIX time when the item was created.

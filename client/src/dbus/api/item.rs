@@ -4,7 +4,7 @@ use ashpd::WindowIdentifier;
 use serde::Serialize;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath, Type};
 
-use super::{secret::SecretInner, Prompt, Secret, Session, Unlockable, DESTINATION};
+use super::{DBusSecret, Prompt, Session, Unlockable, DESTINATION};
 use crate::{
     dbus::{Error, ServiceError},
     AsAttributes,
@@ -121,19 +121,19 @@ impl<'a> Item<'a> {
     }
 
     #[doc(alias = "GetSecret")]
-    pub async fn secret(&self, session: &Session<'_>) -> Result<Secret<'_>, Error> {
+    pub async fn secret(&self, session: &Session<'_>) -> Result<DBusSecret<'_>, Error> {
         let inner = self
             .inner()
             .call_method("GetSecret", &(session))
             .await
             .map_err::<ServiceError, _>(From::from)?
             .body()
-            .deserialize::<SecretInner>()?;
-        Secret::from_inner(self.inner().connection(), inner).await
+            .deserialize::<super::secret::DBusSecretInner>()?;
+        DBusSecret::from_inner(self.inner().connection(), inner).await
     }
 
     #[doc(alias = "SetSecret")]
-    pub async fn set_secret(&self, secret: &Secret<'_>) -> Result<(), Error> {
+    pub async fn set_secret(&self, secret: &DBusSecret<'_>) -> Result<(), Error> {
         self.inner()
             .call_method("SetSecret", &(secret,))
             .await

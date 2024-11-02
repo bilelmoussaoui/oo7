@@ -6,7 +6,6 @@ mod service;
 mod session;
 
 use clap::Parser;
-use oo7::file::Secret;
 use service::Service;
 
 use crate::error::Error;
@@ -31,7 +30,7 @@ struct Args {
 async fn main() -> Result<(), Error> {
     tracing_subscriber::fmt::init();
     let args = Args::parse();
-    let mut secret: Option<Secret> = None;
+    let mut secret = None;
 
     if args.login {
         let password = rpassword::prompt_password("Enter the login password: ")?;
@@ -39,7 +38,7 @@ async fn main() -> Result<(), Error> {
             tracing::error!("Login password can't be empty.");
             return Err(Error::EmptyPassword);
         }
-        secret = Some(Secret::from(password.into_bytes()));
+        secret = Some(oo7::Secret::text(password));
     }
 
     let mut flags = zbus::fdo::RequestNameFlags::AllowReplacement.into();

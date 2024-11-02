@@ -50,7 +50,7 @@ use tokio::{
 };
 use zeroize::Zeroizing;
 
-use crate::{AsAttributes, Key};
+use crate::{AsAttributes, Key, Secret};
 
 #[cfg(feature = "unstable")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
@@ -62,11 +62,9 @@ pub(crate) use api::AttributeValue;
 
 mod error;
 mod item;
-mod secret;
 
 pub use error::{Error, InvalidItemError, WeakKeyError};
 pub use item::Item;
-pub use secret::Secret;
 
 type ItemDefinition = (String, HashMap<String, String>, Zeroizing<Vec<u8>>, bool);
 
@@ -302,7 +300,7 @@ impl Keyring {
         &self,
         label: &str,
         attributes: &impl AsAttributes,
-        secret: impl AsRef<[u8]>,
+        secret: impl Into<Secret>,
         replace: bool,
     ) -> Result<Item, Error> {
         let item = {
@@ -367,7 +365,7 @@ impl Keyring {
             if replace {
                 keyring.remove_items(&attributes, &key)?;
             }
-            let item = Item::new(label, &attributes, &*secret);
+            let item = Item::new(label, &attributes, secret);
             let encrypted_item = item.encrypt(&key)?;
             keyring.items.push(encrypted_item);
         }
@@ -723,7 +721,7 @@ mod tests {
             .create_item(
                 "foo",
                 &HashMap::from([(crate::XDG_SCHEMA_ATTRIBUTE, "org.gnome.keyring.Note")]),
-                b"foo",
+                "foo",
                 false,
             )
             .await?;

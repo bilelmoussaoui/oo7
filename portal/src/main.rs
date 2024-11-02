@@ -66,10 +66,8 @@ async fn send_secret_to_app(app_id: &AppID, fd: std::os::fd::OwnedFd) -> Result<
             .create_item(
                 &format!("Secret Portal token for {app_id}"),
                 &attributes,
-                &secret,
+                secret.clone(),
                 true,
-                // TODO Find a better one.
-                "text/plain",
                 None,
             )
             .await?;

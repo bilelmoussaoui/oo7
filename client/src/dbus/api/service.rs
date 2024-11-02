@@ -5,8 +5,7 @@ use futures_util::{Stream, StreamExt};
 use zbus::zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Type, Value};
 
 use super::{
-    secret::SecretInner, Collection, Item, Prompt, Properties, Secret, Session, Unlockable,
-    DESTINATION, PATH,
+    Collection, DBusSecret, Item, Prompt, Properties, Session, Unlockable, DESTINATION, PATH,
 };
 use crate::{
     dbus::{Algorithm, Error, ServiceError},
@@ -211,14 +210,14 @@ impl<'a> Service<'a> {
         &self,
         items: &[Item<'_>],
         session: &Session<'_>,
-    ) -> Result<HashMap<Item<'_>, Secret<'_>>, Error> {
+    ) -> Result<HashMap<Item<'_>, DBusSecret<'_>>, Error> {
         let secrets = self
             .inner()
             .call_method("GetSecrets", &(items, session))
             .await
             .map_err::<ServiceError, _>(From::from)?
             .body()
-            .deserialize::<HashMap<OwnedObjectPath, SecretInner>>()?;
+            .deserialize::<HashMap<OwnedObjectPath, super::secret::DBusSecretInner>>()?;
 
         let cnx = self.inner().connection();
         // Item's Hash implementation doesn't make use of any mutable internals
@@ -227,7 +226,7 @@ impl<'a> Service<'a> {
         for (path, secret_inner) in secrets {
             output.insert(
                 Item::new(cnx, path).await?,
-                Secret::from_inner(cnx, secret_inner).await?,
+                DBusSecret::from_inner(cnx, secret_inner).await?,
             );
         }
 

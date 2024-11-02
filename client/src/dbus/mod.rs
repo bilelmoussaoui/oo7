@@ -14,14 +14,7 @@
 //! let collection = service.default_collection().await?;
 //! // Store a secret
 //! collection
-//!     .create_item(
-//!         "My App's secret",
-//!         &attributes,
-//!         b"password",
-//!         true,
-//!         "text/plain",
-//!         None,
-//!     )
+//!     .create_item("My App's secret", &attributes, b"password", true, None)
 //!     .await?;
 //!
 //! // Retrieve it later thanks to it attributes
