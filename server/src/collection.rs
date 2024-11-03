@@ -46,9 +46,30 @@ impl Collection {
     #[zbus(out_args("results"))]
     pub async fn search_items(
         &self,
-        _attributes: HashMap<String, String>,
+        attributes: HashMap<String, String>,
     ) -> Result<Vec<OwnedObjectPath>, ServiceError> {
-        todo!()
+        let results = self
+            .search_inner_items(&attributes)
+            .await
+            .iter()
+            .map(|item| item.path().clone())
+            .collect::<Vec<_>>();
+
+        if results.is_empty() {
+            tracing::debug!(
+                "Items with attributes {:?} does not exist in collection: {}.",
+                attributes,
+                self.path
+            );
+        } else {
+            tracing::debug!(
+                "Items with attributes {:?} found in collection: {}.",
+                attributes,
+                self.path
+            );
+        }
+
+        Ok(results)
     }
 
     #[zbus(out_args("item", "prompt"))]
@@ -155,6 +176,21 @@ impl Collection {
 
     pub async fn alias(&self) -> String {
         self.alias.lock().await.clone()
+    }
+
+    pub async fn search_inner_items(
+        &self,
+        attributes: &HashMap<String, String>,
+    ) -> Vec<item::Item> {
+        let mut items = Vec::new();
+
+        for item in self.items.lock().await.iter() {
+            if item.attributes().await == *attributes {
+                items.push(item.clone());
+            }
+        }
+
+        items
     }
 
     pub async fn dispatch_items(&self) -> Result<(), Error> {

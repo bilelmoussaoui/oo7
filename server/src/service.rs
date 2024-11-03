@@ -83,9 +83,33 @@ impl Service {
     #[zbus(out_args("unlocked", "locked"))]
     pub async fn search_items(
         &self,
-        _attributes: HashMap<&str, &str>,
+        attributes: HashMap<String, String>,
     ) -> Result<(Vec<OwnedObjectPath>, Vec<OwnedObjectPath>), ServiceError> {
-        todo!()
+        let mut unlocked = Vec::new();
+        let mut locked = Vec::new();
+        let collections = self.collections.lock().await;
+
+        for collection in collections.iter() {
+            let items = collection.search_inner_items(&attributes).await;
+            for item in items {
+                if item.is_locked().await {
+                    locked.push(item.path().clone());
+                } else {
+                    unlocked.push(item.path().clone());
+                }
+            }
+        }
+
+        if unlocked.is_empty() && locked.is_empty() {
+            tracing::debug!(
+                "Items with attributes {:?} does not exist in any collection.",
+                attributes
+            );
+        } else {
+            tracing::debug!("Items with attributes {:?} found.", attributes);
+        }
+
+        Ok((unlocked, locked))
     }
 
     #[zbus(out_args("unlocked", "prompt"))]
