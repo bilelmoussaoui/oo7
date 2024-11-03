@@ -193,6 +193,18 @@ impl Collection {
         items
     }
 
+    pub async fn item_from_path(&self, path: &OwnedObjectPath) -> Option<item::Item> {
+        let items = self.items.lock().await;
+
+        for item in items.iter() {
+            if item.path() == path {
+                return Some(item.clone());
+            }
+        }
+
+        None
+    }
+
     pub async fn dispatch_items(&self) -> Result<(), Error> {
         let keyring_items = self.keyring.items().await;
         let mut items = self.items.lock().await;

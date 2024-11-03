@@ -29,6 +29,10 @@ impl ServiceManager {
         self.sessions.len()
     }
 
+    pub fn session(&self, path: &OwnedObjectPath) -> Option<Arc<Session>> {
+        self.sessions.get(path).map(Arc::clone)
+    }
+
     pub fn insert_session(&mut self, path: OwnedObjectPath, session: Arc<Session>) {
         self.sessions.insert(path, session);
     }
