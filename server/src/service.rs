@@ -131,10 +131,37 @@ impl Service {
     #[zbus(out_args("secrets"))]
     pub async fn get_secrets(
         &self,
-        _items: Vec<OwnedObjectPath>,
-        _session: ObjectPath<'_>,
+        items: Vec<OwnedObjectPath>,
+        session: OwnedObjectPath,
     ) -> Result<HashMap<OwnedObjectPath, SecretInner>, ServiceError> {
-        todo!()
+        let mut secrets = HashMap::new();
+        let collections = self.collections.lock().await;
+
+        'outer: for collection in collections.iter() {
+            for item in &items {
+                if let Some(item) = collection.item_from_path(item).await {
+                    match item.get_secret(session.clone()).await {
+                        Ok((secret,)) => {
+                            secrets.insert(item.path().clone(), secret);
+                            // To avoid iterating through all the remaining collections, if the
+                            // items secrets are already retrieved.
+                            if secrets.len() == items.len() {
+                                break 'outer;
+                            }
+                        }
+                        // Avoid erroring out if an item is locked.
+                        Err(ServiceError::IsLocked(_)) => {
+                            continue;
+                        }
+                        Err(err) => {
+                            return Err(err);
+                        }
+                    };
+                }
+            }
+        }
+
+        Ok(secrets)
     }
 
     #[zbus(out_args("collection"))]

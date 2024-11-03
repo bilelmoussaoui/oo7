@@ -10,7 +10,7 @@ use crate::service_manager::ServiceManager;
 
 #[derive(Debug, Clone)]
 pub struct Session {
-    _aes_key: Option<Arc<Key>>,
+    aes_key: Option<Arc<Key>>,
     manager: Arc<Mutex<ServiceManager>>,
     path: OwnedObjectPath,
 }
@@ -34,12 +34,16 @@ impl Session {
         Self {
             path: OwnedObjectPath::try_from(format!("/org/freedesktop/secrets/session/s{index}"))
                 .unwrap(),
-            _aes_key: aes_key,
+            aes_key,
             manager,
         }
     }
 
     pub fn path(&self) -> &OwnedObjectPath {
         &self.path
+    }
+
+    pub fn aes_key(&self) -> Option<Arc<Key>> {
+        self.aes_key.as_ref().map(Arc::clone)
     }
 }

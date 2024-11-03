@@ -20,7 +20,7 @@ pub struct Item {
     locked: Arc<AtomicBool>,
     inner: Arc<Mutex<oo7::portal::Item>>,
     // Other attributes
-    _manager: Arc<Mutex<ServiceManager>>,
+    manager: Arc<Mutex<ServiceManager>>,
     path: OwnedObjectPath,
 }
 
@@ -32,12 +32,79 @@ impl Item {
     }
 
     #[zbus(out_args("secret"))]
-    pub async fn get_secret(&self, _session: ObjectPath<'_>) -> Result<SecretInner, ServiceError> {
-        todo!()
+    pub async fn get_secret(
+        &self,
+        session: OwnedObjectPath,
+    ) -> Result<(SecretInner,), ServiceError> {
+        let manager = self.manager.lock().await;
+
+        let Some(session) = manager.session(&session) else {
+            tracing::error!("The session `{}` does not exist.", session);
+            return Err(ServiceError::NoSession(format!(
+                "The session `{}` does not exist.",
+                session
+            )));
+        };
+
+        if self.is_locked().await {
+            tracing::error!("Cannot get secret of a locked object `{}`", self.path);
+            return Err(ServiceError::IsLocked(format!(
+                "Cannot get secret of a locked object `{}`.",
+                self.path
+            )));
+        }
+
+        let inner = self.inner.lock().await;
+        let secret = inner.secret();
+
+        tracing::debug!("Secret retrieved from the item: {}.", self.path);
+
+        match session.aes_key() {
+            Some(key) => {
+                let iv = oo7::crypto::generate_iv();
+                let encrypted = oo7::crypto::encrypt(secret, &key, &iv);
+
+                Ok((SecretInner(
+                    session.path().clone(),
+                    iv,
+                    encrypted,
+                    "text/plain".to_owned(),
+                ),))
+            }
+            None => Ok((SecretInner(
+                session.path().clone(),
+                Vec::new(),
+                secret.to_vec(),
+                "text/plain".to_owned(),
+            ),)),
+        }
     }
 
-    pub async fn set_secret(&self, _secret: SecretInner) -> Result<(), ServiceError> {
-        todo!()
+    pub async fn set_secret(&self, secret: SecretInner) -> Result<(), ServiceError> {
+        let SecretInner(session, iv, secret, _content_type) = secret;
+        let manager = self.manager.lock().await;
+
+        let Some(session) = manager.session(&session) else {
+            tracing::error!("The session `{}` does not exist.", session);
+            return Err(ServiceError::NoSession(format!(
+                "The session `{}` does not exist.",
+                session
+            )));
+        };
+
+        let mut inner = self.inner.lock().await;
+
+        match session.aes_key() {
+            Some(key) => {
+                let decrypted = oo7::crypto::decrypt(secret, &key, &iv);
+                inner.set_secret(decrypted);
+            }
+            None => {
+                inner.set_secret(secret);
+            }
+        }
+
+        Ok(())
     }
 
     #[zbus(property, name = "Locked")]
@@ -94,7 +161,7 @@ impl Item {
             locked: Arc::new(AtomicBool::new(locked)),
             inner: Arc::new(Mutex::new(item)),
             path: OwnedObjectPath::try_from(format!("{}/{}", collection_path, item_index)).unwrap(),
-            _manager: manager,
+            manager,
         }
     }
 
