@@ -12,7 +12,7 @@ use oo7::{
 use tokio::sync::Mutex;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 
-use crate::service_manager::ServiceManager;
+use crate::{collection::Collection, service_manager::ServiceManager};
 
 #[derive(Debug, Clone)]
 pub struct Item {
@@ -21,6 +21,7 @@ pub struct Item {
     inner: Arc<Mutex<oo7::portal::Item>>,
     // Other attributes
     manager: Arc<Mutex<ServiceManager>>,
+    collection_path: OwnedObjectPath,
     path: OwnedObjectPath,
 }
 
@@ -160,6 +161,7 @@ impl Item {
         Self {
             locked: Arc::new(AtomicBool::new(locked)),
             inner: Arc::new(Mutex::new(item)),
+            collection_path: collection_path.clone(),
             path: OwnedObjectPath::try_from(format!("{}/{}", collection_path, item_index)).unwrap(),
             manager,
         }
@@ -167,5 +169,25 @@ impl Item {
 
     pub fn path(&self) -> &OwnedObjectPath {
         &self.path
+    }
+
+    pub async fn set_locked(&self, locked: bool) -> Result<(), ServiceError> {
+        let manager = self.manager.lock().await;
+
+        self.locked
+            .store(locked, std::sync::atomic::Ordering::Relaxed);
+        let signal_emitter = manager.signal_emitter(&self.path)?;
+        self.locked_changed(&signal_emitter).await?;
+
+        let signal_emitter = manager.signal_emitter(&self.collection_path)?;
+        Collection::item_changed(&signal_emitter, &self.path).await?;
+
+        tracing::debug!(
+            "Item: {} is {}.",
+            self.path,
+            if locked { "locked" } else { "unlocked" }
+        );
+
+        Ok(())
     }
 }

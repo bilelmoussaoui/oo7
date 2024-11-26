@@ -3,7 +3,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use tokio::sync::RwLock;
-use zbus::zvariant::OwnedObjectPath;
+use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 
 use crate::session::Session;
 
@@ -38,6 +38,19 @@ impl ServiceManager {
 
     pub fn remove_session(&mut self, path: &OwnedObjectPath) {
         self.sessions.remove(path);
+    }
+
+    pub fn signal_emitter<'a, P>(
+        &self,
+        path: P,
+    ) -> Result<zbus::object_server::SignalEmitter<'a>, oo7::dbus::ServiceError>
+    where
+        P: TryInto<ObjectPath<'a>>,
+        P::Error: Into<zbus::Error>,
+    {
+        let signal_emitter = zbus::object_server::SignalEmitter::new(&self.connection, path)?;
+
+        Ok(signal_emitter)
     }
 
     pub async fn session_index(&self) -> u32 {

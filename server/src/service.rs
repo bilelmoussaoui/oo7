@@ -115,17 +115,21 @@ impl Service {
     #[zbus(out_args("unlocked", "prompt"))]
     pub async fn unlock(
         &mut self,
-        _objects: Vec<OwnedObjectPath>,
-    ) -> Result<(Vec<OwnedObjectPath>, ObjectPath), ServiceError> {
-        todo!()
+        objects: Vec<OwnedObjectPath>,
+    ) -> Result<(Vec<OwnedObjectPath>, OwnedObjectPath), ServiceError> {
+        let (unlocked, _not_unlocked) = self.set_locked(false, &objects).await?;
+
+        Ok((unlocked, OwnedObjectPath::default()))
     }
 
     #[zbus(out_args("locked", "prompt"))]
     pub async fn lock(
         &mut self,
-        _objects: Vec<OwnedObjectPath>,
-    ) -> Result<(Vec<OwnedObjectPath>, ObjectPath), ServiceError> {
-        todo!()
+        objects: Vec<OwnedObjectPath>,
+    ) -> Result<(Vec<OwnedObjectPath>, OwnedObjectPath), ServiceError> {
+        let (locked, _not_locked) = self.set_locked(true, &objects).await?;
+
+        Ok((locked, OwnedObjectPath::default()))
     }
 
     #[zbus(out_args("secrets"))]
@@ -231,9 +235,9 @@ impl Service {
     ) -> zbus::Result<()>;
 
     #[zbus(signal, name = "CollectionChanged")]
-    async fn collection_changed(
+    pub async fn collection_changed(
         signal_emitter: &SignalEmitter<'_>,
-        collection: OwnedObjectPath,
+        collection: &OwnedObjectPath,
     ) -> zbus::Result<()>;
 }
 
@@ -292,5 +296,58 @@ impl Service {
             .await?;
 
         Ok(())
+    }
+
+    pub async fn set_locked(
+        &self,
+        locked: bool,
+        objects: &[OwnedObjectPath],
+    ) -> Result<(Vec<OwnedObjectPath>, Vec<OwnedObjectPath>), ServiceError> {
+        let mut without_prompt = Vec::new();
+        let mut with_prompt = Vec::new();
+        let collections = self.collections.lock().await;
+
+        for object in objects {
+            for collection in collections.iter() {
+                let collection_locked = collection.is_locked().await;
+                if object == collection.path() {
+                    if collection_locked == locked {
+                        tracing::debug!(
+                            "Collection: {} is already {}.",
+                            object,
+                            if locked { "locked" } else { "unlocked" }
+                        );
+                        without_prompt.push(object.clone());
+                    } else {
+                        // TODO: remove this once the prompt implementation is complete.
+                        collection.set_locked(locked).await?;
+                        with_prompt.push(object.clone());
+                    }
+                    break;
+                } else if let Some(item) = collection.item_from_path(object).await {
+                    if locked == item.is_locked().await {
+                        tracing::debug!(
+                            "Item: {} is already {}.",
+                            object,
+                            if locked { "locked" } else { "unlocked" }
+                        );
+                        without_prompt.push(object.clone());
+                    // If the collection is in a similar state, update the Item
+                    // without a prompt.
+                    } else if collection_locked == locked {
+                        item.set_locked(locked).await?;
+                        without_prompt.push(object.clone());
+                    } else {
+                        // TODO: remove this once the prompt implementation is complete.
+                        item.set_locked(locked).await?;
+                        with_prompt.push(object.clone());
+                    }
+                    break;
+                }
+                tracing::warn!("Object: {} does not exist.", object);
+            }
+        }
+
+        Ok((without_prompt, with_prompt))
     }
 }
