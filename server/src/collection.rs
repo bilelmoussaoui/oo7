@@ -14,10 +14,10 @@ use oo7::{
     portal::Keyring,
 };
 use tokio::sync::{Mutex, RwLock};
-use zbus::{interface, object_server::SignalEmitter, zvariant};
+use zbus::{interface, object_server::SignalEmitter, proxy::Defaults, zvariant};
 use zvariant::{ObjectPath, OwnedObjectPath};
 
-use crate::{error::Error, item, service_manager::ServiceManager};
+use crate::{error::Error, item, service_manager::ServiceManager, Service};
 
 #[derive(Debug, Clone)]
 pub struct Collection {
@@ -130,9 +130,9 @@ impl Collection {
     ) -> zbus::Result<()>;
 
     #[zbus(signal, name = "ItemChanged")]
-    async fn item_changed(
+    pub async fn item_changed(
         signal_emitter: &SignalEmitter<'_>,
-        item: OwnedObjectPath,
+        item: &OwnedObjectPath,
     ) -> zbus::Result<()>;
 }
 
@@ -203,6 +203,33 @@ impl Collection {
         }
 
         None
+    }
+
+    pub async fn set_locked(&self, locked: bool) -> Result<(), ServiceError> {
+        let items = self.items.lock().await;
+
+        for item in items.iter() {
+            item.set_locked(locked).await?;
+        }
+
+        let manager = self.manager.lock().await;
+
+        self.locked
+            .store(locked, std::sync::atomic::Ordering::Relaxed);
+        let signal_emitter = manager.signal_emitter(&self.path)?;
+        self.locked_changed(&signal_emitter).await?;
+
+        let service_path = oo7::dbus::api::Service::PATH.as_ref().unwrap();
+        let signal_emitter = manager.signal_emitter(service_path)?;
+        Service::collection_changed(&signal_emitter, &self.path).await?;
+
+        tracing::debug!(
+            "Collection: {} is {}.",
+            self.path,
+            if locked { "locked" } else { "unlocked" }
+        );
+
+        Ok(())
     }
 
     pub async fn dispatch_items(&self) -> Result<(), Error> {
