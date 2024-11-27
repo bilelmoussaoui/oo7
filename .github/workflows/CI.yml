@@ -86,14 +86,17 @@ jobs:
         run: cargo clippy -p oo7 --no-default-features --features tracing,tokio,openssl_crypto -- -D warnings
 
   meson:
-    name: Meson (portal)
+    name: Meson
     runs-on: ubuntu-latest
     container: fedora:latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Install dependencies
-        run: dnf install -y git meson gcc # no idea why the hell meson with rust project requires gcc
-      - name: Build
+        run: dnf install -y git meson gcc systemd
+      - name: Build (portal)
         working-directory: ./portal
+        run: meson setup ./ _build --prefix /usr && ninja -C _build
+      - name: Build (server)
+        working-directory: ./server
         run: meson setup ./ _build --prefix /usr && ninja -C _build
