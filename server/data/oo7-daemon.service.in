@@ -1,0 +1,9 @@
+[Unit]
+Description=Secret service (oo7 implementation)
+[Service]
+Type=simple
+StandardError=journal
+ExecStart=@libexecdir@/@binary@
+Restart=on-failure
+[Install]
+WantedBy=default.target
