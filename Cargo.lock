@@ -1080,6 +1080,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "zbus",
+ "zeroize",
 ]
 
 [[package]]
