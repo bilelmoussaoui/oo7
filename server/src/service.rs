@@ -358,6 +358,18 @@ impl Service {
         self.connection.object_server()
     }
 
+    pub async fn collection_from_path(&self, path: &OwnedObjectPath) -> Option<Collection> {
+        let collections = self.collections.lock().await;
+
+        for collection in collections.iter() {
+            if collection.path() == path {
+                return Some(collection.clone());
+            }
+        }
+
+        None
+    }
+
     pub async fn session(&self, path: &OwnedObjectPath) -> Option<Arc<Session>> {
         self.sessions.lock().await.get(path).map(Arc::clone)
     }

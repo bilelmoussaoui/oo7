@@ -168,9 +168,9 @@ impl Collection {
     ) -> zbus::Result<()>;
 
     #[zbus(signal, name = "ItemDeleted")]
-    async fn item_deleted(
+    pub async fn item_deleted(
         signal_emitter: &SignalEmitter<'_>,
-        item: OwnedObjectPath,
+        item: &OwnedObjectPath,
     ) -> zbus::Result<()>;
 
     #[zbus(signal, name = "ItemChanged")]
@@ -295,6 +295,38 @@ impl Collection {
         }
 
         *self.item_index.write().await = n_items;
+
+        Ok(())
+    }
+
+    pub async fn delete_item(&self, path: &OwnedObjectPath) -> Result<(), ServiceError> {
+        let Some(item) = self.item_from_path(path).await else {
+            return Err(ServiceError::NoSuchObject(format!(
+                "Item `{}` does not exist.",
+                path
+            )));
+        };
+
+        if item.is_locked().await {
+            return Err(ServiceError::IsLocked(format!(
+                "Cannot delete a locked item `{}`",
+                path
+            )));
+        }
+
+        let attributes = item.attributes().await;
+        self.keyring.delete(&attributes).await.map_err(|err| {
+            ServiceError::ZBus(zbus::Error::FDO(Box::new(zbus::fdo::Error::Failed(
+                format!("Failed to deleted item {err}."),
+            ))))
+        })?;
+
+        let mut items = self.items.lock().await;
+        items.retain(|item| item.path() != path);
+        drop(items);
+
+        let signal_emitter = self.service.signal_emitter(&self.path)?;
+        self.items_changed(&signal_emitter).await?;
 
         Ok(())
     }
