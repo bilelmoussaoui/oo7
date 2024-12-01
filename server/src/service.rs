@@ -11,23 +11,24 @@ use oo7::{
     portal::{Keyring, Secret},
     Key,
 };
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use zbus::{
     object_server::SignalEmitter,
     proxy::Defaults,
     zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Value},
 };
 
-use crate::{
-    collection::Collection, error::Error, service_manager::ServiceManager, session::Session,
-};
+use crate::{collection::Collection, error::Error, session::Session};
 
 #[derive(Debug, Clone)]
 pub struct Service {
     // Properties
     collections: Arc<Mutex<Vec<Collection>>>,
     // Other attributes
-    manager: Arc<Mutex<ServiceManager>>,
+    connection: zbus::Connection,
+    // sessions mapped to their corresponding object path on the bus
+    sessions: Arc<Mutex<HashMap<OwnedObjectPath, Arc<Session>>>>,
+    session_index: Arc<RwLock<u32>>,
 }
 
 #[zbus::interface(name = "org.freedesktop.Secret.Service")]
@@ -51,15 +52,15 @@ impl Service {
             }
         };
 
-        let session = Session::new(aes_key.map(Arc::new), Arc::clone(&self.manager)).await;
+        let session = Session::new(aes_key.map(Arc::new), self.clone()).await;
         let path = session.path().clone();
 
         {
             let session = Arc::new(session.clone());
-            self.manager
+            self.sessions
                 .lock()
                 .await
-                .insert_session(path.clone(), Arc::clone(&session));
+                .insert(path.clone(), Arc::clone(&session));
         }
 
         object_server.at(&path, session).await?;
@@ -256,7 +257,9 @@ impl Service {
         let object_server = connection.object_server();
         let service = Self {
             collections: Default::default(),
-            manager: Arc::new(Mutex::new(ServiceManager::new(connection.clone()))),
+            connection: connection.clone(),
+            sessions: Default::default(),
+            session_index: Default::default(),
         };
 
         object_server
@@ -273,7 +276,7 @@ impl Service {
                 "login",
                 "default",
                 false,
-                Arc::clone(&service.manager),
+                service.clone(),
                 Arc::new(Keyring::open("login", secret).await?),
             );
             collections.push(collection.clone());
@@ -287,7 +290,7 @@ impl Service {
             "session",
             "session",
             false,
-            Arc::clone(&service.manager),
+            service.clone(),
             Arc::new(Keyring::temporary(Secret::random()).await?),
         );
         collections.push(collection.clone());
@@ -349,5 +352,37 @@ impl Service {
         }
 
         Ok((without_prompt, with_prompt))
+    }
+
+    pub fn object_server(&self) -> &zbus::ObjectServer {
+        self.connection.object_server()
+    }
+
+    pub async fn session(&self, path: &OwnedObjectPath) -> Option<Arc<Session>> {
+        self.sessions.lock().await.get(path).map(Arc::clone)
+    }
+
+    pub async fn remove_session(&self, path: &OwnedObjectPath) {
+        self.sessions.lock().await.remove(path);
+    }
+
+    pub fn signal_emitter<'a, P>(
+        &self,
+        path: P,
+    ) -> Result<zbus::object_server::SignalEmitter<'a>, oo7::dbus::ServiceError>
+    where
+        P: TryInto<ObjectPath<'a>>,
+        P::Error: Into<zbus::Error>,
+    {
+        let signal_emitter = zbus::object_server::SignalEmitter::new(&self.connection, path)?;
+
+        Ok(signal_emitter)
+    }
+
+    pub async fn session_index(&self) -> u32 {
+        let n_sessions = *self.session_index.read().await + 1;
+        *self.session_index.write().await = n_sessions;
+
+        n_sessions
     }
 }

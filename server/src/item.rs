@@ -12,7 +12,7 @@ use oo7::{
 use tokio::sync::Mutex;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 
-use crate::{collection::Collection, service_manager::ServiceManager};
+use crate::{collection::Collection, Service};
 
 #[derive(Debug, Clone)]
 pub struct Item {
@@ -20,7 +20,7 @@ pub struct Item {
     locked: Arc<AtomicBool>,
     inner: Arc<Mutex<oo7::portal::Item>>,
     // Other attributes
-    manager: Arc<Mutex<ServiceManager>>,
+    service: Service,
     collection_path: OwnedObjectPath,
     path: OwnedObjectPath,
 }
@@ -37,9 +37,7 @@ impl Item {
         &self,
         session: OwnedObjectPath,
     ) -> Result<(SecretInner,), ServiceError> {
-        let manager = self.manager.lock().await;
-
-        let Some(session) = manager.session(&session) else {
+        let Some(session) = self.service.session(&session).await else {
             tracing::error!("The session `{}` does not exist.", session);
             return Err(ServiceError::NoSession(format!(
                 "The session `{}` does not exist.",
@@ -83,9 +81,8 @@ impl Item {
 
     pub async fn set_secret(&self, secret: SecretInner) -> Result<(), ServiceError> {
         let SecretInner(session, iv, secret, _content_type) = secret;
-        let manager = self.manager.lock().await;
 
-        let Some(session) = manager.session(&session) else {
+        let Some(session) = self.service.session(&session).await else {
             tracing::error!("The session `{}` does not exist.", session);
             return Err(ServiceError::NoSession(format!(
                 "The session `{}` does not exist.",
@@ -154,7 +151,7 @@ impl Item {
     pub fn new(
         item: portal::Item,
         locked: bool,
-        manager: Arc<Mutex<ServiceManager>>,
+        service: Service,
         collection_path: &OwnedObjectPath,
         item_index: u32,
     ) -> Self {
@@ -163,7 +160,7 @@ impl Item {
             inner: Arc::new(Mutex::new(item)),
             collection_path: collection_path.clone(),
             path: OwnedObjectPath::try_from(format!("{}/{}", collection_path, item_index)).unwrap(),
-            manager,
+            service,
         }
     }
 
@@ -172,14 +169,12 @@ impl Item {
     }
 
     pub async fn set_locked(&self, locked: bool) -> Result<(), ServiceError> {
-        let manager = self.manager.lock().await;
-
         self.locked
             .store(locked, std::sync::atomic::Ordering::Relaxed);
-        let signal_emitter = manager.signal_emitter(&self.path)?;
+        let signal_emitter = self.service.signal_emitter(&self.path)?;
         self.locked_changed(&signal_emitter).await?;
 
-        let signal_emitter = manager.signal_emitter(&self.collection_path)?;
+        let signal_emitter = self.service.signal_emitter(&self.collection_path)?;
         Collection::item_changed(&signal_emitter, &self.path).await?;
 
         tracing::debug!(
