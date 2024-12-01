@@ -17,7 +17,7 @@ use tokio::sync::{Mutex, RwLock};
 use zbus::{interface, object_server::SignalEmitter, proxy::Defaults, zvariant};
 use zvariant::{ObjectPath, OwnedObjectPath};
 
-use crate::{error::Error, item, service_manager::ServiceManager, Service};
+use crate::{error::Error, item, Service};
 
 #[derive(Debug, Clone)]
 pub struct Collection {
@@ -31,7 +31,7 @@ pub struct Collection {
     alias: Arc<Mutex<String>>,
     #[allow(unused)]
     keyring: Arc<Keyring>,
-    manager: Arc<Mutex<ServiceManager>>,
+    service: Service,
     item_index: Arc<RwLock<u32>>,
     path: OwnedObjectPath,
 }
@@ -141,7 +141,7 @@ impl Collection {
         label: &str,
         alias: &str,
         locked: bool,
-        manager: Arc<Mutex<ServiceManager>>,
+        service: Service,
         keyring: Arc<Keyring>,
     ) -> Self {
         let created = SystemTime::now()
@@ -161,7 +161,7 @@ impl Collection {
             ))
             .unwrap(),
             created,
-            manager,
+            service,
             keyring,
         }
     }
@@ -212,15 +212,13 @@ impl Collection {
             item.set_locked(locked).await?;
         }
 
-        let manager = self.manager.lock().await;
-
         self.locked
             .store(locked, std::sync::atomic::Ordering::Relaxed);
-        let signal_emitter = manager.signal_emitter(&self.path)?;
+        let signal_emitter = self.service.signal_emitter(&self.path)?;
         self.locked_changed(&signal_emitter).await?;
 
         let service_path = oo7::dbus::api::Service::PATH.as_ref().unwrap();
-        let signal_emitter = manager.signal_emitter(service_path)?;
+        let signal_emitter = self.service.signal_emitter(service_path)?;
         Service::collection_changed(&signal_emitter, &self.path).await?;
 
         tracing::debug!(
@@ -235,15 +233,14 @@ impl Collection {
     pub async fn dispatch_items(&self) -> Result<(), Error> {
         let keyring_items = self.keyring.items().await;
         let mut items = self.items.lock().await;
-        let service_manager = self.manager.lock().await;
-        let object_server = service_manager.object_server();
+        let object_server = self.service.object_server();
         let mut n_items = 1;
 
         for keyring_item in keyring_items {
             let item = item::Item::new(
                 keyring_item.map_err(Error::InvalidItem)?,
                 self.is_locked().await,
-                Arc::clone(&self.manager),
+                self.service.clone(),
                 &self.path,
                 n_items,
             );

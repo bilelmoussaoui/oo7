@@ -3,15 +3,14 @@
 use std::sync::Arc;
 
 use oo7::{dbus::ServiceError, Key};
-use tokio::sync::Mutex;
 use zbus::{interface, zvariant::OwnedObjectPath};
 
-use crate::service_manager::ServiceManager;
+use crate::Service;
 
 #[derive(Debug, Clone)]
 pub struct Session {
     aes_key: Option<Arc<Key>>,
-    manager: Arc<Mutex<ServiceManager>>,
+    service: Service,
     path: OwnedObjectPath,
 }
 
@@ -21,7 +20,7 @@ impl Session {
         &self,
         #[zbus(object_server)] object_server: &zbus::ObjectServer,
     ) -> Result<(), ServiceError> {
-        self.manager.lock().await.remove_session(&self.path);
+        self.service.remove_session(&self.path).await;
         object_server.remove::<Self, _>(&self.path).await?;
 
         Ok(())
@@ -29,13 +28,13 @@ impl Session {
 }
 
 impl Session {
-    pub async fn new(aes_key: Option<Arc<Key>>, manager: Arc<Mutex<ServiceManager>>) -> Self {
-        let index = manager.lock().await.session_index().await;
+    pub async fn new(aes_key: Option<Arc<Key>>, service: Service) -> Self {
+        let index = service.session_index().await;
         Self {
             path: OwnedObjectPath::try_from(format!("/org/freedesktop/secrets/session/s{index}"))
                 .unwrap(),
             aes_key,
-            manager,
+            service,
         }
     }
 
