@@ -602,7 +602,7 @@ mod tests {
             .join("legacy.keyring");
         fs::copy(&fixture_path, &v0_dir.join("default.keyring")).await?;
 
-        std::env::set_var("XDG_DATA_HOME", &data_dir.path());
+        std::env::set_var("XDG_DATA_HOME", data_dir.path());
 
         assert!(!v1_dir.join("default.keyring").exists());
 
@@ -630,7 +630,7 @@ mod tests {
             .join("default.keyring");
         fs::copy(&fixture_path, &v0_dir.join("default.keyring")).await?;
 
-        std::env::set_var("XDG_DATA_HOME", &data_dir.path());
+        std::env::set_var("XDG_DATA_HOME", data_dir.path());
 
         let password = b"test";
         let secret = Secret::from(password.to_vec());
@@ -658,7 +658,7 @@ mod tests {
             .join("default.keyring");
         fs::copy(&fixture_path, &v1_dir.join("default.keyring")).await?;
 
-        std::env::set_var("XDG_DATA_HOME", &data_dir.path());
+        std::env::set_var("XDG_DATA_HOME", data_dir.path());
 
         let password = b"wrong";
         let secret = Secret::from(password.to_vec());
@@ -688,7 +688,7 @@ mod tests {
             .join("default.keyring");
         fs::copy(&fixture_path, &v1_dir.join("default.keyring")).await?;
 
-        std::env::set_var("XDG_DATA_HOME", &data_dir.path());
+        std::env::set_var("XDG_DATA_HOME", data_dir.path());
 
         let password = b"test";
         let secret = Secret::from(password.to_vec());
@@ -711,7 +711,7 @@ mod tests {
         let v1_dir = v0_dir.join("v1");
         fs::create_dir_all(&v1_dir).await?;
 
-        std::env::set_var("XDG_DATA_HOME", &data_dir.path());
+        std::env::set_var("XDG_DATA_HOME", data_dir.path());
 
         let password = b"test";
         let secret = Secret::from(password.to_vec());
