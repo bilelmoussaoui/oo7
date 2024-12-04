@@ -14,7 +14,7 @@ use openssl::{
 };
 use zeroize::Zeroizing;
 
-use crate::{portal, Key};
+use crate::{file, Key};
 
 const ENC_ALG: Nid = Nid::AES_128_CBC;
 const MAC_ALG: Nid = Nid::SHA256;
@@ -160,7 +160,7 @@ pub(crate) fn verify_checksum_md5(digest: impl AsRef<[u8]>, content: impl AsRef<
 
 pub(crate) fn derive_key(
     secret: impl AsRef<[u8]>,
-    key_strength: Result<(), portal::WeakKeyError>,
+    key_strength: Result<(), file::WeakKeyError>,
     salt: impl AsRef<[u8]>,
     iteration_count: usize,
 ) -> Key {
@@ -182,7 +182,7 @@ pub(crate) fn derive_key(
 
 pub(crate) fn legacy_derive_key_and_iv(
     secret: impl AsRef<[u8]>,
-    key_strength: Result<(), portal::WeakKeyError>,
+    key_strength: Result<(), file::WeakKeyError>,
     salt: impl AsRef<[u8]>,
     iteration_count: usize,
 ) -> (Key, Vec<u8>) {
