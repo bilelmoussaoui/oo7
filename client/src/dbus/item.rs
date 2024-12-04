@@ -6,10 +6,9 @@ use async_lock::RwLock;
 #[cfg(feature = "tokio")]
 use tokio::sync::RwLock;
 use zbus::zvariant::ObjectPath;
-use zeroize::Zeroizing;
 
 use super::{api, Algorithm, Error};
-use crate::{crypto, AsAttributes, Key};
+use crate::{AsAttributes, Key, Secret};
 
 /// A secret with a label and attributes to identify it.
 ///
@@ -134,23 +133,14 @@ impl<'a> Item<'a> {
     }
 
     /// Retrieve the currently stored secret.
-    pub async fn secret(&self) -> Result<Zeroizing<Vec<u8>>, Error> {
+    pub async fn secret(&self) -> Result<Secret, Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
-            let secret = self.inner.secret(&self.session).await?;
-
-            let value = match self.algorithm {
-                Algorithm::Plain => Zeroizing::new(secret.value.to_owned()),
-                Algorithm::Encrypted => {
-                    let iv = &secret.parameters;
-                    // Safe unwrap as it is encrypted
-                    let aes_key = self.aes_key.as_ref().unwrap();
-
-                    crypto::decrypt(&secret.value, aes_key, iv)
-                }
-            };
-            Ok(value)
+            self.inner
+                .secret(&self.session)
+                .await?
+                .decrypt(self.aes_key.as_ref())
         }
     }
 
@@ -159,19 +149,13 @@ impl<'a> Item<'a> {
     /// # Arguments
     ///
     /// * `secret` - The secret to store.
-    /// * `content_type` - The content type of the secret, usually something
-    ///   like `text/plain`.
     #[doc(alias = "SetSecret")]
-    pub async fn set_secret(
-        &self,
-        secret: impl AsRef<[u8]>,
-        content_type: &str,
-    ) -> Result<(), Error> {
+    pub async fn set_secret(&self, secret: impl Into<Secret>) -> Result<(), Error> {
         let secret = match self.algorithm {
-            Algorithm::Plain => api::Secret::new(Arc::clone(&self.session), secret, content_type),
+            Algorithm::Plain => api::DBusSecret::new(Arc::clone(&self.session), secret),
             Algorithm::Encrypted => {
                 let aes_key = self.aes_key.as_ref().unwrap();
-                api::Secret::new_encrypted(Arc::clone(&self.session), secret, content_type, aes_key)
+                api::DBusSecret::new_encrypted(Arc::clone(&self.session), secret, aes_key)
             }
         };
         self.inner.set_secret(&secret).await?;

@@ -5,7 +5,7 @@ use futures_util::{Stream, StreamExt};
 use serde::Serialize;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath, Type};
 
-use super::{Item, Prompt, Properties, Secret, Unlockable, DESTINATION};
+use super::{DBusSecret, Item, Prompt, Properties, Unlockable, DESTINATION};
 use crate::{
     dbus::{Error, ServiceError},
     AsAttributes,
@@ -165,7 +165,7 @@ impl<'a> Collection<'a> {
         &self,
         label: &str,
         attributes: &impl AsAttributes,
-        secret: &Secret<'_>,
+        secret: &DBusSecret<'_>,
         replace: bool,
         window_id: Option<WindowIdentifier>,
     ) -> Result<Item<'a>, Error> {

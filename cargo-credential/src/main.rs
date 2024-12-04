@@ -50,7 +50,7 @@ impl SecretServiceCredential {
                 let token = cargo_credential::read_token(options, registry)?.expose();
 
                 if let Some(item) = items.first() {
-                    item.set_secret(token, "text/utf8")
+                    item.set_secret(token)
                         .await
                         .map_err(|err| Error::Other(Box::new(err)))?;
                 } else {
@@ -60,7 +60,6 @@ impl SecretServiceCredential {
                             &attributes,
                             token,
                             true,
-                            "text/utf8",
                             None,
                         )
                         .await

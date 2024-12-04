@@ -184,7 +184,7 @@ impl Commands {
                 };
 
                 collection
-                    .create_item(&label, &attributes, &secret, true, "text/plain", None)
+                    .create_item(&label, &attributes, secret, true, None)
                     .await?;
             }
             Commands::Lock => collection.lock(None).await?,
@@ -245,14 +245,15 @@ async fn print_item(
     as_hex: bool,
 ) -> Result<(), Error> {
     use std::fmt::Write;
+    let secret = item.secret().await?;
+    let bytes = secret.as_bytes();
     if secret_only {
-        let bytes = item.secret().await?;
         let mut stdout = std::io::stdout().lock();
         if as_hex {
-            let hex = hex::encode(&bytes);
+            let hex = hex::encode(bytes);
             stdout.write_all(hex.as_bytes())?;
         } else {
-            stdout.write_all(&bytes)?;
+            stdout.write_all(bytes)?;
         }
         // Add a new line if we are writing to a tty
         if stdout.is_terminal() {
@@ -260,7 +261,6 @@ async fn print_item(
         }
     } else {
         let label = item.label().await?;
-        let bytes = item.secret().await?;
         let mut attributes = item.attributes().await?;
         let created = item.created().await?;
         let modified = item.modified().await?;
@@ -277,15 +277,15 @@ async fn print_item(
 
         // we still fallback to hex if it is not a string
         if as_hex {
-            let hex = hex::encode(&bytes);
+            let hex = hex::encode(bytes);
             writeln!(&mut result, "secret = {hex}").unwrap();
         } else {
-            match std::str::from_utf8(&bytes) {
+            match std::str::from_utf8(bytes) {
                 Ok(secret) => {
                     writeln!(&mut result, "secret = {secret}").unwrap();
                 }
                 Err(_) => {
-                    let hex = hex::encode(&bytes);
+                    let hex = hex::encode(bytes);
                     writeln!(&mut result, "secret = {hex}").unwrap();
                 }
             }

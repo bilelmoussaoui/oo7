@@ -4,9 +4,8 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use async_lock::RwLock;
 #[cfg(feature = "tokio")]
 use tokio::sync::RwLock;
-use zeroize::Zeroizing;
 
-use crate::{dbus, file, AsAttributes, Result};
+use crate::{dbus, file, AsAttributes, Result, Secret};
 
 /// A [Secret Service](crate::dbus) or [file](crate::file) backed keyring
 /// implementation.
@@ -118,13 +117,13 @@ impl Keyring {
         &self,
         label: &str,
         attributes: &impl AsAttributes,
-        secret: impl AsRef<[u8]>,
+        secret: impl Into<Secret>,
         replace: bool,
     ) -> Result<()> {
         match self {
             Self::DBus(backend) => {
                 backend
-                    .create_item(label, attributes, secret, replace, "text/plain", None)
+                    .create_item(label, attributes, secret, replace, None)
                     .await?;
             }
             Self::File(backend) => {
@@ -194,7 +193,7 @@ impl Item {
                     .create_item(
                         item_guard.label(),
                         &item_guard.attributes(),
-                        &*item_guard.secret(),
+                        item_guard.secret(),
                         true,
                     )
                     .await?;
@@ -234,7 +233,7 @@ impl Item {
                     backend.replace_item_index(index, &item_guard).await?;
                 } else {
                     backend
-                        .create_item(item_guard.label(), attributes, &*item_guard.secret(), true)
+                        .create_item(item_guard.label(), attributes, item_guard.secret(), true)
                         .await?;
                 }
             }
@@ -244,7 +243,7 @@ impl Item {
     }
 
     /// Sets a new secret.
-    pub async fn set_secret(&self, secret: impl AsRef<[u8]>) -> Result<()> {
+    pub async fn set_secret(&self, secret: impl Into<Secret>) -> Result<()> {
         match self {
             Self::File(item, backend) => {
                 item.write().await.set_secret(secret);
@@ -254,18 +253,18 @@ impl Item {
                     .create_item(
                         item_guard.label(),
                         &item_guard.attributes(),
-                        &*item_guard.secret(),
+                        item_guard.secret(),
                         true,
                     )
                     .await?;
             }
-            Self::DBus(item) => item.set_secret(secret, "text/plain").await?,
+            Self::DBus(item) => item.set_secret(secret).await?,
         };
         Ok(())
     }
 
     /// Retrieves the stored secret.
-    pub async fn secret(&self) -> Result<Zeroizing<Vec<u8>>> {
+    pub async fn secret(&self) -> Result<Secret> {
         let secret = match self {
             Self::File(item, _) => item.read().await.secret(),
             Self::DBus(item) => item.secret().await?,
@@ -352,8 +351,7 @@ mod tests {
         fs::create_dir_all(&dir).await.unwrap();
         let path = dir.join("default.keyring");
 
-        let password = b"test";
-        let secret = file::Secret::from(password.to_vec());
+        let secret = crate::Secret::text("test");
         let keyring = Keyring::File(file::Keyring::load(&path, secret).await?.into());
 
         let items = keyring.items().await?;
@@ -367,7 +365,7 @@ mod tests {
         assert_eq!(items.len(), 1);
         let item = items.remove(0);
         assert_eq!(item.label().await?, "my item");
-        assert_eq!(*item.secret().await?, b"my_secret");
+        assert_eq!(item.secret().await?, Secret::blob("my_secret"));
         let attrs = item.attributes().await?;
         assert_eq!(attrs.len(), 1);
         assert_eq!(attrs.get("key").unwrap(), "value");
@@ -379,7 +377,7 @@ mod tests {
         assert_eq!(items.len(), 1);
         let item = items.remove(0);
         assert_eq!(item.label().await?, "my item");
-        assert_eq!(*item.secret().await?, b"my_secret");
+        assert_eq!(item.secret().await?, Secret::blob("my_secret"));
         let attrs = item.attributes().await?;
         assert_eq!(attrs.len(), 2);
         assert_eq!(attrs.get("key").unwrap(), "changed_value");

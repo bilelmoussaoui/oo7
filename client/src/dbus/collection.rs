@@ -9,7 +9,7 @@ use tokio::sync::RwLock;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 
 use super::{api, Algorithm, Error, Item};
-use crate::{AsAttributes, Key};
+use crate::{AsAttributes, Key, Secret};
 
 /// A collection allows to store and retrieve items.
 ///
@@ -151,28 +151,22 @@ impl<'a> Collection<'a> {
     /// * `secret` - The secret to store.
     /// * `replace` - Whether to replace the value if the `attributes` matches
     ///   an existing `secret`.
-    /// * `content_type` - The content type of the secret, usually something
-    ///   like `text/plain`.
     pub async fn create_item(
         &self,
         label: &str,
         attributes: &impl AsAttributes,
-        secret: impl AsRef<[u8]>,
+        secret: impl Into<Secret>,
         replace: bool,
-        content_type: &str,
         window_id: Option<WindowIdentifier>,
     ) -> Result<Item<'a>, Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
             let secret = match self.algorithm {
-                Algorithm::Plain => {
-                    api::Secret::new(Arc::clone(&self.session), secret, content_type)
-                }
-                Algorithm::Encrypted => api::Secret::new_encrypted(
+                Algorithm::Plain => api::DBusSecret::new(Arc::clone(&self.session), secret),
+                Algorithm::Encrypted => api::DBusSecret::new_encrypted(
                     Arc::clone(&self.session),
                     secret,
-                    content_type,
                     self.aes_key.as_ref().unwrap(),
                 ),
             };
@@ -275,18 +269,18 @@ mod tests {
             "plain-type-test"
         };
         attributes.insert("type", value);
-        let secret = "a password".as_bytes();
+        let secret = crate::Secret::text("a password");
 
         let collection = service.default_collection().await.unwrap();
         let n_items = collection.items().await.unwrap().len();
         let n_search_items = collection.search_items(&attributes).await.unwrap().len();
 
         let item = collection
-            .create_item("A secret", &attributes, secret, true, "text/plain", None)
+            .create_item("A secret", &attributes, secret.clone(), true, None)
             .await
             .unwrap();
 
-        assert_eq!(*item.secret().await.unwrap(), secret);
+        assert_eq!(item.secret().await.unwrap(), secret);
         assert_eq!(item.attributes().await.unwrap()["type"], value);
 
         assert_eq!(collection.items().await.unwrap().len(), n_items + 1);

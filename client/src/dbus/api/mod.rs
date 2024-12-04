@@ -29,9 +29,9 @@ pub(crate) use properties::Properties;
 #[cfg(feature = "unstable")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 pub use properties::Properties;
-pub use secret::Secret;
+pub use secret::DBusSecret;
 #[cfg(feature = "unstable")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-pub use secret::SecretInner;
+pub use secret::DBusSecretInner;
 pub use service::Service;
 pub use session::Session;

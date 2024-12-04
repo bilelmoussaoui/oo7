@@ -1,6 +1,5 @@
 #[derive(Debug)]
 pub enum Error {
-    Rand(getrandom::Error),
     Oo7(oo7::dbus::Error),
     Io(std::io::Error),
     Portal(ashpd::PortalError),
@@ -9,7 +8,6 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Rand(e) => f.write_fmt(format_args!("Rand error {e}")),
             Self::Oo7(e) => f.write_fmt(format_args!("DBus error: {e}")),
             Self::Io(e) => f.write_fmt(format_args!("IO error: {e}")),
             Self::Portal(e) => f.write_fmt(format_args!("Portal error: {e}")),
@@ -20,17 +18,10 @@ impl std::fmt::Display for Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Self::Rand(_) => None,
             Self::Oo7(e) => Some(e),
             Self::Io(e) => Some(e),
             Self::Portal(e) => Some(e),
         }
-    }
-}
-
-impl From<getrandom::Error> for Error {
-    fn from(err: getrandom::Error) -> Self {
-        Self::Rand(err)
     }
 }
 

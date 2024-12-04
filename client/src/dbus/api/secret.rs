@@ -5,15 +5,21 @@ use zbus::zvariant::{OwnedObjectPath, Type};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use super::Session;
-use crate::{crypto, dbus::Error, Key};
+use crate::{
+    crypto,
+    dbus::Error,
+    secret::{BLOB_CONTENT_TYPE, TEXT_CONTENT_TYPE},
+    Key, Secret,
+};
 
 #[derive(Debug, Serialize, Deserialize, Type)]
 #[zvariant(signature = "(oayays)")]
-pub struct SecretInner(pub OwnedObjectPath, pub Vec<u8>, pub Vec<u8>, pub String);
+/// Same as [`DBusSecret`] without tying the session path to a [`Session`] type.
+pub struct DBusSecretInner(pub OwnedObjectPath, pub Vec<u8>, pub Vec<u8>, pub String);
 
 #[derive(Debug, Type, Zeroize, ZeroizeOnDrop)]
 #[zvariant(signature = "(oayays)")]
-pub struct Secret<'a> {
+pub struct DBusSecret<'a> {
     #[zeroize(skip)]
     pub(crate) session: Arc<Session<'a>>,
     pub(crate) parameters: Vec<u8>,
@@ -22,47 +28,59 @@ pub struct Secret<'a> {
     pub(crate) content_type: String,
 }
 
-impl<'a> Secret<'a> {
-    pub(crate) fn new(
-        session: Arc<Session<'a>>,
-        secret: impl AsRef<[u8]>,
-        content_type: &str,
-    ) -> Self {
+impl<'a> DBusSecret<'a> {
+    pub(crate) fn new(session: Arc<Session<'a>>, secret: impl Into<Secret>) -> Self {
+        let secret = secret.into();
         Self {
             session,
             parameters: vec![],
-            value: secret.as_ref().to_vec(),
-            content_type: content_type.to_owned(),
+            value: secret.as_bytes().to_vec(),
+            content_type: secret.content_type().to_owned(),
         }
     }
 
     pub(crate) fn new_encrypted(
         session: Arc<Session<'a>>,
-        secret: impl AsRef<[u8]>,
-        content_type: &str,
+        secret: impl Into<Secret>,
         aes_key: &Key,
     ) -> Self {
         let iv = crypto::generate_iv();
-        let secret = crypto::encrypt(secret.as_ref(), aes_key, &iv);
+        let secret = secret.into();
         Self {
             session,
+            value: crypto::encrypt(secret.as_bytes(), aes_key, &iv),
             parameters: iv,
-            value: secret,
-            content_type: content_type.to_owned(),
+            content_type: secret.content_type().to_owned(),
         }
     }
 
     pub(crate) async fn from_inner(
         cnx: &zbus::Connection,
-        inner: SecretInner,
-    ) -> Result<Secret<'_>, Error> {
-        let secret = Secret {
+        inner: DBusSecretInner,
+    ) -> Result<Self, Error> {
+        Ok(Self {
             session: Arc::new(Session::new(cnx, inner.0).await?),
             parameters: inner.1,
             value: inner.2,
             content_type: inner.3,
+        })
+    }
+
+    pub(crate) fn decrypt(&self, key: Option<&Arc<Key>>) -> Result<Secret, Error> {
+        let value = match key {
+            Some(key) => &crypto::decrypt(&self.value, key, &self.parameters),
+            None => &self.value,
         };
-        Ok(secret)
+
+        match self.content_type.as_str() {
+            TEXT_CONTENT_TYPE => Ok(Secret::Text(String::from_utf8(value.to_vec())?)),
+            BLOB_CONTENT_TYPE => Ok(Secret::blob(value)),
+            e => {
+                #[cfg(feature = "tracing")]
+                tracing::warn!("Unsupported content-type {e}, falling back to blob");
+                Ok(Secret::blob(value))
+            }
+        }
     }
 
     /// Session used to encode the secret
@@ -86,7 +104,7 @@ impl<'a> Secret<'a> {
     }
 }
 
-impl Serialize for Secret<'_> {
+impl Serialize for DBusSecret<'_> {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -106,6 +124,6 @@ mod tests {
 
     #[test]
     fn signature() {
-        assert_eq!(Secret::SIGNATURE, "(oayays)");
+        assert_eq!(DBusSecret::SIGNATURE, "(oayays)");
     }
 }

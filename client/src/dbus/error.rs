@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, string::FromUtf8Error};
 
 /// DBus Secret Service specific errors.
 /// <https://specifications.freedesktop.org/secret-service-spec/latest/errors.html>
@@ -31,6 +31,8 @@ pub enum Error {
     NotFound(String),
     /// Input/Output.
     IO(std::io::Error),
+    /// Secret to string conversion failure.
+    Utf8(FromUtf8Error),
 }
 
 impl From<zbus::Error> for Error {
@@ -63,6 +65,12 @@ impl From<std::io::Error> for Error {
     }
 }
 
+impl From<FromUtf8Error> for Error {
+    fn from(value: FromUtf8Error) -> Self {
+        Self::Utf8(value)
+    }
+}
+
 impl std::error::Error for Error {}
 
 impl fmt::Display for Error {
@@ -74,6 +82,7 @@ impl fmt::Display for Error {
             Self::Deleted => write!(f, "Item/Collection was deleted, can no longer be used"),
             Self::NotFound(name) => write!(f, "The collection '{name}' doesn't exists"),
             Self::Dismissed => write!(f, "Prompt was dismissed"),
+            Self::Utf8(e) => write!(f, "Failed to convert a text/plain secret to string, {e}"),
         }
     }
 }

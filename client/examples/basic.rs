@@ -7,7 +7,7 @@ async fn main() -> oo7::Result<()> {
     let keyring = Keyring::new().await?;
     let attributes = HashMap::from([("attr", "value")]);
     keyring
-        .create_item("Some Label", &attributes, b"secret", true)
+        .create_item("Some Label", &attributes, "secret", true)
         .await?;
 
     let items = keyring.search_items(&attributes).await?;

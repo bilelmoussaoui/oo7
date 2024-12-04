@@ -5,11 +5,11 @@ use std::{collections::HashMap, sync::Arc};
 use enumflags2::BitFlags;
 use oo7::{
     dbus::{
-        api::{Properties, SecretInner},
+        api::{DBusSecretInner, Properties},
         Algorithm, ServiceError,
     },
-    file::{Keyring, Secret},
-    Key,
+    file::Keyring,
+    Key, Secret,
 };
 use tokio::sync::{Mutex, RwLock};
 use zbus::{
@@ -135,7 +135,7 @@ impl Service {
         &self,
         items: Vec<OwnedObjectPath>,
         session: OwnedObjectPath,
-    ) -> Result<HashMap<OwnedObjectPath, SecretInner>, ServiceError> {
+    ) -> Result<HashMap<OwnedObjectPath, DBusSecretInner>, ServiceError> {
         let mut secrets = HashMap::new();
         let collections = self.collections.lock().await;
 
@@ -288,7 +288,7 @@ impl Service {
             "session",
             false,
             service.clone(),
-            Arc::new(Keyring::temporary(Secret::random()).await?),
+            Arc::new(Keyring::temporary(Secret::random().unwrap()).await?),
         );
         collections.push(collection.clone());
         object_server

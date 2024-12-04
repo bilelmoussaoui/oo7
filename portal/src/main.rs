@@ -11,7 +11,6 @@ pub use error::Result;
 use oo7::dbus::Service;
 use tokio::io::AsyncWriteExt;
 
-const PORTAL_SECRET_SIZE: usize = 64;
 const PORTAL_NAME: &str = "org.freedesktop.impl.portal.desktop.oo7";
 
 struct Secret;
@@ -36,13 +35,6 @@ impl ashpd::backend::secret::SecretImpl for Secret {
     }
 }
 
-fn generate_secret() -> Result<zeroize::Zeroizing<Vec<u8>>> {
-    let mut secret = [0; PORTAL_SECRET_SIZE];
-    // Equivalent of `ring::rand::SecureRandom`
-    getrandom::getrandom(&mut secret)?;
-    Ok(zeroize::Zeroizing::new(secret.to_vec()))
-}
-
 /// Generates, stores and send the secret back to the fd stream
 async fn send_secret_to_app(app_id: &AppID, fd: std::os::fd::OwnedFd) -> Result<()> {
     let service = Service::new().await?;
@@ -56,32 +48,30 @@ async fn send_secret_to_app(app_id: &AppID, fd: std::os::fd::OwnedFd) -> Result<
         (oo7::XDG_SCHEMA_ATTRIBUTE, GENERIC_SCHEMA_VALUE),
         ("app_id", app_id),
     ]);
-    let secret = if let Some(item) = collection.search_items(&attributes).await?.first() {
-        item.secret().await?
-    } else {
-        tracing::debug!("Could not find secret for {app_id}, creating one");
-        let secret = generate_secret()?;
-
-        collection
-            .create_item(
-                &format!("Secret Portal token for {app_id}"),
-                &attributes,
-                &secret,
-                true,
-                // TODO Find a better one.
-                "text/plain",
-                None,
-            )
-            .await?;
-
-        secret
-    };
 
     // Write the secret to the FD.
     let std_stream = UnixStream::from(fd);
     std_stream.set_nonblocking(true)?;
     let mut stream = tokio::net::UnixStream::from_std(std_stream)?;
-    stream.write_all(&secret).await?;
+
+    if let Some(item) = collection.search_items(&attributes).await?.first() {
+        stream.write_all(&item.secret().await?).await?;
+    } else {
+        tracing::debug!("Could not find secret for {app_id}, creating one");
+        let secret = oo7::Secret::random().unwrap();
+
+        collection
+            .create_item(
+                &format!("Secret Portal token for {app_id}"),
+                &attributes,
+                secret.clone(),
+                true,
+                None,
+            )
+            .await?;
+
+        stream.write_all(&secret).await?;
+    }
 
     Ok(())
 }

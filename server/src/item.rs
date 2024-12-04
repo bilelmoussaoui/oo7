@@ -6,7 +6,7 @@ use std::{
 };
 
 use oo7::{
-    dbus::{api::SecretInner, ServiceError},
+    dbus::{api::DBusSecretInner, ServiceError},
     file,
 };
 use tokio::sync::Mutex;
@@ -58,7 +58,7 @@ impl Item {
     pub async fn get_secret(
         &self,
         session: OwnedObjectPath,
-    ) -> Result<(SecretInner,), ServiceError> {
+    ) -> Result<(DBusSecretInner,), ServiceError> {
         let Some(session) = self.service.session(&session).await else {
             tracing::error!("The session `{}` does not exist.", session);
             return Err(ServiceError::NoSession(format!(
@@ -77,6 +77,7 @@ impl Item {
 
         let inner = self.inner.lock().await;
         let secret = inner.secret();
+        let content_type = secret.content_type().to_owned();
 
         tracing::debug!("Secret retrieved from the item: {}.", self.path);
 
@@ -85,24 +86,24 @@ impl Item {
                 let iv = oo7::crypto::generate_iv();
                 let encrypted = oo7::crypto::encrypt(secret, &key, &iv);
 
-                Ok((SecretInner(
+                Ok((DBusSecretInner(
                     session.path().clone(),
                     iv,
                     encrypted,
-                    "text/plain".to_owned(),
+                    content_type,
                 ),))
             }
-            None => Ok((SecretInner(
+            None => Ok((DBusSecretInner(
                 session.path().clone(),
                 Vec::new(),
                 secret.to_vec(),
-                "text/plain".to_owned(),
+                content_type,
             ),)),
         }
     }
 
-    pub async fn set_secret(&self, secret: SecretInner) -> Result<(), ServiceError> {
-        let SecretInner(session, iv, secret, _content_type) = secret;
+    pub async fn set_secret(&self, secret: DBusSecretInner) -> Result<(), ServiceError> {
+        let DBusSecretInner(session, iv, secret, _content_type) = secret;
 
         let Some(session) = self.service.session(&session).await else {
             tracing::error!("The session `{}` does not exist.", session);
