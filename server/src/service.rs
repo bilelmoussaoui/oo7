@@ -355,8 +355,8 @@ impl Service {
         self.connection.object_server()
     }
 
-    pub async fn session(&self, path: &OwnedObjectPath) -> Option<Arc<Session>> {
-        self.sessions.lock().await.get(path).map(Arc::clone)
+    pub async fn session(&self, path: &OwnedObjectPath) -> Option<Session> {
+        self.sessions.lock().await.get(path).cloned()
     }
 
     pub async fn remove_session(&self, path: &OwnedObjectPath) {
