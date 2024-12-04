@@ -6,7 +6,7 @@ This library allows to store secrets using two different backends:
 
 - [`dbus`](./src/dbus) implements the [`org.freedesktop.Secret`](https://specifications.freedesktop.org/secret-service-spec/latest/) specification.
 
-- [`portal`](./src/portal) stores secrets in a file that is encrypted using a secret retrieved from the [`org.freedesktop.portal.Secrets` portal](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.Secret.html). The file format is compatible with libsecret.
+- [`file`](./src/file) stores secrets in an encrypted file compatible with libsecret. For sandboxed applications use case, the file can be encrypted using a secret retrieved from the [`org.freedesktop.portal.Secrets` portal](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.Secret.html).
 
 Sandboxed applications should prefer using the file backend as it doesn't expose the application secrets to other applications that can talk to the `org.freedesktop.Secrets` service.
 
