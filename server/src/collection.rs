@@ -75,11 +75,55 @@ impl Collection {
     #[zbus(out_args("item", "prompt"))]
     pub async fn create_item(
         &self,
-        _properties: Properties,
-        _secret: SecretInner,
-        _replace: bool,
-    ) -> Result<(OwnedObjectPath, ObjectPath), ServiceError> {
-        todo!()
+        properties: Properties,
+        secret: SecretInner,
+        replace: bool,
+        #[zbus(object_server)] object_server: &zbus::ObjectServer,
+        #[zbus(signal_emitter)] signal_emitter: zbus::object_server::SignalEmitter<'_>,
+    ) -> Result<(OwnedObjectPath, OwnedObjectPath), ServiceError> {
+        let SecretInner(session, iv, secret, _content_type) = secret;
+        let label = properties.label();
+        // Safe to unwrap as an item always has attributes
+        let attributes = properties.attributes().unwrap();
+
+        let Some(session) = self.service.session(&session).await else {
+            tracing::error!("The session `{}` does not exist.", session);
+            return Err(ServiceError::NoSession(format!(
+                "The session `{}` does not exist.",
+                session
+            )));
+        };
+
+        let secret = match session.aes_key() {
+            Some(key) => oo7::crypto::decrypt(secret, &key, &iv),
+            None => zeroize::Zeroizing::new(secret),
+        };
+
+        let item = self
+            .keyring
+            .create_item(label, &attributes, secret, replace)
+            .await
+            .map_err(|err| {
+                ServiceError::ZBus(zbus::Error::FDO(Box::new(zbus::fdo::Error::Failed(
+                    format!("Failed to create a new item {err}."),
+                ))))
+            })?;
+
+        let n_items = *self.item_index.read().await;
+        let item = item::Item::new(item, false, self.service.clone(), &self.path, n_items);
+        *self.item_index.write().await = n_items + 1;
+
+        self.items.lock().await.push(item.clone());
+
+        let path = item.path().clone();
+        object_server.at(path.clone(), item).await?;
+
+        Self::item_created(&signal_emitter, &path).await?;
+        self.items_changed(&signal_emitter).await?;
+
+        tracing::info!("Item `{}` created.", &path);
+
+        Ok((path, OwnedObjectPath::default()))
     }
 
     #[zbus(property, name = "Items")]
@@ -120,13 +164,13 @@ impl Collection {
     #[zbus(signal, name = "ItemCreated")]
     async fn item_created(
         signal_emitter: &SignalEmitter<'_>,
-        item: OwnedObjectPath,
+        item: &OwnedObjectPath,
     ) -> zbus::Result<()>;
 
     #[zbus(signal, name = "ItemDeleted")]
-    async fn item_deleted(
+    pub async fn item_deleted(
         signal_emitter: &SignalEmitter<'_>,
-        item: OwnedObjectPath,
+        item: &OwnedObjectPath,
     ) -> zbus::Result<()>;
 
     #[zbus(signal, name = "ItemChanged")]
@@ -251,6 +295,38 @@ impl Collection {
         }
 
         *self.item_index.write().await = n_items;
+
+        Ok(())
+    }
+
+    pub async fn delete_item(&self, path: &OwnedObjectPath) -> Result<(), ServiceError> {
+        let Some(item) = self.item_from_path(path).await else {
+            return Err(ServiceError::NoSuchObject(format!(
+                "Item `{}` does not exist.",
+                path
+            )));
+        };
+
+        if item.is_locked().await {
+            return Err(ServiceError::IsLocked(format!(
+                "Cannot delete a locked item `{}`",
+                path
+            )));
+        }
+
+        let attributes = item.attributes().await;
+        self.keyring.delete(&attributes).await.map_err(|err| {
+            ServiceError::ZBus(zbus::Error::FDO(Box::new(zbus::fdo::Error::Failed(
+                format!("Failed to deleted item {err}."),
+            ))))
+        })?;
+
+        let mut items = self.items.lock().await;
+        items.retain(|item| item.path() != path);
+        drop(items);
+
+        let signal_emitter = self.service.signal_emitter(&self.path)?;
+        self.items_changed(&signal_emitter).await?;
 
         Ok(())
     }

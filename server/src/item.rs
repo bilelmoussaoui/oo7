@@ -10,7 +10,7 @@ use oo7::{
     portal,
 };
 use tokio::sync::Mutex;
-use zbus::zvariant::{ObjectPath, OwnedObjectPath};
+use zbus::zvariant::OwnedObjectPath;
 
 use crate::{collection::Collection, Service};
 
@@ -28,8 +28,30 @@ pub struct Item {
 #[zbus::interface(name = "org.freedesktop.Secret.Item")]
 impl Item {
     #[zbus(out_args("prompt"))]
-    pub async fn delete(&self) -> Result<ObjectPath, ServiceError> {
-        todo!()
+    pub async fn delete(
+        &self,
+        #[zbus(object_server)] object_server: &zbus::ObjectServer,
+    ) -> Result<OwnedObjectPath, ServiceError> {
+        let Some(collection) = self
+            .service
+            .collection_from_path(&self.collection_path)
+            .await
+        else {
+            return Err(ServiceError::NoSuchObject(format!(
+                "Collection `{}` does not exist.",
+                &self.collection_path
+            )));
+        };
+
+        collection.delete_item(&self.path).await?;
+        object_server.remove::<Self, _>(&self.path).await?;
+
+        let signal_emitter = self.service.signal_emitter(&self.collection_path)?;
+        Collection::item_deleted(&signal_emitter, &self.path).await?;
+
+        tracing::info!("Item `{}` deleted.", &self.path);
+
+        Ok(OwnedObjectPath::default())
     }
 
     #[zbus(out_args("secret"))]
