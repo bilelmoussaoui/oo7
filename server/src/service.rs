@@ -112,7 +112,7 @@ impl Service {
 
     #[zbus(out_args("unlocked", "prompt"))]
     pub async fn unlock(
-        &mut self,
+        &self,
         objects: Vec<OwnedObjectPath>,
     ) -> Result<(Vec<OwnedObjectPath>, OwnedObjectPath), ServiceError> {
         let (unlocked, _not_unlocked) = self.set_locked(false, &objects).await?;
@@ -122,7 +122,7 @@ impl Service {
 
     #[zbus(out_args("locked", "prompt"))]
     pub async fn lock(
-        &mut self,
+        &self,
         objects: Vec<OwnedObjectPath>,
     ) -> Result<(Vec<OwnedObjectPath>, OwnedObjectPath), ServiceError> {
         let (locked, _not_locked) = self.set_locked(true, &objects).await?;
