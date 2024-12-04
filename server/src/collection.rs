@@ -11,7 +11,7 @@ use oo7::{
         api::{Properties, SecretInner},
         ServiceError,
     },
-    portal::Keyring,
+    file::Keyring,
 };
 use tokio::sync::{Mutex, RwLock};
 use zbus::{interface, object_server::SignalEmitter, proxy::Defaults, zvariant};

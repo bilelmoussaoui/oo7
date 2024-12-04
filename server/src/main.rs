@@ -6,7 +6,7 @@ mod service;
 mod session;
 
 use clap::Parser;
-use oo7::portal::Secret;
+use oo7::file::Secret;
 use service::Service;
 
 use crate::error::Error;

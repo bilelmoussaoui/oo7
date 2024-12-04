@@ -51,7 +51,7 @@ pub(super) use legacy_keyring::{Keyring as LegacyKeyring, MAJOR_VERSION as LEGAC
 use super::{Item, Secret};
 use crate::{
     crypto,
-    portal::{Error, WeakKeyError},
+    file::{Error, WeakKeyError},
     AsAttributes, Key,
 };
 
@@ -79,7 +79,7 @@ pub struct Keyring {
     iteration_count: u32,
     modified_time: u64,
     usage_count: u32,
-    pub(in crate::portal) items: Vec<EncryptedItem>,
+    pub(in crate::file) items: Vec<EncryptedItem>,
 }
 
 impl Keyring {

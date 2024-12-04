@@ -1,9 +1,9 @@
-//! File backend implementation backed by the [Secret portal](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.Secret.html).
+//! File backend implementation that can be backed by the [Secret portal](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.Secret.html).
 //!
 //! ```no_run
 //! use std::collections::HashMap;
 //!
-//! use oo7::portal::Keyring;
+//! use oo7::file::Keyring;
 //!
 //! # async fn run() -> oo7::Result<()> {
 //! let keyring = Keyring::load_default().await?;

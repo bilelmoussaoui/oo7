@@ -8,7 +8,7 @@ use oo7::{
         api::{Properties, SecretInner},
         Algorithm, ServiceError,
     },
-    portal::{Keyring, Secret},
+    file::{Keyring, Secret},
     Key,
 };
 use tokio::sync::{Mutex, RwLock};

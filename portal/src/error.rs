@@ -9,10 +9,10 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::Rand(e) => f.write_fmt(format_args!("Rand error {e}")),
-            Error::Oo7(e) => f.write_fmt(format_args!("DBus error: {e}")),
-            Error::Io(e) => f.write_fmt(format_args!("IO error: {e}")),
-            Error::Portal(e) => f.write_fmt(format_args!("Portal error: {e}")),
+            Self::Rand(e) => f.write_fmt(format_args!("Rand error {e}")),
+            Self::Oo7(e) => f.write_fmt(format_args!("DBus error: {e}")),
+            Self::Io(e) => f.write_fmt(format_args!("IO error: {e}")),
+            Self::Portal(e) => f.write_fmt(format_args!("Portal error: {e}")),
         }
     }
 }

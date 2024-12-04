@@ -16,7 +16,7 @@ use sha2::Sha256;
 use subtle::ConstantTimeEq;
 use zeroize::{Zeroize, Zeroizing};
 
-use crate::{portal, Key};
+use crate::{file, Key};
 
 type EncAlg = cbc::Encryptor<aes::Aes128>;
 type DecAlg = cbc::Decryptor<aes::Aes128>;
@@ -138,7 +138,7 @@ pub(crate) fn verify_checksum_md5(digest: impl AsRef<[u8]>, content: impl AsRef<
 
 pub(crate) fn derive_key(
     secret: impl AsRef<[u8]>,
-    key_strength: Result<(), portal::WeakKeyError>,
+    key_strength: Result<(), file::WeakKeyError>,
     salt: impl AsRef<[u8]>,
     iteration_count: usize,
 ) -> Key {
@@ -157,7 +157,7 @@ pub(crate) fn derive_key(
 
 pub(crate) fn legacy_derive_key_and_iv(
     secret: impl AsRef<[u8]>,
-    key_strength: Result<(), portal::WeakKeyError>,
+    key_strength: Result<(), file::WeakKeyError>,
     salt: impl AsRef<[u8]>,
     iteration_count: usize,
 ) -> (Key, Vec<u8>) {

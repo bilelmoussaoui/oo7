@@ -1,14 +1,14 @@
 use zeroize::{Zeroize, ZeroizeOnDrop};
 use zvariant::Type;
 
-use crate::{crypto, portal};
+use crate::{crypto, file};
 
 /// A key.
 #[derive(Debug, Zeroize, ZeroizeOnDrop)]
 pub struct Key {
     key: Vec<u8>,
     #[zeroize(skip)]
-    strength: Result<(), portal::WeakKeyError>,
+    strength: Result<(), file::WeakKeyError>,
 }
 
 impl AsRef<[u8]> for Key {
@@ -25,16 +25,16 @@ impl AsMut<[u8]> for Key {
 
 impl Key {
     pub fn new(key: Vec<u8>) -> Self {
-        Self::new_with_strength(key, Err(portal::WeakKeyError::StrengthUnknown))
+        Self::new_with_strength(key, Err(file::WeakKeyError::StrengthUnknown))
     }
 
-    pub(crate) fn check_strength(&self) -> Result<(), portal::WeakKeyError> {
+    pub(crate) fn check_strength(&self) -> Result<(), file::WeakKeyError> {
         self.strength
     }
 
     pub(crate) fn new_with_strength(
         key: Vec<u8>,
-        strength: Result<(), portal::WeakKeyError>,
+        strength: Result<(), file::WeakKeyError>,
     ) -> Self {
         Self { key, strength }
     }

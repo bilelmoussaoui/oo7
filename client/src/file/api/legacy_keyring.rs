@@ -10,7 +10,7 @@ use endi::{Endian, ReadBytes};
 use super::{Item, Secret};
 use crate::{
     crypto,
-    portal::{AttributeValue, Error, WeakKeyError},
+    file::{AttributeValue, Error, WeakKeyError},
     AsAttributes,
 };
 

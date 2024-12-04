@@ -6,9 +6,9 @@ use async_lock::RwLock;
 use tokio::sync::RwLock;
 use zeroize::Zeroizing;
 
-use crate::{dbus, portal, AsAttributes, Result};
+use crate::{dbus, file, AsAttributes, Result};
 
-/// A [Secret Service](crate::dbus) or [file](crate::portal) backed keyring
+/// A [Secret Service](crate::dbus) or [file](crate::file) backed keyring
 /// implementation.
 ///
 /// It will automatically use the file backend if the application is sandboxed
@@ -20,7 +20,7 @@ use crate::{dbus, portal, AsAttributes, Result};
 #[derive(Debug)]
 pub enum Keyring {
     #[doc(hidden)]
-    File(Arc<portal::Keyring>),
+    File(Arc<file::Keyring>),
     #[doc(hidden)]
     DBus(dbus::Collection<'static>),
 }
@@ -33,16 +33,16 @@ impl Keyring {
             #[cfg(feature = "tracing")]
             tracing::debug!("Application is sandboxed, using the file backend");
 
-            match portal::Keyring::load_default().await {
-                Ok(portal) => return Ok(Self::File(Arc::new(portal))),
+            match file::Keyring::load_default().await {
+                Ok(file) => return Ok(Self::File(Arc::new(file))),
                 // Do nothing in this case, we are supposed to fallback to the host keyring
-                Err(super::portal::Error::Portal(ashpd::Error::PortalNotFound(_))) => {
+                Err(super::file::Error::Portal(ashpd::Error::PortalNotFound(_))) => {
                     #[cfg(feature = "tracing")]
                     tracing::debug!(
                         "org.freedesktop.portal.Secrets is not available, falling back to the Secret Service backend"
                     );
                 }
-                Err(e) => return Err(crate::Error::Portal(e)),
+                Err(e) => return Err(crate::Error::File(e)),
             };
         } else {
             #[cfg(feature = "tracing")]
@@ -159,13 +159,13 @@ impl Keyring {
 #[derive(Debug)]
 pub enum Item {
     #[doc(hidden)]
-    File(RwLock<portal::Item>, Arc<portal::Keyring>),
+    File(RwLock<file::Item>, Arc<file::Keyring>),
     #[doc(hidden)]
     DBus(dbus::Item<'static>),
 }
 
 impl Item {
-    fn for_file(item: portal::Item, backend: Arc<portal::Keyring>) -> Self {
+    fn for_file(item: file::Item, backend: Arc<file::Keyring>) -> Self {
         Self::File(RwLock::new(item), backend)
     }
 
@@ -353,8 +353,8 @@ mod tests {
         let path = dir.join("default.keyring");
 
         let password = b"test";
-        let secret = portal::Secret::from(password.to_vec());
-        let keyring = Keyring::File(portal::Keyring::load(&path, secret).await?.into());
+        let secret = file::Secret::from(password.to_vec());
+        let keyring = Keyring::File(file::Keyring::load(&path, secret).await?.into());
 
         let items = keyring.items().await?;
         assert_eq!(items.len(), 0);

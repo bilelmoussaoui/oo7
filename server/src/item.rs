@@ -7,7 +7,7 @@ use std::{
 
 use oo7::{
     dbus::{api::SecretInner, ServiceError},
-    portal,
+    file,
 };
 use tokio::sync::Mutex;
 use zbus::zvariant::OwnedObjectPath;
@@ -18,7 +18,7 @@ use crate::{collection::Collection, Service};
 pub struct Item {
     // Properties
     locked: Arc<AtomicBool>,
-    inner: Arc<Mutex<oo7::portal::Item>>,
+    inner: Arc<Mutex<oo7::file::Item>>,
     // Other attributes
     service: Service,
     collection_path: OwnedObjectPath,
@@ -171,7 +171,7 @@ impl Item {
 
 impl Item {
     pub fn new(
-        item: portal::Item,
+        item: file::Item,
         locked: bool,
         service: Service,
         collection_path: &OwnedObjectPath,

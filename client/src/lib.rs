@@ -32,7 +32,7 @@ mod crypto;
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 pub mod crypto;
 pub mod dbus;
-pub mod portal;
+pub mod file;
 
 mod keyring;
 
@@ -55,7 +55,7 @@ pub trait AsAttributes {
     fn hash<'a>(&'a self, key: &Key) -> Vec<(&'a str, zeroize::Zeroizing<Vec<u8>>)> {
         self.as_attributes()
             .into_iter()
-            .map(|(k, v)| (k, crate::portal::AttributeValue::from(v).mac(key)))
+            .map(|(k, v)| (k, crate::file::AttributeValue::from(v).mac(key)))
             .collect()
     }
 }
