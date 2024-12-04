@@ -239,8 +239,8 @@ where
     Ok((s[..pos].parse()?, s[pos + 1..].parse()?))
 }
 
-async fn print_item<'a>(
-    item: &oo7::dbus::Item<'a>,
+async fn print_item(
+    item: &oo7::dbus::Item<'_>,
     secret_only: bool,
     as_hex: bool,
 ) -> Result<(), Error> {
