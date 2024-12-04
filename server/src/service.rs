@@ -27,7 +27,7 @@ pub struct Service {
     // Other attributes
     connection: zbus::Connection,
     // sessions mapped to their corresponding object path on the bus
-    sessions: Arc<Mutex<HashMap<OwnedObjectPath, Arc<Session>>>>,
+    sessions: Arc<Mutex<HashMap<OwnedObjectPath, Session>>>,
     session_index: Arc<RwLock<u32>>,
 }
 
@@ -55,13 +55,10 @@ impl Service {
         let session = Session::new(aes_key.map(Arc::new), self.clone()).await;
         let path = session.path().clone();
 
-        {
-            let session = Arc::new(session.clone());
-            self.sessions
-                .lock()
-                .await
-                .insert(path.clone(), Arc::clone(&session));
-        }
+        self.sessions
+            .lock()
+            .await
+            .insert(path.clone(), session.clone());
 
         object_server.at(&path, session).await?;
 
