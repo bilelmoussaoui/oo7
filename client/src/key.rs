@@ -47,8 +47,21 @@ impl Key {
         Self::new(crypto::generate_public_key(private_key))
     }
 
+    pub fn generate_public_key_for_secret_exchange(private_key: &Self) -> Self {
+        Self::new(crypto::generate_public_key_for_secret_exchange(private_key))
+    }
+
     pub fn generate_aes_key(private_key: &Self, server_public_key: &Self) -> Self {
         Self::new(crypto::generate_aes_key(private_key, server_public_key).to_vec())
+    }
+
+    pub fn generate_aes_key_for_secret_exchange(
+        private_key: &Self,
+        server_public_key: &Self,
+    ) -> Self {
+        Self::new(
+            crypto::generate_aes_key_for_secret_exchange(private_key, server_public_key).to_vec(),
+        )
     }
 }
 
