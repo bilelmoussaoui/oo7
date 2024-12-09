@@ -2,6 +2,7 @@ mod collection;
 mod error;
 mod item;
 mod prompt;
+mod secret_exchange;
 mod service;
 mod session;
 
