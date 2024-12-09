@@ -39,16 +39,21 @@ impl Key {
         Self { key, strength }
     }
 
-    pub fn generate_private_key() -> Self {
-        Self::new(crypto::generate_private_key().to_vec())
+    pub fn generate_private_key() -> Result<Self, crypto::Error> {
+        Ok(Self::new(crypto::generate_private_key()?.to_vec()))
     }
 
-    pub fn generate_public_key(private_key: &Self) -> Self {
-        Self::new(crypto::generate_public_key(private_key))
+    pub fn generate_public_key(private_key: &Self) -> Result<Self, crypto::Error> {
+        Ok(Self::new(crypto::generate_public_key(private_key)?))
     }
 
-    pub fn generate_aes_key(private_key: &Self, server_public_key: &Self) -> Self {
-        Self::new(crypto::generate_aes_key(private_key, server_public_key).to_vec())
+    pub fn generate_aes_key(
+        private_key: &Self,
+        server_public_key: &Self,
+    ) -> Result<Self, crypto::Error> {
+        Ok(Self::new(
+            crypto::generate_aes_key(private_key, server_public_key)?.to_vec(),
+        ))
     }
 }
 
@@ -127,7 +132,7 @@ mod tests {
         let public_key = Key::generate_public_key(&private_key);
         let aes_key = Key::generate_aes_key(&private_key, &server_public_key);
 
-        assert_eq!(public_key.as_ref(), expected_public_key);
-        assert_eq!(aes_key.as_ref(), expected_aes_key);
+        assert_eq!(public_key.unwrap().as_ref(), expected_public_key);
+        assert_eq!(aes_key.unwrap().as_ref(), expected_aes_key);
     }
 }

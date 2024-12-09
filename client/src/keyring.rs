@@ -100,7 +100,7 @@ impl Keyring {
                 items.into_iter().map(Item::for_dbus).collect::<Vec<_>>()
             }
             Self::File(backend) => {
-                let items = backend.items().await;
+                let items = backend.items().await?;
                 items
                     .into_iter()
                     // Ignore invalid items
@@ -224,7 +224,7 @@ impl Item {
             Self::File(item, backend) => {
                 let index = backend
                     .lookup_item_index(item.read().await.attributes())
-                    .await;
+                    .await?;
 
                 item.write().await.set_attributes(attributes);
                 let item_guard = item.read().await;

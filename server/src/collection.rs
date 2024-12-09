@@ -95,7 +95,11 @@ impl Collection {
         };
 
         let secret = match session.aes_key() {
-            Some(key) => oo7::crypto::decrypt(secret, &key, &iv),
+            Some(key) => oo7::crypto::decrypt(secret, &key, &iv).map_err(|err| {
+                ServiceError::ZBus(zbus::Error::FDO(Box::new(zbus::fdo::Error::Failed(
+                    format!("Failed to decrypt secret {err}."),
+                ))))
+            })?,
             None => zeroize::Zeroizing::new(secret),
         };
 
@@ -275,7 +279,7 @@ impl Collection {
     }
 
     pub async fn dispatch_items(&self) -> Result<(), Error> {
-        let keyring_items = self.keyring.items().await;
+        let keyring_items = self.keyring.items().await?;
         let mut items = self.items.lock().await;
         let object_server = self.service.object_server();
         let mut n_items = 1;

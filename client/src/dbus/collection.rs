@@ -168,7 +168,7 @@ impl<'a> Collection<'a> {
                     Arc::clone(&self.session),
                     secret,
                     self.aes_key.as_ref().unwrap(),
-                ),
+                )?,
             };
             let item = self
                 .inner

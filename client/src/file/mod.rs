@@ -118,7 +118,7 @@ impl Keyring {
             }
         };
 
-        let key = keyring.derive_key(&secret);
+        let key = keyring.derive_key(&secret)?;
         for encrypted_item in &mut keyring.items {
             if encrypted_item.clone().decrypt(&key).is_err() {
                 return Err(Error::IncorrectSecret);
@@ -171,7 +171,7 @@ impl Keyring {
 
                 let legacy_keyring = api::LegacyKeyring::try_from(content.as_slice())?;
                 let mut keyring = api::Keyring::new();
-                let key = keyring.derive_key(&secret);
+                let key = keyring.derive_key(&secret)?;
 
                 for item in legacy_keyring.decrypt_items(&secret)? {
                     let encrypted_item = item.encrypt(&key)?;
@@ -236,10 +236,10 @@ impl Keyring {
     ///
     /// If items cannot be decrypted, [`InvalidItemError`]s are returned for
     /// them instead of [`Item`]s.
-    pub async fn items(&self) -> Vec<Result<Item, InvalidItemError>> {
-        let key = self.derive_key().await;
+    pub async fn items(&self) -> Result<Vec<Result<Item, InvalidItemError>>, Error> {
+        let key = self.derive_key().await?;
         let keyring = self.keyring.read().await;
-        keyring
+        Ok(keyring
             .items
             .iter()
             .map(|e| {
@@ -250,35 +250,38 @@ impl Keyring {
                     )
                 })
             })
-            .collect()
+            .collect())
     }
 
     /// Search items matching the attributes.
     pub async fn search_items(&self, attributes: &impl AsAttributes) -> Result<Vec<Item>, Error> {
-        let key = self.derive_key().await;
+        let key = self.derive_key().await?;
         let keyring = self.keyring.read().await;
         keyring.search_items(attributes, &key)
     }
 
     /// Find the first item matching the attributes.
     pub async fn lookup_item(&self, attributes: &impl AsAttributes) -> Result<Option<Item>, Error> {
-        let key = self.derive_key().await;
+        let key = self.derive_key().await?;
         let keyring = self.keyring.read().await;
         keyring.lookup_item(attributes, &key)
     }
 
     /// Find the index in the list of items of the first item matching the
     /// attributes.
-    pub async fn lookup_item_index(&self, attributes: &impl AsAttributes) -> Option<usize> {
-        let key = self.derive_key().await;
+    pub async fn lookup_item_index(
+        &self,
+        attributes: &impl AsAttributes,
+    ) -> Result<Option<usize>, Error> {
+        let key = self.derive_key().await?;
         let keyring = self.keyring.read().await;
-        keyring.lookup_item_index(attributes, &key)
+        Ok(keyring.lookup_item_index(attributes, &key))
     }
 
     /// Delete an item.
     pub async fn delete(&self, attributes: &impl AsAttributes) -> Result<(), Error> {
         {
-            let key = self.derive_key().await;
+            let key = self.derive_key().await?;
             let mut keyring = self.keyring.write().await;
             keyring.remove_items(attributes, &key)?;
         };
@@ -303,7 +306,7 @@ impl Keyring {
         replace: bool,
     ) -> Result<Item, Error> {
         let item = {
-            let key = self.derive_key().await;
+            let key = self.derive_key().await?;
             let mut keyring = self.keyring.write().await;
             if replace {
                 keyring.remove_items(attributes, &key)?;
@@ -326,7 +329,7 @@ impl Keyring {
     /// returns an error.
     pub async fn replace_item_index(&self, index: usize, item: &Item) -> Result<(), Error> {
         {
-            let key = self.derive_key().await;
+            let key = self.derive_key().await?;
             let mut keyring = self.keyring.write().await;
 
             if let Some(item_store) = keyring.items.get_mut(index) {
@@ -358,7 +361,7 @@ impl Keyring {
 
     /// Helper used for migration to avoid re-writing the file multiple times
     pub(crate) async fn create_items(&self, items: Vec<ItemDefinition>) -> Result<(), Error> {
-        let key = self.derive_key().await;
+        let key = self.derive_key().await?;
         let mut keyring = self.keyring.write().await;
         for (label, attributes, secret, replace) in items {
             if replace {
@@ -402,7 +405,7 @@ impl Keyring {
     }
 
     /// Return key, derive and store it first if not initialized
-    async fn derive_key(&self) -> Arc<Key> {
+    async fn derive_key(&self) -> Result<Arc<Key>, crate::crypto::Error> {
         let keyring = Arc::clone(&self.keyring);
         let secret_lock = self.secret.lock().await;
         let secret = Arc::clone(&secret_lock);
@@ -414,17 +417,17 @@ impl Keyring {
             let key = blocking::unblock(move || {
                 async_io::block_on(async { keyring.read().await.derive_key(&secret) })
             })
-            .await;
+            .await?;
             #[cfg(feature = "tokio")]
             let key =
                 tokio::task::spawn_blocking(move || keyring.blocking_read().derive_key(&secret))
                     .await
-                    .unwrap();
+                    .unwrap()?;
 
             *key_lock = Some(Arc::new(key));
         }
 
-        Arc::clone(key_lock.as_ref().unwrap())
+        Ok(Arc::clone(key_lock.as_ref().unwrap()))
     }
 
     /// Change keyring secret
@@ -437,7 +440,7 @@ impl Keyring {
         tracing::debug!("Changing keyring secret and key");
 
         let keyring = self.keyring.read().await;
-        let key = self.derive_key().await;
+        let key = self.derive_key().await?;
         let mut items = Vec::with_capacity(keyring.items.len());
         for item in &keyring.items {
             items.push(item.clone().decrypt(&key)?);
@@ -459,7 +462,7 @@ impl Keyring {
         drop(keyring);
 
         // Set new key
-        let key = self.derive_key().await;
+        let key = self.derive_key().await?;
 
         let mut keyring = self.keyring.write().await;
         for item in items {
@@ -570,7 +573,7 @@ mod tests {
 
     async fn check_items(keyring: &Keyring) -> Result<(), Error> {
         assert_eq!(keyring.n_items().await, 1);
-        let items: Result<Vec<_>, _> = keyring.items().await.into_iter().collect();
+        let items: Result<Vec<_>, _> = keyring.items().await?.into_iter().collect();
         let items = items.expect("unable to retrieve items");
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].label(), "foo");

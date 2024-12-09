@@ -35,8 +35,8 @@ impl Keyring {
             self.key_strength(secret),
             &self.salt,
             self.iteration_count.try_into().unwrap(),
-        );
-        let decrypted = crypto::decrypt_no_padding(&self.encrypted_content, &key, iv);
+        )?;
+        let decrypted = crypto::decrypt_no_padding(&self.encrypted_content, &key, iv)?;
         let (digest, content) = decrypted.split_at(16);
         if !crypto::verify_checksum_md5(digest, content) {
             return Err(Error::ChecksumMismatch);
