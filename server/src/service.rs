@@ -18,7 +18,7 @@ use zbus::{
     zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Value},
 };
 
-use crate::{collection::Collection, error::Error, session::Session};
+use crate::{collection::Collection, error::Error, prompt::Prompt, session::Session};
 
 #[derive(Debug, Clone)]
 pub struct Service {
@@ -29,6 +29,7 @@ pub struct Service {
     // sessions mapped to their corresponding object path on the bus
     sessions: Arc<Mutex<HashMap<OwnedObjectPath, Session>>>,
     session_index: Arc<RwLock<u32>>,
+    prompt_index: Arc<RwLock<u32>>,
 }
 
 #[zbus::interface(name = "org.freedesktop.Secret.Service")]
@@ -114,8 +115,16 @@ impl Service {
     pub async fn unlock(
         &self,
         objects: Vec<OwnedObjectPath>,
+        #[zbus(object_server)] object_server: &zbus::ObjectServer,
     ) -> Result<(Vec<OwnedObjectPath>, OwnedObjectPath), ServiceError> {
-        let (unlocked, _not_unlocked) = self.set_locked(false, &objects).await?;
+        let (unlocked, not_unlocked) = self.set_locked(false, &objects).await?;
+        if !not_unlocked.is_empty() {
+            let prompt = Prompt::new(self.clone()).await;
+            let path = prompt.path().clone();
+
+            object_server.at(&path, prompt).await?;
+            return Ok((unlocked, path));
+        }
 
         Ok((unlocked, OwnedObjectPath::default()))
     }
@@ -257,6 +266,7 @@ impl Service {
             connection: connection.clone(),
             sessions: Default::default(),
             session_index: Default::default(),
+            prompt_index: Default::default(),
         };
 
         object_server
@@ -393,5 +403,12 @@ impl Service {
         *self.session_index.write().await = n_sessions;
 
         n_sessions
+    }
+
+    pub async fn prompt_index(&self) -> u32 {
+        let n_prompts = *self.prompt_index.read().await + 1;
+        *self.prompt_index.write().await = n_prompts;
+
+        n_prompts
     }
 }
