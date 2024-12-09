@@ -22,69 +22,74 @@ type EncAlg = cbc::Encryptor<aes::Aes128>;
 type DecAlg = cbc::Decryptor<aes::Aes128>;
 type MacAlg = hmac::Hmac<sha2::Sha256>;
 
-pub fn encrypt(data: impl AsRef<[u8]>, key: &Key, iv: impl AsRef<[u8]>) -> Vec<u8> {
+pub fn encrypt(
+    data: impl AsRef<[u8]>,
+    key: &Key,
+    iv: impl AsRef<[u8]>,
+) -> Result<Vec<u8>, super::Error> {
     let mut blob = vec![0; data.as_ref().len() + EncAlg::block_size()];
 
     // Unwrapping since adding `CIPHER_BLOCK_SIZE` to array is enough space for
     // PKCS7
     let encrypted_len = EncAlg::new_from_slices(key.as_ref(), iv.as_ref())
         .expect("Invalid key length")
-        .encrypt_padded_b2b_mut::<Pkcs7>(data.as_ref(), &mut blob)
-        .unwrap()
+        .encrypt_padded_b2b_mut::<Pkcs7>(data.as_ref(), &mut blob)?
         .len();
 
     blob.truncate(encrypted_len);
 
-    blob
+    Ok(blob)
 }
 
-pub fn decrypt(blob: impl AsRef<[u8]>, key: &Key, iv: impl AsRef<[u8]>) -> Zeroizing<Vec<u8>> {
+pub fn decrypt(
+    blob: impl AsRef<[u8]>,
+    key: &Key,
+    iv: impl AsRef<[u8]>,
+) -> Result<Zeroizing<Vec<u8>>, super::Error> {
     let mut data = blob.as_ref().to_vec();
 
-    DecAlg::new_from_slices(key.as_ref(), iv.as_ref())
+    Ok(DecAlg::new_from_slices(key.as_ref(), iv.as_ref())
         .expect("Invalid key length")
-        .decrypt_padded_mut::<Pkcs7>(&mut data)
-        .unwrap()
+        .decrypt_padded_mut::<Pkcs7>(&mut data)?
         .to_vec()
-        .into()
+        .into())
 }
 
 pub(crate) fn decrypt_no_padding(
     blob: impl AsRef<[u8]>,
     key: &Key,
     iv: impl AsRef<[u8]>,
-) -> Zeroizing<Vec<u8>> {
+) -> Result<Zeroizing<Vec<u8>>, super::Error> {
     let mut data = blob.as_ref().to_vec();
 
-    DecAlg::new_from_slices(key.as_ref(), iv.as_ref())
+    Ok(DecAlg::new_from_slices(key.as_ref(), iv.as_ref())
         .expect("Invalid key length")
-        .decrypt_padded_mut::<NoPadding>(&mut data)
-        .unwrap()
+        .decrypt_padded_mut::<NoPadding>(&mut data)?
         .to_vec()
-        .into()
+        .into())
 }
 
 pub(crate) fn iv_len() -> usize {
     DecAlg::iv_size()
 }
 
-pub(crate) fn generate_private_key() -> Zeroizing<Vec<u8>> {
+pub(crate) fn generate_private_key() -> Result<Zeroizing<Vec<u8>>, super::Error> {
     let generic_array = EncAlg::generate_key(cipher::rand_core::OsRng);
-    Zeroizing::new(generic_array.to_vec())
+    Ok(Zeroizing::new(generic_array.to_vec()))
 }
 
-pub(crate) fn generate_public_key(private_key: impl AsRef<[u8]>) -> Vec<u8> {
+pub(crate) fn generate_public_key(private_key: impl AsRef<[u8]>) -> Result<Vec<u8>, super::Error> {
     let private_key_uint = BigUint::from_bytes_be(private_key.as_ref());
     static DH_GENERATOR: LazyLock<BigUint> = LazyLock::new(|| BigUint::from_u64(0x2).unwrap());
     let public_key_uint = powm(&DH_GENERATOR, private_key_uint);
 
-    public_key_uint.to_bytes_be()
+    Ok(public_key_uint.to_bytes_be())
 }
 
 pub(crate) fn generate_aes_key(
     private_key: impl AsRef<[u8]>,
     server_public_key: impl AsRef<[u8]>,
-) -> Zeroizing<Vec<u8>> {
+) -> Result<Zeroizing<Vec<u8>>, super::Error> {
     let server_public_key_uint = BigUint::from_bytes_be(server_public_key.as_ref());
     let private_key_uint = BigUint::from_bytes_be(private_key.as_ref());
     let common_secret = powm(&server_public_key_uint, private_key_uint);
@@ -107,27 +112,31 @@ pub(crate) fn generate_aes_key(
     hk.expand(&info, okm.as_mut())
         .expect("hkdf expand should never fail");
 
-    okm
+    Ok(okm)
 }
 
-pub fn generate_iv() -> Vec<u8> {
-    EncAlg::generate_iv(cipher::rand_core::OsRng).to_vec()
+pub fn generate_iv() -> Result<Vec<u8>, super::Error> {
+    Ok(EncAlg::generate_iv(cipher::rand_core::OsRng).to_vec())
 }
 
 pub(crate) fn mac_len() -> usize {
     MacAlg::output_size()
 }
 
-pub(crate) fn compute_mac(data: impl AsRef<[u8]>, key: &Key) -> Vec<u8> {
+pub(crate) fn compute_mac(data: impl AsRef<[u8]>, key: &Key) -> Result<Vec<u8>, super::Error> {
     let mut mac = MacAlg::new_from_slice(key.as_ref()).unwrap();
     mac.update(data.as_ref());
-    mac.finalize().into_bytes().to_vec()
+    Ok(mac.finalize().into_bytes().to_vec())
 }
 
-pub(crate) fn verify_mac(data: impl AsRef<[u8]>, key: &Key, expected: impl AsRef<[u8]>) -> bool {
+pub(crate) fn verify_mac(
+    data: impl AsRef<[u8]>,
+    key: &Key,
+    expected: impl AsRef<[u8]>,
+) -> Result<bool, super::Error> {
     let mut mac = MacAlg::new_from_slice(key.as_ref()).unwrap();
     mac.update(data.as_ref());
-    mac.verify_slice(expected.as_ref()).is_ok()
+    Ok(mac.verify_slice(expected.as_ref()).is_ok())
 }
 
 pub(crate) fn verify_checksum_md5(digest: impl AsRef<[u8]>, content: impl AsRef<[u8]>) -> bool {
@@ -141,7 +150,7 @@ pub(crate) fn derive_key(
     key_strength: Result<(), file::WeakKeyError>,
     salt: impl AsRef<[u8]>,
     iteration_count: usize,
-) -> Key {
+) -> Result<Key, super::Error> {
     let mut key = Key::new_with_strength(vec![0; EncAlg::block_size()], key_strength);
 
     pbkdf2::pbkdf2::<hmac::Hmac<sha2::Sha256>>(
@@ -152,7 +161,7 @@ pub(crate) fn derive_key(
     )
     .expect("HMAC can be initialized with any key length");
 
-    key
+    Ok(key)
 }
 
 pub(crate) fn legacy_derive_key_and_iv(
@@ -160,7 +169,7 @@ pub(crate) fn legacy_derive_key_and_iv(
     key_strength: Result<(), file::WeakKeyError>,
     salt: impl AsRef<[u8]>,
     iteration_count: usize,
-) -> (Key, Vec<u8>) {
+) -> Result<(Key, Vec<u8>), super::Error> {
     let mut buffer = vec![0; EncAlg::key_size() + EncAlg::iv_size()];
     let mut hasher = Sha256::new();
     let mut digest_buffer = vec![0; <Sha256 as Digest>::output_size()];
@@ -198,7 +207,7 @@ pub(crate) fn legacy_derive_key_and_iv(
     }
 
     let iv = buffer.split_off(EncAlg::key_size());
-    (Key::new_with_strength(buffer, key_strength), iv)
+    Ok((Key::new_with_strength(buffer, key_strength), iv))
 }
 
 /// from https://github.com/plietar/librespot/blob/master/core/src/util/mod.rs#L53

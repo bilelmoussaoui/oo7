@@ -43,15 +43,15 @@ impl<'a> DBusSecret<'a> {
         session: Arc<Session<'a>>,
         secret: impl Into<Secret>,
         aes_key: &Key,
-    ) -> Self {
-        let iv = crypto::generate_iv();
+    ) -> Result<Self, crate::dbus::Error> {
+        let iv = crypto::generate_iv()?;
         let secret = secret.into();
-        Self {
+        Ok(Self {
             session,
-            value: crypto::encrypt(secret.as_bytes(), aes_key, &iv),
+            value: crypto::encrypt(secret.as_bytes(), aes_key, &iv)?,
             parameters: iv,
             content_type: secret.content_type().to_owned(),
-        }
+        })
     }
 
     pub(crate) async fn from_inner(
@@ -68,7 +68,7 @@ impl<'a> DBusSecret<'a> {
 
     pub(crate) fn decrypt(&self, key: Option<&Arc<Key>>) -> Result<Secret, Error> {
         let value = match key {
-            Some(key) => &crypto::decrypt(&self.value, key, &self.parameters),
+            Some(key) => &crypto::decrypt(&self.value, key, &self.parameters)?,
             None => &self.value,
         };
 

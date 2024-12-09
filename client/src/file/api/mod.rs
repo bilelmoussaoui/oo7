@@ -190,7 +190,11 @@ impl Keyring {
 
         self.items
             .iter()
-            .filter(|e| hashed_search.iter().all(|(k, v)| e.has_attribute(k, v)))
+            .filter(|e| {
+                hashed_search
+                    .iter()
+                    .all(|(k, v)| v.as_ref().is_ok_and(|v| e.has_attribute(k, v)))
+            })
             .map(|e| (*e).clone().decrypt(key))
             .collect()
     }
@@ -204,7 +208,11 @@ impl Keyring {
 
         self.items
             .iter()
-            .find(|e| hashed_search.iter().all(|(k, v)| e.has_attribute(k, v)))
+            .find(|e| {
+                hashed_search
+                    .iter()
+                    .all(|(k, v)| v.as_ref().is_ok_and(|v| e.has_attribute(k, v)))
+            })
             .map(|e| (*e).clone().decrypt(key))
             .transpose()
     }
@@ -212,19 +220,22 @@ impl Keyring {
     pub fn lookup_item_index(&self, attributes: &impl AsAttributes, key: &Key) -> Option<usize> {
         let hashed_search = attributes.hash(key);
 
-        self.items
-            .iter()
-            .position(|e| hashed_search.iter().all(|(k, v)| e.has_attribute(k, v)))
+        self.items.iter().position(|e| {
+            hashed_search
+                .iter()
+                .all(|(k, v)| v.as_ref().is_ok_and(|v| e.has_attribute(k, v)))
+        })
     }
 
     pub fn remove_items(&mut self, attributes: &impl AsAttributes, key: &Key) -> Result<(), Error> {
         let hashed_search = attributes.hash(key);
 
-        let (remove, keep): (Vec<EncryptedItem>, _) = self
-            .items
-            .clone()
-            .into_iter()
-            .partition(|e| hashed_search.iter().all(|(k, v)| e.has_attribute(k, v)));
+        let (remove, keep): (Vec<EncryptedItem>, _) =
+            self.items.clone().into_iter().partition(|e| {
+                hashed_search
+                    .iter()
+                    .all(|(k, v)| v.as_ref().is_ok_and(|v| e.has_attribute(k, v)))
+            });
 
         // check hashes for the ones to be removed
         for item in remove {
@@ -263,7 +274,7 @@ impl Keyring {
         Self::path("default", LEGACY_MAJOR_VERSION)
     }
 
-    pub fn derive_key(&self, secret: &Secret) -> Key {
+    pub fn derive_key(&self, secret: &Secret) -> Result<Key, crypto::Error> {
         crypto::derive_key(
             &**secret,
             self.key_strength(secret),
@@ -337,7 +348,7 @@ mod tests {
         let needle = HashMap::from([("key", "value")]);
 
         let mut keyring = Keyring::new();
-        let key = keyring.derive_key(&SECRET.to_vec().into());
+        let key = keyring.derive_key(&SECRET.to_vec().into())?;
 
         keyring
             .items
@@ -357,7 +368,7 @@ mod tests {
         let _silent = std::fs::remove_file("/tmp/test.keyring");
 
         let mut new_keyring = Keyring::new();
-        let key = new_keyring.derive_key(&SECRET.to_vec().into());
+        let key = new_keyring.derive_key(&SECRET.to_vec().into())?;
 
         new_keyring.items.push(
             Item::new(

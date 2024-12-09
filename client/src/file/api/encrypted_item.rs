@@ -21,14 +21,14 @@ impl EncryptedItem {
         let mac_tag = self.blob.split_off(self.blob.len() - crypto::mac_len());
 
         // verify item
-        if !crypto::verify_mac(&self.blob, key, mac_tag) {
+        if !crypto::verify_mac(&self.blob, key, mac_tag)? {
             return Err(Error::MacError);
         }
 
         let iv = self.blob.split_off(self.blob.len() - crypto::iv_len());
 
         // decrypt item
-        let decrypted = crypto::decrypt(self.blob, key, iv);
+        let decrypted = crypto::decrypt(self.blob, key, iv)?;
 
         let item = Item::try_from(decrypted.as_slice())?;
 
@@ -44,7 +44,7 @@ impl EncryptedItem {
     ) -> Result<(), Error> {
         for (attribute_key, hashed_attribute) in hashed_attributes.iter() {
             if let Some(attribute_plaintext) = item.attributes().get(attribute_key) {
-                if !crypto::verify_mac(attribute_plaintext.as_bytes(), key, hashed_attribute) {
+                if !crypto::verify_mac(attribute_plaintext.as_bytes(), key, hashed_attribute)? {
                     return Err(Error::HashedAttributeMac(attribute_key.to_owned()));
                 }
             } else {

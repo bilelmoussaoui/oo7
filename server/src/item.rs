@@ -83,8 +83,16 @@ impl Item {
 
         match session.aes_key() {
             Some(key) => {
-                let iv = oo7::crypto::generate_iv();
-                let encrypted = oo7::crypto::encrypt(secret, &key, &iv);
+                let iv = oo7::crypto::generate_iv().map_err(|err| {
+                    ServiceError::ZBus(zbus::Error::FDO(Box::new(zbus::fdo::Error::Failed(
+                        format!("Failed to generate iv {err}."),
+                    ))))
+                })?;
+                let encrypted = oo7::crypto::encrypt(secret, &key, &iv).map_err(|err| {
+                    ServiceError::ZBus(zbus::Error::FDO(Box::new(zbus::fdo::Error::Failed(
+                        format!("Failed to encrypt secret {err}."),
+                    ))))
+                })?;
 
                 Ok((DBusSecretInner(
                     session.path().clone(),
@@ -117,7 +125,11 @@ impl Item {
 
         match session.aes_key() {
             Some(key) => {
-                let decrypted = oo7::crypto::decrypt(secret, &key, &iv);
+                let decrypted = oo7::crypto::decrypt(secret, &key, &iv).map_err(|err| {
+                    ServiceError::ZBus(zbus::Error::FDO(Box::new(zbus::fdo::Error::Failed(
+                        format!("Failed to decrypt secret {err}."),
+                    ))))
+                })?;
                 inner.set_secret(decrypted);
             }
             None => {

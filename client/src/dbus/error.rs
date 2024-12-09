@@ -33,6 +33,8 @@ pub enum Error {
     IO(std::io::Error),
     /// Secret to string conversion failure.
     Utf8(FromUtf8Error),
+    /// Crypto related error.
+    Crypto(crate::crypto::Error),
 }
 
 impl From<zbus::Error> for Error {
@@ -71,6 +73,12 @@ impl From<FromUtf8Error> for Error {
     }
 }
 
+impl From<crate::crypto::Error> for Error {
+    fn from(value: crate::crypto::Error) -> Self {
+        Self::Crypto(value)
+    }
+}
+
 impl std::error::Error for Error {}
 
 impl fmt::Display for Error {
@@ -83,6 +91,7 @@ impl fmt::Display for Error {
             Self::NotFound(name) => write!(f, "The collection '{name}' doesn't exists"),
             Self::Dismissed => write!(f, "Prompt was dismissed"),
             Self::Utf8(e) => write!(f, "Failed to convert a text/plain secret to string, {e}"),
+            Self::Crypto(e) => write!(f, "Failed to do a cryptography operation, {e}"),
         }
     }
 }

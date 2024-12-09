@@ -9,8 +9,8 @@ use crate::{crypto, Key};
 pub struct AttributeValue(String);
 
 impl AttributeValue {
-    pub(crate) fn mac(&self, key: &Key) -> Zeroizing<Vec<u8>> {
-        Zeroizing::new(crypto::compute_mac(self.0.as_bytes(), key))
+    pub(crate) fn mac(&self, key: &Key) -> Result<Zeroizing<Vec<u8>>, crate::crypto::Error> {
+        Ok(Zeroizing::new(crypto::compute_mac(self.0.as_bytes(), key)?))
     }
 }
 

@@ -54,7 +54,14 @@ pub const XDG_SCHEMA_ATTRIBUTE: &str = "xdg:schema";
 pub trait AsAttributes {
     fn as_attributes(&self) -> HashMap<&str, &str>;
 
-    fn hash<'a>(&'a self, key: &Key) -> Vec<(&'a str, zeroize::Zeroizing<Vec<u8>>)> {
+    #[allow(clippy::type_complexity)]
+    fn hash<'a>(
+        &'a self,
+        key: &Key,
+    ) -> Vec<(
+        &'a str,
+        std::result::Result<zeroize::Zeroizing<Vec<u8>>, crate::crypto::Error>,
+    )> {
         self.as_attributes()
             .into_iter()
             .map(|(k, v)| (k, crate::file::AttributeValue::from(v).mac(key)))

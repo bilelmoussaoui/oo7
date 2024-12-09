@@ -7,6 +7,9 @@ pub(crate) use native::*;
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 pub use native::*;
 
+mod error;
+pub use error::Error;
+
 #[cfg(feature = "openssl_crypto")]
 mod openssl;
 #[cfg(all(feature = "openssl_crypto", not(feature = "unstable")))]
@@ -33,10 +36,10 @@ mod test {
             78, 82, 67, 158, 214, 102, 48, 109, 84, 107, 94, 54, 225, 29, 186, 246,
         ];
 
-        let encrypted = encrypt(data, &aes_key, aes_iv);
+        let encrypted = encrypt(data, &aes_key, aes_iv).unwrap();
         assert_eq!(encrypted, expected_encrypted);
 
-        let decrypted = decrypt(&encrypted, &aes_key, aes_iv);
+        let decrypted = decrypt(&encrypted, &aes_key, aes_iv).unwrap();
         assert_eq!(decrypted.to_vec(), data);
     }
 
@@ -53,7 +56,7 @@ mod test {
         let salt = &[0x92, 0xf4, 0xc0, 0x34, 0x0f, 0x5f, 0x36, 0xf9];
         let iteration_count = 1782;
         let password = b"test";
-        let (key, iv) = legacy_derive_key_and_iv(password, Ok(()), salt, iteration_count);
+        let (key, iv) = legacy_derive_key_and_iv(password, Ok(()), salt, iteration_count).unwrap();
         assert_eq!(key.as_ref(), &expected_key[..]);
         assert_eq!(iv, &expected_iv[..]);
     }

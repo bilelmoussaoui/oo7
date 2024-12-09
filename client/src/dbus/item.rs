@@ -155,7 +155,7 @@ impl<'a> Item<'a> {
             Algorithm::Plain => api::DBusSecret::new(Arc::clone(&self.session), secret),
             Algorithm::Encrypted => {
                 let aes_key = self.aes_key.as_ref().unwrap();
-                api::DBusSecret::new_encrypted(Arc::clone(&self.session), secret, aes_key)
+                api::DBusSecret::new_encrypted(Arc::clone(&self.session), secret, aes_key)?
             }
         };
         self.inner.set_secret(&secret).await?;

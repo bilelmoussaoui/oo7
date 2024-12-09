@@ -106,17 +106,17 @@ impl Item {
 
         let decrypted = Zeroizing::new(zvariant::to_bytes(*GVARIANT_ENCODING, &self)?.to_vec());
 
-        let iv = crypto::generate_iv();
+        let iv = crypto::generate_iv()?;
 
-        let mut blob = crypto::encrypt(&*decrypted, key, &iv);
+        let mut blob = crypto::encrypt(&*decrypted, key, &iv)?;
 
         blob.append(&mut iv.as_slice().into());
-        blob.append(&mut crypto::compute_mac(&blob, key).as_slice().into());
+        blob.append(&mut crypto::compute_mac(&blob, key)?.as_slice().into());
 
         let hashed_attributes = self
             .attributes
             .iter()
-            .map(|(k, v)| (k.to_owned(), v.mac(key).as_slice().into()))
+            .filter_map(|(k, v)| Some((k.to_owned(), v.mac(key).ok()?.as_slice().into())))
             .collect();
 
         Ok(EncryptedItem {
