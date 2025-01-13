@@ -36,4 +36,4 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 zbus = { version = "5.0", default-features = false }
 zeroize = { version = "1", features = ["zeroize_derive"] }
-zvariant = { version = "5.1", default-features = false, features = ["gvariant"]}
+zvariant = { version = "5.2", default-features = false, features = ["gvariant"]}
