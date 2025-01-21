@@ -337,9 +337,9 @@ checksum = "325918d6fe32f23b19878fe4b34794ae41fc19ddbe53b10571a4874d44ffd39b"
 
 [[package]]
 name = "cargo-credential"
-version = "0.4.7"
+version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8951a7e8159904939f036c967e24b60636efd6a6f22379af6b32afc6b867a2b8"
+checksum = "ac1ef5080adde1db190e901884d2c400990856c2a23201c5a181b910a6dbdf2a"
 dependencies = [
  "anyhow",
  "libc",
@@ -553,7 +553,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33d852cb9b869c2a9b3df2f71a3074817f01e1844f839a144f5fcef059a4eb5d"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1678,7 +1678,7 @@ dependencies = [
  "getrandom",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
