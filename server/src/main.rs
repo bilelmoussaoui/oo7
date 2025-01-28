@@ -1,5 +1,6 @@
 mod collection;
 mod error;
+mod gnome;
 mod item;
 mod prompt;
 mod service;
