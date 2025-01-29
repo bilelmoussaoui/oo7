@@ -18,7 +18,12 @@ use zbus::{
     zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Value},
 };
 
-use crate::{collection::Collection, error::Error, session::Session};
+use crate::{
+    collection::Collection,
+    error::Error,
+    prompt::{Prompt, PromptRole},
+    session::Session,
+};
 
 #[derive(Debug, Clone)]
 pub struct Service {
@@ -29,6 +34,8 @@ pub struct Service {
     // sessions mapped to their corresponding object path on the bus
     sessions: Arc<Mutex<HashMap<OwnedObjectPath, Session>>>,
     session_index: Arc<RwLock<u32>>,
+    prompts: Arc<Mutex<Vec<Prompt>>>,
+    prompt_index: Arc<RwLock<u32>>,
 }
 
 #[zbus::interface(name = "org.freedesktop.Secret.Service")]
@@ -130,8 +137,17 @@ impl Service {
     pub async fn unlock(
         &self,
         objects: Vec<OwnedObjectPath>,
+        #[zbus(object_server)] object_server: &zbus::ObjectServer,
     ) -> Result<(Vec<OwnedObjectPath>, OwnedObjectPath), ServiceError> {
-        let (unlocked, _not_unlocked) = self.set_locked(false, &objects).await?;
+        let (unlocked, not_unlocked) = self.set_locked(false, &objects, false).await?;
+        if !not_unlocked.is_empty() {
+            let prompt = Prompt::new(self.clone(), not_unlocked, PromptRole::Unlock).await;
+            self.prompts.lock().await.push(prompt.clone());
+            let path = prompt.path().clone();
+
+            object_server.at(&path, prompt).await?;
+            return Ok((unlocked, path));
+        }
 
         Ok((unlocked, OwnedObjectPath::default()))
     }
@@ -140,8 +156,17 @@ impl Service {
     pub async fn lock(
         &self,
         objects: Vec<OwnedObjectPath>,
+        #[zbus(object_server)] object_server: &zbus::ObjectServer,
     ) -> Result<(Vec<OwnedObjectPath>, OwnedObjectPath), ServiceError> {
-        let (locked, _not_locked) = self.set_locked(true, &objects).await?;
+        let (locked, not_locked) = self.set_locked(true, &objects, false).await?;
+        if !not_locked.is_empty() {
+            let prompt = Prompt::new(self.clone(), not_locked, PromptRole::Lock).await;
+            self.prompts.lock().await.push(prompt.clone());
+            let path = prompt.path().clone();
+
+            object_server.at(&path, prompt).await?;
+            return Ok((locked, path));
+        }
 
         Ok((locked, OwnedObjectPath::default()))
     }
@@ -273,6 +298,8 @@ impl Service {
             connection: connection.clone(),
             sessions: Default::default(),
             session_index: Default::default(),
+            prompts: Default::default(),
+            prompt_index: Default::default(),
         };
 
         object_server
@@ -318,6 +345,7 @@ impl Service {
         &self,
         locked: bool,
         objects: &[OwnedObjectPath],
+        prompt: bool,
     ) -> Result<(Vec<OwnedObjectPath>, Vec<OwnedObjectPath>), ServiceError> {
         let mut without_prompt = Vec::new();
         let mut with_prompt = Vec::new();
@@ -336,7 +364,9 @@ impl Service {
                         without_prompt.push(object.clone());
                     } else {
                         // TODO: remove this once the prompt implementation is complete.
-                        collection.set_locked(locked).await?;
+                        if prompt {
+                            collection.set_locked(locked).await?;
+                        }
                         with_prompt.push(object.clone());
                     }
                     break;
@@ -355,7 +385,9 @@ impl Service {
                         without_prompt.push(object.clone());
                     } else {
                         // TODO: remove this once the prompt implementation is complete.
-                        item.set_locked(locked).await?;
+                        if prompt {
+                            item.set_locked(locked).await?;
+                        }
                         with_prompt.push(object.clone());
                     }
                     break;
@@ -409,5 +441,24 @@ impl Service {
         *self.session_index.write().await = n_sessions;
 
         n_sessions
+    }
+
+    pub async fn prompt_index(&self) -> u32 {
+        let n_prompts = *self.prompt_index.read().await + 1;
+        *self.prompt_index.write().await = n_prompts;
+
+        n_prompts
+    }
+
+    pub async fn prompt(&self) -> Option<Prompt> {
+        let prompts = self.prompts.lock().await;
+
+        prompts.last().cloned()
+    }
+
+    pub async fn remove_prompt(&self) {
+        // prompts should always contain one item during a prompt related operation and
+        // it should be cleaned up afterwards.
+        self.prompts.lock().await.pop();
     }
 }
