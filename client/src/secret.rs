@@ -17,7 +17,7 @@ impl Secret {
     pub fn random() -> Result<Self, getrandom::Error> {
         let mut secret = [0; 64];
         // Equivalent of `ring::rand::SecureRandom`
-        getrandom::getrandom(&mut secret)?;
+        getrandom::fill(&mut secret)?;
 
         Ok(Self::blob(secret))
     }
