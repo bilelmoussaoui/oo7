@@ -20,7 +20,7 @@ pub enum ServiceError {
 #[derive(Debug)]
 pub enum Error {
     /// Something went wrong on the wire.
-    Zbus(zbus::Error),
+    ZBus(zbus::Error),
     /// A service error.
     Service(ServiceError),
     /// The item/collection was removed.
@@ -39,19 +39,19 @@ pub enum Error {
 
 impl From<zbus::Error> for Error {
     fn from(e: zbus::Error) -> Self {
-        Self::Zbus(e)
+        Self::ZBus(e)
     }
 }
 
 impl From<zbus::fdo::Error> for Error {
     fn from(e: zbus::fdo::Error) -> Self {
-        Self::Zbus(zbus::Error::FDO(Box::new(e)))
+        Self::ZBus(zbus::Error::FDO(Box::new(e)))
     }
 }
 
 impl From<zbus::zvariant::Error> for Error {
     fn from(e: zbus::zvariant::Error) -> Self {
-        Self::Zbus(zbus::Error::Variant(e))
+        Self::ZBus(zbus::Error::Variant(e))
     }
 }
 
@@ -84,7 +84,7 @@ impl std::error::Error for Error {}
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Zbus(err) => write!(f, "zbus error {err}"),
+            Self::ZBus(err) => write!(f, "zbus error {err}"),
             Self::Service(err) => write!(f, "service error {err}"),
             Self::IO(err) => write!(f, "IO error {err}"),
             Self::Deleted => write!(f, "Item/Collection was deleted, can no longer be used"),

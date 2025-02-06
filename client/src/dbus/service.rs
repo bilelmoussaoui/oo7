@@ -51,7 +51,7 @@ impl<'a> Service<'a> {
     pub async fn new() -> Result<Service<'a>, Error> {
         let service = match Self::encrypted().await {
             Ok(service) => Ok(service),
-            Err(Error::Zbus(zbus::Error::MethodError(..))) => Self::plain().await,
+            Err(Error::ZBus(zbus::Error::MethodError(..))) => Self::plain().await,
             Err(Error::Service(ServiceError::ZBus(zbus::Error::MethodError(..)))) => {
                 Self::plain().await
             }
