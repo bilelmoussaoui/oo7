@@ -4,7 +4,7 @@ use ashpd::WindowIdentifier;
 use futures_util::{Stream, StreamExt};
 use zbus::zvariant::OwnedObjectPath;
 
-use super::{api, Algorithm, Collection, Error};
+use super::{api, Algorithm, Collection, Error, ServiceError};
 use crate::Key;
 
 /// The entry point of communicating with a [`org.freedesktop.Secrets`](https://specifications.freedesktop.org/secret-service-spec/latest/index.html) implementation.
@@ -51,7 +51,10 @@ impl<'a> Service<'a> {
     pub async fn new() -> Result<Service<'a>, Error> {
         let service = match Self::encrypted().await {
             Ok(service) => Ok(service),
-            Err(Error::Zbus(zbus::Error::MethodError(_, _, _))) => Self::plain().await,
+            Err(Error::ZBus(zbus::Error::MethodError(..))) => Self::plain().await,
+            Err(Error::Service(ServiceError::ZBus(zbus::Error::MethodError(..)))) => {
+                Self::plain().await
+            }
             Err(e) => Err(e),
         }?;
         Ok(service)

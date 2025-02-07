@@ -33,7 +33,7 @@ impl From<oo7::dbus::Error> for Error {
 
 impl From<oo7::zbus::Error> for Error {
     fn from(value: oo7::zbus::Error) -> Self {
-        Self::Oo7(oo7::dbus::Error::Zbus(value))
+        Self::Oo7(oo7::dbus::Error::ZBus(value))
     }
 }
 
