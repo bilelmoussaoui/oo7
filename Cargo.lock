@@ -88,7 +88,7 @@ checksum = "34ac096ce696dc2fcabef30516bb13c0a68a11d30131d3df6f04711467681b04"
 [[package]]
 name = "ashpd"
 version = "0.11.0"
-source = "git+https://github.com/bilelmoussaoui/ashpd#94d5e07b46964ebbd8fd42ff963ac61a67023925"
+source = "git+https://github.com/bilelmoussaoui/ashpd#5fda527a25c12e7f75dfe0aecb496646e028f043"
 dependencies = [
  "async-fs",
  "async-net",
@@ -665,8 +665,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9fa08315bb612088cc391249efdc3bc77536f16c91f6cf495e6fbe85b20a4a81"
 dependencies = [
  "futures-core",
+ "futures-io",
  "futures-macro",
  "futures-task",
+ "memchr",
  "pin-project-lite",
  "pin-utils",
  "slab",
@@ -1000,9 +1002,9 @@ dependencies = [
 
 [[package]]
 name = "miniz_oxide"
-version = "0.8.3"
+version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8402cab7aefae129c6977bb0ff1b8fd9a04eb5b51efc50a70bea51cda0c7924"
+checksum = "b3b1c9bd4fe1f0f8b387f6eb9eb3b4a1aa26185e5750efb9140301703f62cd1b"
 dependencies = [
  "adler2",
 ]
@@ -1178,7 +1180,7 @@ dependencies = [
  "endi",
  "futures-lite",
  "futures-util",
- "getrandom 0.2.15",
+ "getrandom 0.3.1",
  "hkdf",
  "hmac",
  "md-5",
@@ -1186,7 +1188,7 @@ dependencies = [
  "num-bigint-dig",
  "openssl",
  "pbkdf2",
- "rand 0.8.5",
+ "rand 0.9.0",
  "serde",
  "sha2",
  "subtle",
@@ -1194,6 +1196,7 @@ dependencies = [
  "tokio",
  "tracing",
  "zbus",
+ "zbus_macros",
  "zeroize",
  "zvariant",
 ]

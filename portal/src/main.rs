@@ -3,6 +3,7 @@ mod error;
 
 use ashpd::{
     async_trait,
+    desktop::HandleToken,
     zbus::{self, zvariant::OwnedValue},
     AppID,
 };
@@ -17,13 +18,14 @@ struct Secret;
 
 #[async_trait::async_trait]
 impl ashpd::backend::request::RequestImpl for Secret {
-    async fn close(&self) {}
+    async fn close(&self, _token: HandleToken) {}
 }
 
 #[async_trait::async_trait]
 impl ashpd::backend::secret::SecretImpl for Secret {
     async fn retrieve(
         &self,
+        _token: HandleToken,
         app_id: ashpd::AppID,
         fd: std::os::fd::OwnedFd,
     ) -> ashpd::backend::Result<HashMap<String, OwnedValue>> {
