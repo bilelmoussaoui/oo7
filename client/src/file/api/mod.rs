@@ -85,7 +85,7 @@ pub struct Keyring {
 impl Keyring {
     #[allow(clippy::new_without_default)]
     pub(crate) fn new() -> Self {
-        let salt = rand::thread_rng().gen::<[u8; DEFAULT_SALT_SIZE]>().to_vec();
+        let salt = rand::rng().random::<[u8; DEFAULT_SALT_SIZE]>().to_vec();
 
         Self {
             salt_size: salt.len() as u32,
@@ -120,8 +120,8 @@ impl Keyring {
         mtime: Option<std::time::SystemTime>,
     ) -> Result<(), Error> {
         let tmp_path = if let Some(parent) = path.as_ref().parent() {
-            let rnd: String = rand::thread_rng()
-                .sample_iter(&rand::distributions::Alphanumeric)
+            let rnd: String = rand::rng()
+                .sample_iter(&rand::distr::Alphanumeric)
                 .take(16)
                 .map(char::from)
                 .collect();
@@ -285,7 +285,7 @@ impl Keyring {
 
     // Reset Keyring content
     pub(crate) fn reset(&mut self) {
-        let salt = rand::thread_rng().gen::<[u8; DEFAULT_SALT_SIZE]>().to_vec();
+        let salt = rand::rng().random::<[u8; DEFAULT_SALT_SIZE]>().to_vec();
         self.salt_size = salt.len() as u32;
         self.salt = salt;
         self.iteration_count = DEFAULT_ITERATION_COUNT;
