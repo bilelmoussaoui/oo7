@@ -22,7 +22,7 @@ rust-version = "1.80"
 exclude = ["org.freedesktop.Secrets.xml"]
 
 [workspace.dependencies]
-ashpd = {version = "0.10", default-features = false}
+ashpd = {version = "0.11", git = "https://github.com/bilelmoussaoui/ashpd", default-features = false}
 endi = "1.1"
 clap = { version = "4.5", features = [ "cargo", "derive" ] }
 futures-channel = "0.3"
