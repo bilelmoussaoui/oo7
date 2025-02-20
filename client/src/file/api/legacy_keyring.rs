@@ -65,7 +65,7 @@ impl Keyring {
                         io::ErrorKind::InvalidInput,
                         "unknown attribute type",
                     )
-                    .into())
+                    .into());
                 }
             };
             result.insert(name, value);
@@ -149,7 +149,7 @@ impl Keyring {
                             io::ErrorKind::InvalidInput,
                             "unknown attribute type",
                         )
-                        .into())
+                        .into());
                     }
                 }
             }
