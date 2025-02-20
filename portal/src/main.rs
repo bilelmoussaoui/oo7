@@ -2,10 +2,9 @@ use std::{collections::HashMap, future::pending, os::unix::net::UnixStream};
 mod error;
 
 use ashpd::{
-    async_trait,
+    AppID, PortalError, async_trait,
     desktop::HandleToken,
     zbus::{self, zvariant::OwnedValue},
-    AppID, PortalError,
 };
 use clap::Parser;
 pub use error::Result;

@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use oo7::{dbus::ServiceError, Key};
+use oo7::{Key, dbus::ServiceError};
 use zbus::{interface, names::UniqueName, zvariant::OwnedObjectPath};
 
 use crate::Service;

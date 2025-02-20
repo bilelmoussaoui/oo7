@@ -4,12 +4,12 @@ use std::{collections::HashMap, sync::Arc};
 
 use enumflags2::BitFlags;
 use oo7::{
+    Key, Secret,
     dbus::{
-        api::{DBusSecretInner, Properties},
         Algorithm, ServiceError,
+        api::{DBusSecretInner, Properties},
     },
     file::Keyring,
-    Key, Secret,
 };
 use tokio::sync::{Mutex, RwLock};
 use tokio_stream::StreamExt;
@@ -22,7 +22,7 @@ use zbus::{
 
 use crate::{
     collection::Collection,
-    error::{custom_service_error, Error},
+    error::{Error, custom_service_error},
     prompt::{Prompt, PromptRole},
     session::Session,
 };

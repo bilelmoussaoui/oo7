@@ -11,7 +11,7 @@
 use std::collections::HashMap;
 
 use base64::prelude::*;
-use oo7::{crypto, Key};
+use oo7::{Key, crypto};
 
 const SECRET: &str = "secret";
 const PUBLIC: &str = "public";

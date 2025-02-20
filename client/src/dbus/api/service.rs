@@ -5,11 +5,11 @@ use futures_util::{Stream, StreamExt};
 use zbus::zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Type, Value};
 
 use super::{
-    Collection, DBusSecret, Item, Prompt, Properties, Session, Unlockable, DESTINATION, PATH,
+    Collection, DBusSecret, DESTINATION, Item, PATH, Prompt, Properties, Session, Unlockable,
 };
 use crate::{
-    dbus::{Algorithm, Error, ServiceError},
     AsAttributes, Key,
+    dbus::{Algorithm, Error, ServiceError},
 };
 
 #[derive(Type)]

@@ -22,7 +22,7 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "tokio")]
 use tokio::{fs, io, io::AsyncWriteExt};
-use zbus::zvariant::{serialized::Context, Endian, Type};
+use zbus::zvariant::{Endian, Type, serialized::Context};
 
 /// Used for newly created [`Keyring`]s
 const DEFAULT_ITERATION_COUNT: u32 = 100000;
@@ -50,9 +50,8 @@ pub(super) use legacy_keyring::{Keyring as LegacyKeyring, MAJOR_VERSION as LEGAC
 
 use super::{Item, Secret};
 use crate::{
-    crypto,
+    AsAttributes, Key, crypto,
     file::{Error, WeakKeyError},
-    AsAttributes, Key,
 };
 
 pub(crate) fn data_dir() -> Option<PathBuf> {

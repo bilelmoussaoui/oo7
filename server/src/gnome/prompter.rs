@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use oo7::{ashpd::WindowIdentifierType, dbus::ServiceError, Key};
+use oo7::{Key, ashpd::WindowIdentifierType, dbus::ServiceError};
 use serde::{Deserialize, Serialize};
 use tokio::sync::OnceCell;
-use zbus::zvariant::{self, as_value, Optional, OwnedObjectPath, Type};
+use zbus::zvariant::{self, Optional, OwnedObjectPath, Type, as_value};
 
 use super::secret_exchange;
 use crate::{
@@ -333,7 +333,7 @@ impl PrompterCallback {
                     Err(err) => {
                         return Err(custom_service_error(&format!(
                             "Failed to unlock {label} keyring: {err}."
-                        )))
+                        )));
                     }
                 }
             }

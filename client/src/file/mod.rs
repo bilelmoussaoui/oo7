@@ -181,7 +181,9 @@ impl Keyring {
                     tracing::warn!(
                         "The file contains {n_broken_items} broken items and {n_valid_items} valid ones."
                     );
-                    tracing::info!("Please switch to Keyring::load_unchecked to load the keyring without the secret validation");
+                    tracing::info!(
+                        "Please switch to Keyring::load_unchecked to load the keyring without the secret validation"
+                    );
                     tracing::info!("Keyring::delete_broken_items can be used to remove them");
                 }
                 return Err(Error::IncorrectSecret);
@@ -864,9 +866,11 @@ mod tests {
             .await?;
         drop(keyring);
 
-        assert!(Keyring::load(&keyring_path, Secret::blob("wrong_password"))
-            .await
-            .is_err());
+        assert!(
+            Keyring::load(&keyring_path, Secret::blob("wrong_password"))
+                .await
+                .is_err()
+        );
 
         let keyring = Keyring::load(&keyring_path, Secret::blob("test")).await?;
         keyring

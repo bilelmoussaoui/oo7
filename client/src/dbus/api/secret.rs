@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use serde::{ser::SerializeTuple, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, ser::SerializeTuple};
 use zbus::zvariant::{OwnedObjectPath, Type};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use super::Session;
-use crate::{crypto, dbus::Error, secret::ContentType, Key, Secret};
+use crate::{Key, Secret, crypto, dbus::Error, secret::ContentType};
 
 #[derive(Debug, Serialize, Deserialize, Type)]
 #[zvariant(signature = "(oayays)")]
