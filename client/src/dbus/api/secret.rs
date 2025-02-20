@@ -1,15 +1,14 @@
 use std::sync::Arc;
 
-use serde::{ser::SerializeTuple, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, ser::SerializeTuple};
 use zbus::zvariant::{OwnedObjectPath, Type};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use super::Session;
 use crate::{
-    crypto,
+    Key, Secret, crypto,
     dbus::Error,
     secret::{BLOB_CONTENT_TYPE, TEXT_CONTENT_TYPE},
-    Key, Secret,
 };
 
 #[derive(Debug, Serialize, Deserialize, Type)]
