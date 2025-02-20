@@ -5,10 +5,10 @@ use futures_util::{Stream, StreamExt};
 use serde::Serialize;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath, Type};
 
-use super::{DBusSecret, Item, Prompt, Properties, Unlockable, DESTINATION};
+use super::{DBusSecret, DESTINATION, Item, Prompt, Properties, Unlockable};
 use crate::{
-    dbus::{Error, ServiceError},
     AsAttributes,
+    dbus::{Error, ServiceError},
 };
 
 #[derive(Type)]
@@ -106,10 +106,7 @@ impl<'a> Collection<'a> {
     }
 
     pub async fn set_label(&self, label: &str) -> Result<(), Error> {
-        self.inner()
-            .set_property("Label", label)
-            .await
-            .map_err::<zbus::fdo::Error, _>(From::from)?;
+        self.inner().set_property("Label", label).await?;
         Ok(())
     }
 
@@ -180,7 +177,7 @@ impl<'a> Collection<'a> {
         let cnx = self.inner().connection();
         let item_path = if let Some(prompt) = Prompt::new(cnx, prompt_path).await? {
             let response = prompt.receive_completed(window_id).await?;
-            OwnedObjectPath::try_from(response).map_err::<zbus::zvariant::Error, _>(From::from)?
+            OwnedObjectPath::try_from(response)?
         } else {
             item_path
         };

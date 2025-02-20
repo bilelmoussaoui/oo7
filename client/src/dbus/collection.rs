@@ -8,7 +8,7 @@ use futures_util::{Stream, StreamExt};
 use tokio::sync::RwLock;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 
-use super::{api, Algorithm, Error, Item};
+use super::{Algorithm, Error, Item, api};
 use crate::{AsAttributes, Key, Secret};
 
 /// A collection allows to store and retrieve items.

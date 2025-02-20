@@ -4,10 +4,10 @@ use ashpd::WindowIdentifier;
 use serde::Serialize;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath, Type};
 
-use super::{DBusSecret, Prompt, Session, Unlockable, DESTINATION};
+use super::{DBusSecret, DESTINATION, Prompt, Session, Unlockable};
 use crate::{
-    dbus::{Error, ServiceError},
     AsAttributes,
+    dbus::{Error, ServiceError},
 };
 
 #[derive(Type)]
@@ -74,10 +74,7 @@ impl<'a> Item<'a> {
     }
 
     pub async fn set_label(&self, label: &str) -> Result<(), Error> {
-        self.inner()
-            .set_property("Label", label)
-            .await
-            .map_err::<zbus::fdo::Error, _>(From::from)?;
+        self.inner().set_property("Label", label).await?;
         Ok(())
     }
 
@@ -101,8 +98,7 @@ impl<'a> Item<'a> {
     pub async fn set_attributes(&self, attributes: &impl AsAttributes) -> Result<(), Error> {
         self.inner()
             .set_property("Attributes", attributes.as_attributes())
-            .await
-            .map_err::<zbus::fdo::Error, _>(From::from)?;
+            .await?;
         Ok(())
     }
 
