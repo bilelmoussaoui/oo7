@@ -11,14 +11,14 @@ members = [
 
 [workspace.package]
 version = "0.4.0"
-edition = "2021"
+edition = "2024"
 authors = ["Bilal Elmoussaoui", "Sophie Herold", "Maximiliano Sandoval"]
 keywords = ["keyring", "secret", "service", "portal", "keychain"]
 categories = ["os::linux-apis", "os", "api-bindings"]
 repository = "https://github.com/bilelmoussaoui/oo7"
 homepage = "https://github.com/bilelmoussaoui/oo7"
 license = "MIT"
-rust-version = "1.80"
+rust-version = "1.85"
 exclude = ["org.freedesktop.Secrets.xml"]
 
 [workspace.dependencies]
