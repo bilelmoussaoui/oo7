@@ -4,10 +4,10 @@ use ashpd::WindowIdentifier;
 use serde::Serialize;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath, Type};
 
-use super::{DBusSecret, Prompt, Session, Unlockable, DESTINATION};
+use super::{DBusSecret, DESTINATION, Prompt, Session, Unlockable};
 use crate::{
-    dbus::{Error, ServiceError},
     AsAttributes,
+    dbus::{Error, ServiceError},
 };
 
 #[derive(Type)]

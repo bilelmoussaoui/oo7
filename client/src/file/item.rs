@@ -4,10 +4,10 @@ use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 use super::{
-    api::{AttributeValue, EncryptedItem, GVARIANT_ENCODING},
     Error,
+    api::{AttributeValue, EncryptedItem, GVARIANT_ENCODING},
 };
-use crate::{crypto, secret::ContentType, AsAttributes, Key, Secret, CONTENT_TYPE_ATTRIBUTE};
+use crate::{AsAttributes, CONTENT_TYPE_ATTRIBUTE, Key, Secret, crypto, secret::ContentType};
 
 /// An item stored in the file backend.
 #[derive(Deserialize, Serialize, zvariant::Type, Clone, Debug, Zeroize, ZeroizeOnDrop)]

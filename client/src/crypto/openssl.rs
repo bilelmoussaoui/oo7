@@ -1,7 +1,7 @@
 use openssl::{
     bn::BigNum,
     dh::Dh,
-    hash::{hash, Hasher, MessageDigest},
+    hash::{Hasher, MessageDigest, hash},
     md::Md,
     memcmp,
     nid::Nid,
@@ -14,7 +14,7 @@ use openssl::{
 };
 use zeroize::Zeroizing;
 
-use crate::{file, Key};
+use crate::{Key, file};
 
 const ENC_ALG: Nid = Nid::AES_128_CBC;
 const MAC_ALG: Nid = Nid::SHA256;

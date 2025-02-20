@@ -4,8 +4,8 @@ use std::{
 };
 
 use cipher::{
-    block_padding::{NoPadding, Pkcs7},
     BlockDecryptMut, BlockEncryptMut, BlockSizeUser, IvSizeUser, KeyIvInit, KeySizeUser,
+    block_padding::{NoPadding, Pkcs7},
 };
 use digest::{Digest, FixedOutput, Mac, Output, OutputSizeUser};
 use hkdf::Hkdf;
@@ -16,7 +16,7 @@ use sha2::Sha256;
 use subtle::ConstantTimeEq;
 use zeroize::{Zeroize, Zeroizing};
 
-use crate::{file, Key};
+use crate::{Key, file};
 
 type EncAlg = cbc::Encryptor<aes::Aes128>;
 type DecAlg = cbc::Decryptor<aes::Aes128>;

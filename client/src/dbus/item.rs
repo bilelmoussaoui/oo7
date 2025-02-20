@@ -7,7 +7,7 @@ use async_lock::RwLock;
 use tokio::sync::RwLock;
 use zbus::zvariant::ObjectPath;
 
-use super::{api, Algorithm, Error};
+use super::{Algorithm, Error, api};
 use crate::{AsAttributes, Key, Secret};
 
 /// A secret with a label and attributes to identify it.
