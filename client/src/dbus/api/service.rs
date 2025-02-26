@@ -127,14 +127,13 @@ impl<'a> Service<'a> {
             .body()
             .deserialize::<(OwnedObjectPath, OwnedObjectPath)>()?;
 
-        let collection_path = if let Some(prompt) =
-            Prompt::new(self.inner().connection(), prompt_path).await?
-        {
-            let response = prompt.receive_completed(window_id).await?;
-            OwnedObjectPath::try_from(response).map_err::<zbus::zvariant::Error, _>(From::from)?
-        } else {
-            collection_path
-        };
+        let collection_path =
+            if let Some(prompt) = Prompt::new(self.inner().connection(), prompt_path).await? {
+                let response = prompt.receive_completed(window_id).await?;
+                OwnedObjectPath::try_from(response)?
+            } else {
+                collection_path
+            };
         Collection::new(self.inner().connection(), collection_path).await
     }
 
@@ -174,8 +173,7 @@ impl<'a> Service<'a> {
 
         if let Some(prompt) = Prompt::new(cnx, prompt_path).await? {
             let response = prompt.receive_completed(window_id).await?;
-            let locked_paths = Vec::<OwnedObjectPath>::try_from(response)
-                .map_err::<zbus::zvariant::Error, _>(From::from)?;
+            let locked_paths = Vec::<OwnedObjectPath>::try_from(response)?;
             unlocked_item_paths.extend(locked_paths);
         };
         Ok(unlocked_item_paths)
@@ -197,8 +195,7 @@ impl<'a> Service<'a> {
 
         if let Some(prompt) = Prompt::new(cnx, prompt_path).await? {
             let response = prompt.receive_completed(window_id).await?;
-            let locked_paths = Vec::<OwnedObjectPath>::try_from(response)
-                .map_err::<zbus::zvariant::Error, _>(From::from)?;
+            let locked_paths = Vec::<OwnedObjectPath>::try_from(response)?;
             locked_item_paths.extend(locked_paths);
         };
 
