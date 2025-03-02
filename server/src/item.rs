@@ -2,17 +2,17 @@
 
 use std::{
     collections::HashMap,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
 };
 
 use oo7::{
-    dbus::{api::DBusSecretInner, ServiceError},
+    dbus::{ServiceError, api::DBusSecretInner},
     file,
 };
 use tokio::sync::Mutex;
 use zbus::zvariant::OwnedObjectPath;
 
-use crate::{collection::Collection, Service};
+use crate::{Service, collection::Collection};
 
 #[derive(Debug, Clone)]
 pub struct Item {

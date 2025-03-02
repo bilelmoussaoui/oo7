@@ -5,10 +5,10 @@ use futures_util::{Stream, StreamExt};
 use serde::Serialize;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath, Type};
 
-use super::{DBusSecret, Item, Prompt, Properties, Unlockable, DESTINATION};
+use super::{DBusSecret, DESTINATION, Item, Prompt, Properties, Unlockable};
 use crate::{
-    dbus::{Error, ServiceError},
     AsAttributes,
+    dbus::{Error, ServiceError},
 };
 
 #[derive(Type)]
