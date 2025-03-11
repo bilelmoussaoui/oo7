@@ -1,5 +1,6 @@
 mod collection;
 mod error;
+#[allow(unused)]
 mod gnome;
 mod item;
 mod prompt;
