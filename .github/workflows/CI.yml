@@ -38,9 +38,12 @@ jobs:
         run: |
           cargo build --manifest-path ./cli/Cargo.toml
 
-      - name: Build Server
+      - name: Build Server (native)
         run: |
           cargo build --manifest-path ./server/Cargo.toml
+      - name: Build Server (OpenSSL)
+        run: |
+          cargo build --manifest-path ./server/Cargo.toml --no-default-features --features openssl_crypto
 
       - name: Build Portal
         run: |
@@ -52,6 +55,13 @@ jobs:
       - name: Test (OpenSSL)
         run: |
           cargo test --manifest-path ./client/Cargo.toml --no-default-features --features tokio --features openssl_crypto
+
+      - name: Test Server (native)
+        run: |
+          cargo test --manifest-path ./server/Cargo.toml
+      - name: Test Server (OpenSSL)
+        run: |
+          cargo test --manifest-path ./server/Cargo.toml --no-default-features --features openssl_crypto
 
   cargo-deny:
       runs-on: ubuntu-latest
