@@ -33,8 +33,6 @@ skip = [
   {name = "rand_chacha", version = "0.3.1"},
   # num-bigint-dig
   {name = "rand", version = "0.8.5"},
-  # num-bigint-dig -> ppv-lite86
-  {name = "zerocopy", version = "0.7.35"},
   # num-bigint-dig & crypto_common
   {name = "getrandom", version = "0.2.15"},
 ]
