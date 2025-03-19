@@ -807,9 +807,18 @@ mod tests {
 
     #[tokio::test]
     async fn change_secret() -> Result<(), Error> {
-        let path = PathBuf::from("../../tests/test_rekeying.keyring");
+        let data_dir = tempdir()?;
+        let v0_dir = data_dir.path().join("keyrings");
+        let v1_dir = v0_dir.join("v1");
+        fs::create_dir_all(&v1_dir).await?;
 
-        let keyring = Keyring::load(&path, strong_key()).await?;
+        let fixture_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("fixtures")
+            .join("default.keyring");
+        let keyring_path = v1_dir.join("default.keyring");
+        fs::copy(&fixture_path, &keyring_path).await?;
+
+        let keyring = Keyring::load(&keyring_path, Secret::blob("test")).await?;
         let attributes = HashMap::from([("attr", "value")]);
         let item_before = keyring
             .create_item("test", &attributes, "password", false)
@@ -819,7 +828,7 @@ mod tests {
         keyring.change_secret(secret).await?;
 
         let secret = Secret::blob("new_secret");
-        let keyring = Keyring::load(&path, secret).await?;
+        let keyring = Keyring::load(&keyring_path, secret).await?;
         let item_now = keyring.lookup_item(&attributes).await?.unwrap();
 
         assert_eq!(item_before.label(), item_now.label());
@@ -829,7 +838,7 @@ mod tests {
         // No items were broken during the secret change
         assert_eq!(keyring.delete_broken_items().await?, 0);
 
-        fs::remove_file(path).await?;
+        fs::remove_file(keyring_path).await?;
 
         Ok(())
     }
