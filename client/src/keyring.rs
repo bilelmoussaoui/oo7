@@ -152,6 +152,22 @@ impl Keyring {
         };
         Ok(items)
     }
+
+    /// Get the inner file backend if the keyring is backed by one.
+    pub fn as_file(&self) -> Arc<file::Keyring> {
+        match self {
+            Self::File(keyring) => keyring.clone(),
+            _ => unreachable!(),
+        }
+    }
+
+    /// Get the inner DBus backend if the keyring is backed by one.
+    pub fn as_dbus(&self) -> &dbus::Collection {
+        match self {
+            Self::DBus(collection) => collection,
+            _ => unreachable!(),
+        }
+    }
 }
 
 /// A generic secret with a label and attributes.
