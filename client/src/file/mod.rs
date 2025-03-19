@@ -95,9 +95,39 @@ impl Keyring {
     /// * `path` - The path to the file backend.
     /// * `secret` - The service key, usually retrieved from the Secrets portal.
     pub async fn load(path: impl AsRef<Path>, secret: Secret) -> Result<Self, Error> {
+        Self::load_inner(path, secret, true).await
+    }
+
+    /// Load from a keyring file.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The path to the file backend.
+    /// * `secret` - The service key, usually retrieved from the Secrets portal.
+    ///
+    /// # Safety
+    ///
+    /// The secret is not validated to be the correct one to decrypt the keyring
+    /// items. Allowing the API user to write new items with a different
+    /// secret on top of previously added items with a different secret.
+    ///
+    /// As it is not a supported behaviour, this API is mostly meant for
+    /// recovering broken keyrings.
+    pub async unsafe fn load_unchecked(
+        path: impl AsRef<Path>,
+        secret: Secret,
+    ) -> Result<Self, Error> {
+        Self::load_inner(path, secret, false).await
+    }
+
+    async fn load_inner(
+        path: impl AsRef<Path>,
+        secret: Secret,
+        validate_items: bool,
+    ) -> Result<Self, Error> {
         #[cfg(feature = "tracing")]
         tracing::debug!("Trying to load keyring file at {:?}", path.as_ref());
-        let (mtime, mut keyring) = match fs::File::open(path.as_ref()).await {
+        let (mtime, keyring) = match fs::File::open(path.as_ref()).await {
             Err(err) if err.kind() == io::ErrorKind::NotFound => {
                 #[cfg(feature = "tracing")]
                 tracing::debug!("Keyring file not found, creating a new one");
@@ -118,15 +148,34 @@ impl Keyring {
             }
         };
 
-        let key = keyring.derive_key(&secret)?;
-        for encrypted_item in &mut keyring.items {
-            if let Err(_err) = encrypted_item.clone().decrypt(&key) {
+        if validate_items {
+            let key = keyring.derive_key(&secret)?;
+
+            let mut n_broken_items = 0;
+            let mut n_valid_items = 0;
+            for encrypted_item in &keyring.items {
+                if let Err(_err) = encrypted_item.clone().decrypt(&key) {
+                    #[cfg(feature = "tracing")]
+                    tracing::warn!("Failed to decrypt item, incorrect secret?: {_err}");
+                    n_broken_items += 1;
+                } else {
+                    n_valid_items += 1;
+                }
+            }
+
+            if n_broken_items > n_valid_items {
                 #[cfg(feature = "tracing")]
-                tracing::error!("Failed to decrypt item, incorrect secret?: {_err}");
+                {
+                    tracing::warn!(
+                        "The file contains {n_broken_items} broken items and {n_valid_items} valid ones."
+                    );
+                    tracing::info!("Please switch to Keyring::load_unchecked to load the keyring with the secret validation and restore your valid items in a new keyring.");
+                }
                 return Err(Error::IncorrectSecret);
             }
+
+            drop(key);
         }
-        drop(key);
 
         Ok(Self {
             keyring: Arc::new(RwLock::new(keyring)),
