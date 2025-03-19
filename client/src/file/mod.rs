@@ -169,7 +169,8 @@ impl Keyring {
                     tracing::warn!(
                         "The file contains {n_broken_items} broken items and {n_valid_items} valid ones."
                     );
-                    tracing::info!("Please switch to Keyring::load_unchecked to load the keyring with the secret validation and restore your valid items in a new keyring.");
+                    tracing::info!("Please switch to Keyring::load_unchecked to load the keyring without the secret validation");
+                    tracing::info!("Keyring::delete_broken_items can be used to remove them");
                 }
                 return Err(Error::IncorrectSecret);
             }
@@ -524,6 +525,31 @@ impl Keyring {
 
         self.write().await
     }
+
+    /// Delete any item that cannot be decrypted with the key associated to the
+    /// keyring.
+    ///
+    /// This can only happen if an item was created using
+    /// [`Self::load_unchecked`] or prior to 0.4 where we didn't validate
+    /// the secret when using [`Self::load`] or modified externally.
+    pub async fn delete_broken_items(&self) -> Result<usize, Error> {
+        let key = self.derive_key().await?;
+        let mut keyring = self.keyring.write().await;
+        let mut broken_items = vec![];
+        for (index, encrypted_item) in keyring.items.iter().enumerate() {
+            if let Err(_err) = encrypted_item.clone().decrypt(&key) {
+                broken_items.push(index);
+            }
+        }
+        let n_broken_items = broken_items.len();
+        for index in broken_items {
+            keyring.items.remove(index);
+        }
+        drop(keyring);
+
+        self.write().await?;
+        Ok(n_broken_items)
+    }
 }
 
 #[cfg(test)]
@@ -799,6 +825,9 @@ mod tests {
         assert_eq!(item_before.label(), item_now.label());
         assert_eq!(item_before.secret(), item_now.secret());
         assert_eq!(item_before.attributes(), item_now.attributes());
+
+        // No items were broken during the secret change
+        assert_eq!(keyring.delete_broken_items().await?, 0);
 
         fs::remove_file(path).await?;
 
