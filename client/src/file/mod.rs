@@ -806,6 +806,65 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn delete_broken_items() -> Result<(), Error> {
+        let data_dir = tempdir()?;
+        let v0_dir = data_dir.path().join("keyrings");
+        let v1_dir = v0_dir.join("v1");
+        fs::create_dir_all(&v1_dir).await?;
+
+        let fixture_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("fixtures")
+            .join("default.keyring");
+        let keyring_path = v1_dir.join("default.keyring");
+        fs::copy(&fixture_path, &keyring_path).await?;
+
+        let keyring = Keyring::load(&keyring_path, Secret::blob("test")).await?;
+        keyring
+            .create_item(
+                "test 3",
+                &HashMap::from([("attr3", "value3")]),
+                "password3",
+                false,
+            )
+            .await?;
+        drop(keyring);
+
+        let keyring = unsafe {
+            Keyring::load_unchecked(&keyring_path, Secret::blob("wrong_password")).await?
+        };
+        keyring
+            .create_item(
+                "test",
+                &HashMap::from([("attr", "value")]),
+                "password",
+                false,
+            )
+            .await?;
+        drop(keyring);
+
+        assert!(Keyring::load(&keyring_path, Secret::blob("wrong_password"))
+            .await
+            .is_err());
+
+        let keyring = Keyring::load(&keyring_path, Secret::blob("test")).await?;
+        keyring
+            .create_item(
+                "test 2",
+                &HashMap::from([("attr2", "value2")]),
+                "password2",
+                false,
+            )
+            .await?;
+
+        assert_eq!(keyring.delete_broken_items().await?, 1);
+        assert_eq!(keyring.delete_broken_items().await?, 0);
+
+        fs::remove_file(keyring_path).await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn change_secret() -> Result<(), Error> {
         let data_dir = tempdir()?;
         let v0_dir = data_dir.path().join("keyrings");
