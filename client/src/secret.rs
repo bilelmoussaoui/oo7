@@ -3,12 +3,12 @@ use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 pub(crate) const TEXT_CONTENT_TYPE: &str = "text/plain";
 pub(crate) const BLOB_CONTENT_TYPE: &str = "application/octet-stream";
 
-/// A safe wrapper around a combination of (secret, content-type).
+/// A wrapper around a combination of (secret, content-type).
 #[derive(Debug, Clone, PartialEq, Eq, Zeroize, ZeroizeOnDrop)]
 pub enum Secret {
     /// Corresponds to `text/plain`
     Text(String),
-    /// Corresponds to application/octet-stream
+    /// Corresponds to `application/octet-stream`
     Blob(Vec<u8>),
 }
 
