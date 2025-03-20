@@ -25,8 +25,21 @@ pub enum Keyring {
 }
 
 impl Keyring {
+    /// Create a new instance of the Keyring that automatically removes the
+    /// broken items from the file backend keyring.
+    ///
+    /// This method will probably be removed in future versions if the
+    /// misbehaviour is tracked and fixed.
+    pub async fn with_broken_item_cleanup() -> Result<Self> {
+        Self::new_inner(true).await
+    }
+
     /// Create a new instance of the Keyring.
     pub async fn new() -> Result<Self> {
+        Self::new_inner(false).await
+    }
+
+    async fn new_inner(auto_delete_broken_items: bool) -> Result<Self> {
         let is_sandboxed = ashpd::is_sandboxed().await;
         if is_sandboxed {
             #[cfg(feature = "tracing")]
@@ -41,7 +54,15 @@ impl Keyring {
                         "org.freedesktop.portal.Secrets is not available, falling back to the Secret Service backend"
                     );
                 }
-                Err(e) => return Err(crate::Error::File(e)),
+                Err(e) => {
+                    if matches!(e, file::Error::IncorrectSecret) && auto_delete_broken_items {
+                        let keyring = unsafe { file::Keyring::load_default_unchecked().await? };
+                        let deleted_items = keyring.delete_broken_items().await?;
+                        debug_assert!(deleted_items > 0);
+                        return Ok(Self::File(Arc::new(keyring)));
+                    }
+                    return Err(crate::Error::File(e));
+                }
             };
         } else {
             #[cfg(feature = "tracing")]
