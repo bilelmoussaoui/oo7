@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use zbus::zvariant::Type;
 
 use super::{Error, Item};
-use crate::{crypto, Key};
+use crate::{Key, crypto};
 
 #[derive(Deserialize, Serialize, Type, Debug, Clone)]
 pub(crate) struct EncryptedItem {

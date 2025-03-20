@@ -9,9 +9,8 @@ use endi::{Endian, ReadBytes};
 
 use super::{Item, Secret};
 use crate::{
-    crypto,
+    AsAttributes, crypto,
     file::{AttributeValue, Error, WeakKeyError},
-    AsAttributes,
 };
 
 const FILE_HEADER: &[u8] = b"GnomeKeyring\n\r\0\n";
@@ -65,7 +64,7 @@ impl Keyring {
                         io::ErrorKind::InvalidInput,
                         "unknown attribute type",
                     )
-                    .into())
+                    .into());
                 }
             };
             result.insert(name, value);
@@ -149,7 +148,7 @@ impl Keyring {
                             io::ErrorKind::InvalidInput,
                             "unknown attribute type",
                         )
-                        .into())
+                        .into());
                     }
                 }
             }

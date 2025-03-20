@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use zbus::zvariant::Type;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
-use crate::{crypto, Key};
+use crate::{Key, crypto};
 
 /// An encrypted attribute value.
 #[derive(Deserialize, Serialize, Type, Clone, Debug, Eq, PartialEq, Zeroize, ZeroizeOnDrop)]

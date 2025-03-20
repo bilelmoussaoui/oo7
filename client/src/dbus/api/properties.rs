@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use serde::{
-    ser::{Serialize, SerializeMap},
     Deserialize,
+    ser::{Serialize, SerializeMap},
 };
 use zbus::zvariant::{Type, Value};
 
@@ -102,7 +102,7 @@ impl<'de> Deserialize<'de> for Properties {
 
 #[cfg(test)]
 mod tests {
-    use zbus::zvariant::{serialized::Context, to_bytes, Endian, Type};
+    use zbus::zvariant::{Endian, Type, serialized::Context, to_bytes};
 
     use super::*;
 

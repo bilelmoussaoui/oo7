@@ -4,7 +4,7 @@ use ashpd::WindowIdentifier;
 use futures_util::{Stream, StreamExt};
 use zbus::zvariant::OwnedObjectPath;
 
-use super::{api, Algorithm, Collection, Error, ServiceError};
+use super::{Algorithm, Collection, Error, ServiceError, api};
 use crate::Key;
 
 /// The entry point of communicating with a [`org.freedesktop.Secrets`](https://specifications.freedesktop.org/secret-service-spec/latest/index.html) implementation.

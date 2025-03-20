@@ -1,4 +1,4 @@
-use crate::{dbus::Service, file::Keyring, AsAttributes, Result};
+use crate::{AsAttributes, Result, dbus::Service, file::Keyring};
 
 /// Helper to migrate your secrets from the host Secret Service
 /// to the sandboxed file backend.
