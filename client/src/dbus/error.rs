@@ -1,5 +1,3 @@
-use std::{fmt, string::FromUtf8Error};
-
 /// DBus Secret Service specific errors.
 /// <https://specifications.freedesktop.org/secret-service-spec/latest/errors.html>
 #[derive(zbus::DBusError, Debug)]
@@ -31,8 +29,6 @@ pub enum Error {
     NotFound(String),
     /// Input/Output.
     IO(std::io::Error),
-    /// Secret to string conversion failure.
-    Utf8(FromUtf8Error),
     /// Crypto related error.
     Crypto(crate::crypto::Error),
 }
@@ -67,12 +63,6 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl From<FromUtf8Error> for Error {
-    fn from(value: FromUtf8Error) -> Self {
-        Self::Utf8(value)
-    }
-}
-
 impl From<crate::crypto::Error> for Error {
     fn from(value: crate::crypto::Error) -> Self {
         Self::Crypto(value)
@@ -81,8 +71,8 @@ impl From<crate::crypto::Error> for Error {
 
 impl std::error::Error for Error {}
 
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::ZBus(err) => write!(f, "zbus error {err}"),
             Self::Service(err) => write!(f, "service error {err}"),
@@ -90,7 +80,6 @@ impl fmt::Display for Error {
             Self::Deleted => write!(f, "Item/Collection was deleted, can no longer be used"),
             Self::NotFound(name) => write!(f, "The collection '{name}' doesn't exists"),
             Self::Dismissed => write!(f, "Prompt was dismissed"),
-            Self::Utf8(e) => write!(f, "Failed to convert a text/plain secret to string, {e}"),
             Self::Crypto(e) => write!(f, "Failed to do a cryptography operation, {e}"),
         }
     }

@@ -71,9 +71,14 @@ impl<'a> DBusSecret<'a> {
             Some(key) => &crypto::decrypt(&self.value, key, &self.parameters)?,
             None => &self.value,
         };
-
         match self.content_type.as_str() {
-            TEXT_CONTENT_TYPE => Ok(Secret::Text(String::from_utf8(value.to_vec())?)),
+            TEXT_CONTENT_TYPE => {
+                match String::from_utf8(value.to_vec()) {
+                    Ok(text) => Ok(Secret::Text(text)),
+                    // Workaround gnome-keyring always reporting text/plain even if it is not one.
+                    Err(_) => Ok(Secret::blob(value)),
+                }
+            }
             BLOB_CONTENT_TYPE => Ok(Secret::blob(value)),
             e => {
                 #[cfg(feature = "tracing")]
