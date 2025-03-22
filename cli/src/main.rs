@@ -1,7 +1,10 @@
 use std::{
+    collections::HashMap,
     fmt,
     io::{BufRead, IsTerminal, Write},
+    path::PathBuf,
     process::{ExitCode, Termination},
+    time::Duration,
 };
 
 use clap::{Args, Parser, Subcommand};
@@ -24,6 +27,12 @@ impl From<std::io::Error> for Error {
     }
 }
 
+impl From<oo7::file::Error> for Error {
+    fn from(err: oo7::file::Error) -> Error {
+        Error(err.to_string())
+    }
+}
+
 impl From<oo7::dbus::Error> for Error {
     fn from(err: oo7::dbus::Error) -> Error {
         Error(err.to_string())
@@ -40,6 +49,11 @@ impl Termination for Error {
     fn report(self) -> ExitCode {
         ExitCode::FAILURE
     }
+}
+
+enum Keyring {
+    File(oo7::file::Keyring),
+    Collection(oo7::dbus::Collection<'static>),
 }
 
 #[derive(Subcommand)]
@@ -121,54 +135,143 @@ enum Commands {
 
     #[command(name = "unlock", about = "Unlock the keyring")]
     Unlock,
+
+    #[command(name = "repair", about = "Repair the keyring")]
+    Repair,
 }
 
 impl Commands {
-    async fn execute(self, args: &Arguments) -> Result<(), Error> {
+    async fn execute(self, args: Arguments) -> Result<(), Error> {
         let service = Service::new().await?;
-        let collection = if let Some(alias) = &args.collection {
-            service
-                .with_alias(alias)
-                .await?
-                .ok_or_else(|| Error(format!("Collection '{alias}' not found")))?
-        } else {
-            service.default_collection().await?
-        };
-        match self {
-            Commands::Delete { attributes } => {
-                let items = collection.search_items(&attributes).await?;
+        if args.app_id.is_some() && args.keyring.is_some() {
+            return Err(Error::new(
+                "Only one of application ID or keyring can be specified at a time.",
+            ));
+        }
+        // We get the secret first from the app-id, then if the --keyring is set, we try
+        // to use the --secret variable.
+        let (secret, path) = if let Some(app_id) = &args.app_id {
+            const GENERIC_SCHEMA_VALUE: &str = "org.freedesktop.Secret.Generic";
 
-                for item in items {
-                    item.delete(None).await?;
-                }
+            let attributes = HashMap::from([
+                (oo7::XDG_SCHEMA_ATTRIBUTE, GENERIC_SCHEMA_VALUE),
+                ("app_id", app_id),
+            ]);
+            let default_collection = service.default_collection().await?;
+            let secret =
+                if let Some(item) = default_collection.search_items(&attributes).await?.first() {
+                    item.secret().await?
+                } else {
+                    return Err(Error::new(
+                        "The application doesn't have a stored key on the host keyring.",
+                    ));
+                };
+
+            // That is the path used by libsecret/oo7, how does it work with kwallet for
+            // example?
+            let path = home().map(|mut path| {
+                path.push(".var/app");
+                path.push(app_id.to_string());
+                path.push("data/keyrings/default.keyring");
+                path
+            });
+            (Some(secret), path)
+        } else if let Some(keyring) = args.keyring {
+            (args.secret, Some(keyring))
+        } else if let Some(secret) = args.secret {
+            (
+                Some(secret),
+                data_dir().map(|mut path| {
+                    path.push("keyrings/default.keyring");
+                    path
+                }),
+            )
+        } else {
+            (None, None)
+        };
+
+        let keyring = match (path, secret) {
+            (Some(path), Some(secret)) => {
+                Keyring::File(oo7::file::Keyring::load(path, secret).await?)
             }
+            (Some(_), None) => {
+                return Err(Error::new("A keyring requires a secret."));
+            }
+            (None, Some(_)) => {
+                return Err(Error::new("A secret requires a keyring."));
+            }
+            _ => {
+                let collection = if let Some(alias) = &args.collection {
+                    service
+                        .with_alias(alias)
+                        .await?
+                        .ok_or_else(|| Error(format!("Collection '{alias}' not found")))?
+                } else {
+                    service.default_collection().await?
+                };
+                Keyring::Collection(collection)
+            }
+        };
+
+        match self {
+            Commands::Delete { attributes } => match keyring {
+                Keyring::Collection(collection) => {
+                    let items = collection.search_items(&attributes).await?;
+                    for item in items {
+                        item.delete(None).await?;
+                    }
+                }
+                Keyring::File(keyring) => {
+                    keyring.delete(&attributes).await?;
+                }
+            },
             Commands::Lookup {
                 attributes,
                 secret_only,
                 hex,
-            } => {
-                let items = collection.search_items(&attributes).await?;
+            } => match keyring {
+                Keyring::Collection(collection) => {
+                    let items = collection.search_items(&attributes).await?;
 
-                if let Some(item) = items.first() {
-                    print_item(item, secret_only, hex).await?;
+                    if let Some(item) = items.first() {
+                        print_item_dbus(item, secret_only, hex).await?;
+                    }
                 }
-            }
+                Keyring::File(keyring) => {
+                    let items = keyring.search_items(&attributes).await?;
+                    if let Some(item) = items.first() {
+                        print_item_keyring(item, secret_only, hex)?;
+                    }
+                }
+            },
             Commands::Search {
                 all,
                 attributes,
                 secret_only,
                 hex,
-            } => {
-                let items = collection.search_items(&attributes).await?;
-
-                if all {
-                    for item in items {
-                        print_item(&item, secret_only, hex).await?;
+            } => match keyring {
+                Keyring::File(keyring) => {
+                    let items = keyring.search_items(&attributes).await?;
+                    if all {
+                        for item in items {
+                            print_item_keyring(&item, secret_only, hex)?;
+                        }
+                    } else if let Some(item) = items.first() {
+                        print_item_keyring(item, secret_only, hex)?;
                     }
-                } else if let Some(item) = items.first() {
-                    print_item(item, secret_only, hex).await?;
                 }
-            }
+                Keyring::Collection(collection) => {
+                    let items = collection.search_items(&attributes).await?;
+
+                    if all {
+                        for item in items {
+                            print_item_dbus(&item, secret_only, hex).await?;
+                        }
+                    } else if let Some(item) = items.first() {
+                        print_item_dbus(item, secret_only, hex).await?;
+                    }
+                }
+            },
             Commands::Store { label, attributes } => {
                 let mut stdin = std::io::stdin().lock();
                 let secret = if stdin.is_terminal() {
@@ -183,13 +286,44 @@ impl Commands {
                     secret
                 };
 
-                collection
-                    .create_item(&label, &attributes, secret, true, None)
-                    .await?;
+                match keyring {
+                    Keyring::File(keyring) => {
+                        keyring
+                            .create_item(&label, &attributes, secret, true)
+                            .await?;
+                    }
+                    Keyring::Collection(collection) => {
+                        collection
+                            .create_item(&label, &attributes, secret, true, None)
+                            .await?;
+                    }
+                }
             }
-            Commands::Lock => collection.lock(None).await?,
-
-            Commands::Unlock => collection.unlock(None).await?,
+            Commands::Lock => match keyring {
+                Keyring::File(_) => {
+                    return Err(Error::new("Keyring file doesn't support locking."));
+                }
+                Keyring::Collection(collection) => {
+                    collection.lock(None).await?;
+                }
+            },
+            Commands::Unlock => match keyring {
+                Keyring::File(_) => {
+                    return Err(Error::new("Keyring file doesn't support unlocking."));
+                }
+                Keyring::Collection(collection) => {
+                    collection.unlock(None).await?;
+                }
+            },
+            Commands::Repair => match keyring {
+                Keyring::File(keyring) => {
+                    let deleted_items = keyring.delete_broken_items().await?;
+                    println!("{deleted_items} broken items were deleted");
+                }
+                Keyring::Collection(_) => {
+                    return Err(Error::new("Only a keyring file can be repaired."));
+                }
+            },
         };
         Ok(())
     }
@@ -214,13 +348,35 @@ struct Arguments {
         help = "Specify a collection. The default collection will be used if not specified"
     )]
     collection: Option<String>,
+    #[arg(
+        name = "keyring",
+        short,
+        long,
+        global = true,
+        help = "Specify a keyring. The default collection will be used if not specified"
+    )]
+    keyring: Option<PathBuf>,
+    #[arg(
+        name = "secret",
+        short,
+        long,
+        global = true,
+        help = "Specify the keyring secret. The default collection will be used if not specified"
+    )]
+    secret: Option<oo7::Secret>,
+    #[arg(
+        name = "app-id",
+        long,
+        global = true,
+        help = "Specify a sandboxed application ID. The default collection will be used if not specified"
+    )]
+    app_id: Option<oo7::ashpd::AppID>,
 }
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Error> {
     let cli = Cli::parse();
-    let args = &cli.args;
-    cli.command.execute(args).await
+    cli.command.execute(cli.args).await
 }
 
 // Source <https://github.com/clap-rs/clap/blob/master/examples/typed-derive.rs#L48>
@@ -239,13 +395,16 @@ where
     Ok((s[..pos].parse()?, s[pos + 1..].parse()?))
 }
 
-async fn print_item(
-    item: &oo7::dbus::Item<'_>,
+fn print_item_common(
+    secret: &oo7::Secret,
+    label: &str,
+    mut attributes: HashMap<String, String>,
+    created: Duration,
+    modified: Duration,
     secret_only: bool,
     as_hex: bool,
 ) -> Result<(), Error> {
     use std::fmt::Write;
-    let secret = item.secret().await?;
     let bytes = secret.as_bytes();
     if secret_only {
         let mut stdout = std::io::stdout().lock();
@@ -260,10 +419,6 @@ async fn print_item(
             stdout.write_all(b"\n")?;
         }
     } else {
-        let label = item.label().await?;
-        let mut attributes = item.attributes().await?;
-        let created = item.created().await?;
-        let modified = item.modified().await?;
         let local_offset = UtcOffset::current_local_offset().unwrap_or(UtcOffset::UTC);
 
         let created = OffsetDateTime::from_unix_timestamp(created.as_secs() as i64)
@@ -315,4 +470,69 @@ async fn print_item(
         print!("{result}");
     }
     Ok(())
+}
+
+fn print_item_keyring(
+    item: &oo7::file::Item,
+    secret_only: bool,
+    as_hex: bool,
+) -> Result<(), Error> {
+    let secret = item.secret();
+    let label = item.label();
+    let attributes = item
+        .attributes()
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect::<HashMap<String, String>>();
+    let created = item.created();
+    let modified = item.modified();
+    print_item_common(
+        &secret,
+        label,
+        attributes,
+        created,
+        modified,
+        secret_only,
+        as_hex,
+    )?;
+    Ok(())
+}
+
+async fn print_item_dbus(
+    item: &oo7::dbus::Item<'_>,
+    secret_only: bool,
+    as_hex: bool,
+) -> Result<(), Error> {
+    let secret = item.secret().await?;
+    let label = item.label().await?;
+    let attributes = item.attributes().await?;
+    let created = item.created().await?;
+    let modified = item.modified().await?;
+
+    print_item_common(
+        &secret,
+        &label,
+        attributes,
+        created,
+        modified,
+        secret_only,
+        as_hex,
+    )?;
+
+    Ok(())
+}
+
+// Copy from /client/src/file/api/mod.rs
+fn data_dir() -> Option<PathBuf> {
+    std::env::var_os("XDG_DATA_HOME")
+        .and_then(|h| if h.is_empty() { None } else { Some(h) })
+        .map(PathBuf::from)
+        .and_then(|p| if p.is_absolute() { Some(p) } else { None })
+        .or_else(|| home().map(|p| p.join(".local/share")))
+}
+
+fn home() -> Option<PathBuf> {
+    std::env::var_os("HOME")
+        .and_then(|h| if h.is_empty() { None } else { Some(h) })
+        .map(PathBuf::from)
 }
