@@ -130,6 +130,12 @@ enum Commands {
         attributes: Vec<(String, String)>,
     },
 
+    #[command(name = "list", about = "List all the items in the keyring")]
+    List {
+        #[arg(long, help = "Print the secret in hexadecimal.")]
+        hex: bool,
+    },
+
     #[command(name = "lock", about = "Lock the keyring")]
     Lock,
 
@@ -299,6 +305,24 @@ impl Commands {
                     }
                 }
             }
+            Commands::List { hex } => match keyring {
+                Keyring::File(keyring) => {
+                    let items = keyring.items().await?;
+                    for item in items {
+                        if let Ok(item) = item {
+                            print_item_keyring(&item, false, hex)?;
+                        } else {
+                            println!("Item is not valid and cannot be decrypted");
+                        }
+                    }
+                }
+                Keyring::Collection(collection) => {
+                    let items = collection.items().await?;
+                    for item in items {
+                        print_item_dbus(&item, false, hex).await?;
+                    }
+                }
+            },
             Commands::Lock => match keyring {
                 Keyring::File(_) => {
                     return Err(Error::new("Keyring file doesn't support locking."));
