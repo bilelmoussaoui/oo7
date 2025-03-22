@@ -353,7 +353,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-credential-oo7"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "cargo-credential",
  "oo7",
@@ -1173,7 +1173,7 @@ checksum = "d75b0bedcc4fe52caa0e03d9f1151a323e4aa5e2d78ba3580400cd3c9e2bc4bc"
 
 [[package]]
 name = "oo7"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "aes",
  "ashpd",
@@ -1210,7 +1210,7 @@ dependencies = [
 
 [[package]]
 name = "oo7-cli"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "clap",
  "hex",
@@ -1222,7 +1222,7 @@ dependencies = [
 
 [[package]]
 name = "oo7-daemon"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "clap",
  "enumflags2",
@@ -1238,7 +1238,7 @@ dependencies = [
 
 [[package]]
 name = "oo7-portal"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "ashpd",
  "clap",
