@@ -30,6 +30,7 @@ impl Keyring {
     ///
     /// This method will probably be removed in future versions if the
     /// misbehaviour is tracked and fixed.
+    #[deprecated = "The method is no longer useful as the user can fix the keyring using oo7-cli"]
     pub async fn with_broken_item_cleanup() -> Result<Self> {
         Self::new_inner(true).await
     }
