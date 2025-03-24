@@ -6,7 +6,7 @@ use zbus::{interface, object_server::SignalEmitter, zvariant::{OwnedObjectPath, 
 use crate::service::Service;
 
 #[derive(Debug, Clone, Copy)]
-enum PromptRole {
+pub enum PromptRole {
     Lock,
     Unlock,
     CreateCollection,
