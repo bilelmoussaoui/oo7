@@ -155,7 +155,7 @@ impl PrompterCallback {
         service: Service,
         prompt_path: OwnedObjectPath,
     ) -> Result<Self, oo7::crypto::Error> {
-        let index = 0;
+        let index = service.prompt_index().await;
         Ok(Self {
             window_id: window_id.to_owned(),
             path: OwnedObjectPath::try_from(format!("/org/gnome/keyring/Prompt/p{index}")).unwrap(),
