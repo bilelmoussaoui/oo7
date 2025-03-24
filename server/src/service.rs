@@ -18,7 +18,7 @@ use zbus::{
     zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Value},
 };
 
-use crate::{collection::Collection, error::Error, session::Session};
+use crate::{collection::Collection, error::Error, prompt::Prompt, session::Session};
 
 #[derive(Debug, Clone)]
 pub struct Service {
@@ -29,6 +29,9 @@ pub struct Service {
     // sessions mapped to their corresponding object path on the bus
     sessions: Arc<Mutex<HashMap<OwnedObjectPath, Session>>>,
     session_index: Arc<RwLock<u32>>,
+    // prompts mapped to their corresponding object path on the bus
+    prompts: Arc<Mutex<HashMap<OwnedObjectPath, Prompt>>>,
+    prompt_index: Arc<RwLock<u32>>,
 }
 
 #[zbus::interface(name = "org.freedesktop.Secret.Service")]
@@ -273,6 +276,8 @@ impl Service {
             connection: connection.clone(),
             sessions: Default::default(),
             session_index: Default::default(),
+            prompts: Default::default(),
+            prompt_index: Default::default(),
         };
 
         object_server
@@ -383,12 +388,34 @@ impl Service {
         None
     }
 
+    pub async fn session_index(&self) -> u32 {
+        let n_sessions = *self.session_index.read().await + 1;
+        *self.session_index.write().await = n_sessions;
+
+        n_sessions
+    }
+
     pub async fn session(&self, path: &OwnedObjectPath) -> Option<Session> {
         self.sessions.lock().await.get(path).cloned()
     }
 
     pub async fn remove_session(&self, path: &OwnedObjectPath) {
         self.sessions.lock().await.remove(path);
+    }
+
+    pub async fn prompt_index(&self) -> u32 {
+        let n_prompts = *self.prompt_index.read().await + 1;
+        *self.prompt_index.write().await = n_prompts;
+
+        n_prompts
+    }
+
+    pub async fn prompt(&self, path: &OwnedObjectPath) -> Option<Prompt> {
+        self.prompts.lock().await.get(path).cloned()
+    }
+
+    pub async fn remove_prompt(&self, path: &OwnedObjectPath) {
+        self.prompts.lock().await.remove(path);
     }
 
     pub fn signal_emitter<'a, P>(
@@ -402,12 +429,5 @@ impl Service {
         let signal_emitter = zbus::object_server::SignalEmitter::new(&self.connection, path)?;
 
         Ok(signal_emitter)
-    }
-
-    pub async fn session_index(&self) -> u32 {
-        let n_sessions = *self.session_index.read().await + 1;
-        *self.session_index.write().await = n_sessions;
-
-        n_sessions
     }
 }
