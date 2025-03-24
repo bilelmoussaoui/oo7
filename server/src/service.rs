@@ -18,7 +18,7 @@ use zbus::{
     zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Value},
 };
 
-use crate::{collection::Collection, error::Error, prompt::Prompt, session::Session};
+use crate::{collection::Collection, error::Error, prompt::{Prompt, PromptRole}, session::Session};
 
 #[derive(Debug, Clone)]
 pub struct Service {
@@ -134,7 +134,18 @@ impl Service {
         &self,
         objects: Vec<OwnedObjectPath>,
     ) -> Result<(Vec<OwnedObjectPath>, OwnedObjectPath), ServiceError> {
-        let (unlocked, _not_unlocked) = self.set_locked(false, &objects).await?;
+        let (unlocked, not_unlocked) = self.set_locked(false, &objects).await?;
+        if !not_unlocked.is_empty() {
+            let prompt = Prompt::new(self.clone(), not_unlocked, PromptRole::Unlock).await;
+            let path = prompt.path().clone();
+            self.prompts
+                .lock()
+                .await
+                .insert(path.clone(), prompt.clone());
+
+            self.object_server().at(&path, prompt).await?;
+            return Ok((unlocked, path));
+        }
 
         Ok((unlocked, OwnedObjectPath::default()))
     }
@@ -144,7 +155,19 @@ impl Service {
         &self,
         objects: Vec<OwnedObjectPath>,
     ) -> Result<(Vec<OwnedObjectPath>, OwnedObjectPath), ServiceError> {
-        let (locked, _not_locked) = self.set_locked(true, &objects).await?;
+        let (locked, not_locked) = self.set_locked(true, &objects).await?;
+        if !not_locked.is_empty() {
+            let prompt = Prompt::new(self.clone(), not_locked, PromptRole::Lock).await;
+            let path = prompt.path().clone();
+            self.prompts
+                .lock()
+                .await
+                .insert(path.clone(), prompt.clone());
+
+            self.object_server().at(&path, prompt).await?;
+            return Ok((locked, path));
+        }
+
 
         Ok((locked, OwnedObjectPath::default()))
     }
