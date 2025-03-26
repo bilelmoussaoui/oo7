@@ -7,10 +7,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use zbus::{
     interface, proxy,
-    zvariant::{
-        DeserializeDict, NoneValue, Optional, OwnedObjectPath, OwnedValue, SerializeDict, Type,
-        Value,
-    },
+    zvariant::{DeserializeDict, NoneValue, Optional, OwnedObjectPath, SerializeDict, Type, Value},
 };
 
 use crate::{
@@ -56,6 +53,25 @@ impl Properties {
             choice_chosen: None,
             caller_window: Some(window_id.to_owned()),
             continue_label: Some("Lock".to_owned()),
+            cancel_label: Some("Cancel".to_owned()),
+        }
+    }
+
+    fn for_unlock(object: &str, warning: &str, window_id: &str) -> Self {
+        Self {
+            title: Some("Unlock Keyring".to_owned()),
+            message: Some("Authentication required".to_owned()),
+            description: Some(format!(
+                "An application wants access to the keyring '{}', but it is locked",
+                object
+            )),
+            warning: Some(warning.to_owned()),
+            password_new: None,
+            password_strength: None,
+            choice_label: None,
+            choice_chosen: None,
+            caller_window: Some(window_id.to_owned()),
+            continue_label: Some("Unlock".to_owned()),
             cancel_label: Some("Cancel".to_owned()),
         }
     }
@@ -171,6 +187,11 @@ impl PrompterCallback {
             }
             Some(Reply::Yes) => {
                 // Second PromptReady call with the final exchange
+                let label = self
+                    .object_label(&prompt_objects)
+                    .await
+                    .unwrap_or(String::new());
+
                 match prompt_role {
                     PromptRole::Lock => {
                         let service = self.service.clone();
@@ -180,7 +201,61 @@ impl PrompterCallback {
                             let _ = service.set_locked(true, &objects, true).await;
                         });
                     }
-                    PromptRole::Unlock => todo!(),
+                    PromptRole::Unlock => {
+                        let Some(aes_key) = &*self.aes_key.read().await else {
+                            return Err(ServiceError::ZBus(zbus::Error::FDO(Box::new(
+                                zbus::fdo::Error::Failed(
+                                    "Failed to retrieve AES key for SecretExchange.".to_string(),
+                                ),
+                            ))));
+                        };
+
+                        // Verify the secret
+                        if let Some(secret) = secret_exchange::retrieve(exchange, aes_key) {
+                            match oo7::file::Keyring::open(&label, secret).await {
+                                Ok(_) => {
+                                    tracing::debug!("{} keyring secret matches.", &label);
+                                }
+                                Err(oo7::file::Error::IncorrectSecret) => {
+                                    tracing::error!("{} keyring incorrect secret.", &label);
+
+                                    let properties = Properties::for_unlock(
+                                        &label,
+                                        "The unlock password was incorrect",
+                                        &self.window_id,
+                                    );
+                                    let server_exchange = self.exchange.read().await.clone();
+
+                                    tokio::spawn(async move {
+                                        prompter
+                                            .perform_prompt(
+                                                path,
+                                                PromptType::Password,
+                                                properties,
+                                                &server_exchange,
+                                            )
+                                            .await
+                                    });
+
+                                    return Ok(());
+                                }
+                                Err(err) => {
+                                    return Err(ServiceError::ZBus(zbus::Error::FDO(Box::new(
+                                        zbus::fdo::Error::Failed(format!(
+                                            "Failed to unlock {label} Keyring: {err}."
+                                        )),
+                                    ))))
+                                }
+                            }
+                        }
+
+                        let service = self.service.clone();
+                        let objects = prompt_objects.clone();
+
+                        tokio::spawn(async move {
+                            let _ = service.set_locked(false, &objects, true).await;
+                        });
+                    }
                     PromptRole::CreateCollection => todo!(),
                 }
 
@@ -210,7 +285,22 @@ impl PrompterCallback {
                         Properties::for_lock(&label, &self.window_id),
                         PromptType::Confirm,
                     ),
-                    PromptRole::Unlock => todo!(),
+                    PromptRole::Unlock => {
+                        let aes_key = secret_exchange::handshake(&self.private_key, exchange)
+                            .map_err(|err| {
+                                ServiceError::ZBus(zbus::Error::FDO(Box::new(
+                                    zbus::fdo::Error::Failed(format!(
+                                        "Failed to generate AES key for SecretExchange {err}."
+                                    )),
+                                )))
+                            })?;
+                        *self.aes_key.write().await = Some(aes_key);
+
+                        (
+                            Properties::for_unlock(&label, "", &self.window_id),
+                            PromptType::Password,
+                        )
+                    }
                     PromptRole::CreateCollection => todo!(),
                 };
 
