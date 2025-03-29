@@ -691,7 +691,9 @@ mod tests {
             .join("legacy.keyring");
         fs::copy(&fixture_path, &v0_dir.join("default.keyring")).await?;
 
-        std::env::set_var("XDG_DATA_HOME", data_dir.path());
+        unsafe {
+            std::env::set_var("XDG_DATA_HOME", data_dir.path());
+        }
 
         assert!(!v1_dir.join("default.keyring").exists());
 
@@ -718,7 +720,9 @@ mod tests {
             .join("default.keyring");
         fs::copy(&fixture_path, &v0_dir.join("default.keyring")).await?;
 
-        std::env::set_var("XDG_DATA_HOME", data_dir.path());
+        unsafe {
+            std::env::set_var("XDG_DATA_HOME", data_dir.path());
+        }
 
         let secret = Secret::blob("test");
         let keyring = Keyring::open("default", secret).await?;
@@ -745,7 +749,9 @@ mod tests {
             .join("default.keyring");
         fs::copy(&fixture_path, &v1_dir.join("default.keyring")).await?;
 
-        std::env::set_var("XDG_DATA_HOME", data_dir.path());
+        unsafe {
+            std::env::set_var("XDG_DATA_HOME", data_dir.path());
+        }
 
         let secret = Secret::blob("wrong");
         let keyring = Keyring::open("default", secret).await;
@@ -773,7 +779,9 @@ mod tests {
             .join("default.keyring");
         fs::copy(&fixture_path, &v1_dir.join("default.keyring")).await?;
 
-        std::env::set_var("XDG_DATA_HOME", data_dir.path());
+        unsafe {
+            std::env::set_var("XDG_DATA_HOME", data_dir.path());
+        }
 
         let secret = Secret::blob("test");
         let keyring = Keyring::open("default", secret).await?;
@@ -795,7 +803,9 @@ mod tests {
         let v1_dir = v0_dir.join("v1");
         fs::create_dir_all(&v1_dir).await?;
 
-        std::env::set_var("XDG_DATA_HOME", data_dir.path());
+        unsafe {
+            std::env::set_var("XDG_DATA_HOME", data_dir.path());
+        }
 
         let secret = Secret::blob("test");
         let keyring = Keyring::open("default", secret).await?;

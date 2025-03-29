@@ -2,14 +2,14 @@
 
 use std::{
     collections::HashMap,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
     time::{Duration, SystemTime},
 };
 
 use oo7::{
     dbus::{
-        api::{DBusSecretInner, Properties},
         ServiceError,
+        api::{DBusSecretInner, Properties},
     },
     file::Keyring,
 };
@@ -17,7 +17,7 @@ use tokio::sync::{Mutex, RwLock};
 use zbus::{interface, object_server::SignalEmitter, proxy::Defaults, zvariant};
 use zvariant::{ObjectPath, OwnedObjectPath};
 
-use crate::{error::Error, item, Service};
+use crate::{Service, error::Error, item};
 
 #[derive(Debug, Clone)]
 pub struct Collection {

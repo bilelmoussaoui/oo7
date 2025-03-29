@@ -5,7 +5,7 @@ use async_lock::RwLock;
 #[cfg(feature = "tokio")]
 use tokio::sync::RwLock;
 
-use crate::{dbus, file, AsAttributes, Result, Secret};
+use crate::{AsAttributes, Result, Secret, dbus, file};
 
 /// A [Secret Service](crate::dbus) or [file](crate::file) backed keyring
 /// implementation.
