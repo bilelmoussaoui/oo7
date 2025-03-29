@@ -161,7 +161,7 @@ impl PrompterCallback {
         match *reply {
             // First PromptReady call
             None => {
-                self.prompter_init(prompt.role()).await?;
+                self.prompter_init(&prompt).await?;
             }
             // Second PromptReady call with final exchange
             Some(Reply::Yes) => {
@@ -219,14 +219,16 @@ impl PrompterCallback {
         &self.path
     }
 
-    async fn prompter_init(&self, role: PromptRole) -> Result<(), ServiceError> {
-        // TODO: figure out the appropriate label to use here
-        let label = "";
+    async fn prompter_init(&self, prompt: &Prompt) -> Result<(), ServiceError> {
+        let label = self
+            .object_label(prompt.objects())
+            .await
+            .unwrap_or_default();
         let connection = self.service.connection();
         let exchange = secret_exchange::begin(&self.public_key);
         self.exchange.set(exchange).unwrap();
 
-        let (properties, prompt_type) = match role {
+        let (properties, prompt_type) = match prompt.role() {
             PromptRole::Lock => (
                 Properties::for_lock(&label, self.window_id.as_deref()),
                 PromptType::Confirm,
@@ -263,7 +265,10 @@ impl PrompterCallback {
     }
 
     async fn prompter_done(&self, prompt: &Prompt, exchange: &str) -> Result<(), ServiceError> {
-        let label = "";
+        let label = self
+            .object_label(prompt.objects())
+            .await
+            .unwrap_or_default();
         let prompter = PrompterProxy::new(self.service.connection()).await?;
 
         match prompt.role() {
@@ -288,7 +293,7 @@ impl PrompterCallback {
 
                 // TODO: this should check if the service has a keyring, check the secret
                 // without opening it again.
-                match oo7::file::Keyring::open(label, secret).await {
+                match oo7::file::Keyring::open(&label, secret).await {
                     Ok(_) => tracing::debug!("Keyring secret matches for {label}."),
                     Err(oo7::file::Error::IncorrectSecret) => {
                         tracing::error!("Keyring {label} failed to unlock, incorrect secret.");
@@ -340,6 +345,30 @@ impl PrompterCallback {
             Prompt::completed(&signal_emitter, false, result).await
         });
         Ok(())
+    }
+
+    async fn object_label(&self, objects: &[OwnedObjectPath]) -> Option<String> {
+        debug_assert!(!objects.is_empty());
+        // If at least one of the items is a Collection
+        for object in objects {
+            if let Some(collection) = self.service.collection_from_path(object).await {
+                return Some(collection.label().await);
+            }
+        }
+        // Get the collection path from the first item in the keyring as you cannot
+        // unlock items from different collections I guess?
+        let path = objects
+            .first()
+            .unwrap()
+            .as_str()
+            .rsplit_once('/')
+            .map(|(parent, _)| parent)?;
+        let collection = self
+            .service
+            .collection_from_path(&OwnedObjectPath::try_from(path).unwrap())
+            .await?;
+
+        Some(collection.label().await)
     }
 
     async fn prompter_dismissed(&self, prompt_path: &OwnedObjectPath) -> Result<(), ServiceError> {
