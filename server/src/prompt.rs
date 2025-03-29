@@ -11,6 +11,7 @@ use zbus::{
 };
 
 use crate::{
+    error::custom_service_error,
     gnome::prompter::{PrompterCallback, PrompterProxy},
     service::Service,
 };
@@ -50,17 +51,15 @@ impl std::fmt::Debug for Prompt {
 impl Prompt {
     pub async fn prompt(&self, window_id: Optional<&str>) -> Result<(), ServiceError> {
         if self.callback.get().is_some() {
-            return Err(ServiceError::ZBus(zbus::Error::FDO(Box::new(
-                zbus::fdo::Error::Failed(format!("A prompt callback is ongoing already.")),
-            ))));
+            return Err(custom_service_error(
+                "A prompt callback is ongoing already.",
+            ));
         };
 
         let callback = PrompterCallback::new(*window_id, self.service.clone(), self.path.clone())
             .await
             .map_err(|err| {
-                ServiceError::ZBus(zbus::Error::FDO(Box::new(zbus::fdo::Error::Failed(
-                    format!("Failed to create PrompterCallback {err}."),
-                ))))
+                custom_service_error(&format!("Failed to create PrompterCallback {err}."))
             })?;
 
         let path = callback.path().clone();

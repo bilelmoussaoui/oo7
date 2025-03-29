@@ -237,11 +237,9 @@ impl PrompterCallback {
                 let aes_key =
                     secret_exchange::handshake(&self.private_key, self.exchange.get().unwrap())
                         .map_err(|err| {
-                            ServiceError::ZBus(zbus::Error::FDO(Box::new(
-                                zbus::fdo::Error::Failed(format!(
-                                    "Failed to generate AES key for SecretExchange {err}."
-                                )),
-                            )))
+                            custom_service_error(&format!(
+                                "Failed to generate AES key for SecretExchange {err}."
+                            ))
                         })?;
                 self.aes_key.set(aes_key).unwrap();
 

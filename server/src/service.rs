@@ -20,7 +20,7 @@ use zbus::{
 
 use crate::{
     collection::Collection,
-    error::Error,
+    error::{custom_service_error, Error},
     prompt::{Prompt, PromptRole},
     session::Session,
 };
@@ -53,23 +53,15 @@ impl Service {
             Algorithm::Encrypted => {
                 let client_public_key = Key::from(input);
                 let private_key = Key::generate_private_key().map_err(|err| {
-                    ServiceError::ZBus(zbus::Error::FDO(Box::new(zbus::fdo::Error::Failed(
-                        format!("Failed to generate private key {err}."),
-                    ))))
+                    custom_service_error(&format!("Failed to generate private key {err}."))
                 })?;
                 (
                     Some(Key::generate_public_key(&private_key).map_err(|err| {
-                        ServiceError::ZBus(zbus::Error::FDO(Box::new(zbus::fdo::Error::Failed(
-                            format!("Failed to generate public key {err}."),
-                        ))))
+                        custom_service_error(&format!("Failed to generate public key {err}."))
                     })?),
                     Some(
                         Key::generate_aes_key(&private_key, &client_public_key).map_err(|err| {
-                            ServiceError::ZBus(zbus::Error::FDO(Box::new(
-                                zbus::fdo::Error::Failed(format!(
-                                    "Failed to generate aes key {err}."
-                                )),
-                            )))
+                            custom_service_error(&format!("Failed to generate aes key {err}."))
                         })?,
                     ),
                 )
