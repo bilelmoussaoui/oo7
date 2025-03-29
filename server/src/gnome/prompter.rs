@@ -2,7 +2,10 @@ use oo7::dbus::ServiceError;
 use serde::{Deserialize, Serialize};
 use zbus::zvariant::{self, DeserializeDict, Optional, OwnedObjectPath, SerializeDict, Type};
 
-use crate::service::Service;
+use crate::{
+    prompt::{Prompt, PromptRole},
+    service::Service,
+};
 
 #[derive(Debug, DeserializeDict, SerializeDict, Type)]
 #[zvariant(signature = "dict")]
@@ -122,8 +125,9 @@ pub trait Prompter {
     fn stop_prompting(&self, callback: OwnedObjectPath) -> Result<(), ServiceError>;
 }
 
+#[derive(Debug, Clone)]
 pub struct PrompterCallback {
-    window_id: String,
+    window_id: Option<String>,
     service: Service,
     prompt_path: OwnedObjectPath,
     path: OwnedObjectPath,
@@ -138,26 +142,45 @@ impl PrompterCallback {
         exchange: &str,
         #[zbus(connection)] connection: &zbus::Connection,
     ) -> Result<(), ServiceError> {
-        todo!();
+        let prompt_path = &self.prompt_path;
+        let Some(prompt) = self.service.prompt(prompt_path).await else {
+            return Err(ServiceError::NoSuchObject(format!(
+                "Prompt '{prompt_path}' does not exist."
+            )));
+        };
+
+        match prompt.role() {
+            PromptRole::Lock => todo!(),
+            PromptRole::Unlock => todo!(),
+            PromptRole::CreateCollection => todo!(),
+        };
+        Ok(())
     }
 
     async fn prompt_done(
         &self,
-        #[zbus(object_server)] object_server: &zbus::ObjectServer,
     ) -> Result<(), ServiceError> {
-        todo!();
+        // This is only does check if the prompt is tracked on Service
+        let path = &self.prompt_path;
+        if let Some(prompt) = self.service.prompt(path).await {
+            self.service.object_server().remove::<Prompt, _>(path).await?;
+            self.service.remove_prompt(path).await;
+        }
+        self.service.object_server().remove::<Self, _>(&self.path).await?;
+
+        Ok(())
     }
 }
 
 impl PrompterCallback {
     pub async fn new(
-        window_id: &str,
+        window_id: Option<&str>,
         service: Service,
         prompt_path: OwnedObjectPath,
     ) -> Result<Self, oo7::crypto::Error> {
         let index = service.prompt_index().await;
         Ok(Self {
-            window_id: window_id.to_owned(),
+            window_id: window_id.map(ToOwned::to_owned),
             path: OwnedObjectPath::try_from(format!("/org/gnome/keyring/Prompt/p{index}")).unwrap(),
             service,
             prompt_path,

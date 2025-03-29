@@ -18,7 +18,12 @@ use zbus::{
     zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Value},
 };
 
-use crate::{collection::Collection, error::Error, prompt::{Prompt, PromptRole}, session::Session};
+use crate::{
+    collection::Collection,
+    error::Error,
+    prompt::{Prompt, PromptRole},
+    session::Session,
+};
 
 #[derive(Debug, Clone)]
 pub struct Service {
@@ -167,7 +172,6 @@ impl Service {
             self.object_server().at(&path, prompt).await?;
             return Ok((locked, path));
         }
-
 
         Ok((locked, OwnedObjectPath::default()))
     }
@@ -393,6 +397,10 @@ impl Service {
         }
 
         Ok((without_prompt, with_prompt))
+    }
+
+    pub fn connection(&self) -> &zbus::Connection {
+        &self.connection
     }
 
     pub fn object_server(&self) -> &zbus::ObjectServer {
