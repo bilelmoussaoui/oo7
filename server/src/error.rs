@@ -1,5 +1,7 @@
 use std::fmt;
 
+use oo7::dbus::ServiceError;
+
 #[derive(Debug)]
 pub enum Error {
     // File backend error
@@ -42,4 +44,10 @@ impl fmt::Display for Error {
             Self::InvalidItem(err) => write!(f, "Item cannot be decrypted {err}"),
         }
     }
+}
+
+pub(crate) fn custom_service_error(error: &str) -> ServiceError {
+    ServiceError::ZBus(zbus::Error::FDO(Box::new(zbus::fdo::Error::Failed(
+        error.to_string(),
+    ))))
 }

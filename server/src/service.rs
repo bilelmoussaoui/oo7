@@ -139,7 +139,7 @@ impl Service {
         &self,
         objects: Vec<OwnedObjectPath>,
     ) -> Result<(Vec<OwnedObjectPath>, OwnedObjectPath), ServiceError> {
-        let (unlocked, not_unlocked) = self.set_locked(false, &objects).await?;
+        let (unlocked, not_unlocked) = self.set_locked(false, &objects, false).await?;
         if !not_unlocked.is_empty() {
             let prompt = Prompt::new(self.clone(), not_unlocked, PromptRole::Unlock).await;
             let path = prompt.path().clone();
@@ -160,7 +160,7 @@ impl Service {
         &self,
         objects: Vec<OwnedObjectPath>,
     ) -> Result<(Vec<OwnedObjectPath>, OwnedObjectPath), ServiceError> {
-        let (locked, not_locked) = self.set_locked(true, &objects).await?;
+        let (locked, not_locked) = self.set_locked(true, &objects, false).await?;
         if !not_locked.is_empty() {
             let prompt = Prompt::new(self.clone(), not_locked, PromptRole::Lock).await;
             let path = prompt.path().clone();
@@ -350,6 +350,7 @@ impl Service {
         &self,
         locked: bool,
         objects: &[OwnedObjectPath],
+        from_prompt: bool,
     ) -> Result<(Vec<OwnedObjectPath>, Vec<OwnedObjectPath>), ServiceError> {
         let mut without_prompt = Vec::new();
         let mut with_prompt = Vec::new();
@@ -367,8 +368,10 @@ impl Service {
                         );
                         without_prompt.push(object.clone());
                     } else {
-                        // TODO: remove this once the prompt implementation is complete.
-                        collection.set_locked(locked).await?;
+                        // TODO: get rid of from_prompt and use futures
+                        if from_prompt {
+                            collection.set_locked(locked).await?;
+                        }
                         with_prompt.push(object.clone());
                     }
                     break;
@@ -386,8 +389,10 @@ impl Service {
                         item.set_locked(locked).await?;
                         without_prompt.push(object.clone());
                     } else {
-                        // TODO: remove this once the prompt implementation is complete.
-                        item.set_locked(locked).await?;
+                        // TODO: get rid of from_prompt and use futures
+                        if from_prompt {
+                            item.set_locked(locked).await?;
+                        }
                         with_prompt.push(object.clone());
                     }
                     break;
