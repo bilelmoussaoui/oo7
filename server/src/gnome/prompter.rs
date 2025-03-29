@@ -1,8 +1,13 @@
-use oo7::dbus::ServiceError;
+use std::sync::Arc;
+
+use oo7::{dbus::ServiceError, Key};
 use serde::{Deserialize, Serialize};
+use tokio::sync::OnceCell;
 use zbus::zvariant::{self, DeserializeDict, Optional, OwnedObjectPath, SerializeDict, Type};
 
+use super::secret_exchange;
 use crate::{
+    error::custom_service_error,
     prompt::{Prompt, PromptRole},
     service::Service,
 };
@@ -128,6 +133,10 @@ pub trait Prompter {
 #[derive(Debug, Clone)]
 pub struct PrompterCallback {
     window_id: Option<String>,
+    private_key: Arc<Key>,
+    public_key: Arc<Key>,
+    aes_key: Arc<OnceCell<Key>>,
+    exchange: OnceCell<String>,
     service: Service,
     prompt_path: OwnedObjectPath,
     path: OwnedObjectPath,
@@ -149,24 +158,37 @@ impl PrompterCallback {
             )));
         };
 
-        match prompt.role() {
-            PromptRole::Lock => todo!(),
-            PromptRole::Unlock => todo!(),
-            PromptRole::CreateCollection => todo!(),
+        match *reply {
+            // First PromptReady call
+            None => {
+                self.prompter_init(prompt.role()).await?;
+            }
+            // Second PromptReady call with final exchange
+            Some(Reply::Yes) => {
+                self.prompter_done(&prompt, exchange).await?;
+            }
+            // Dismissed prompt
+            Some(Reply::No) => {
+                self.prompter_dismissed(prompt.path()).await?;
+            }
         };
         Ok(())
     }
 
-    async fn prompt_done(
-        &self,
-    ) -> Result<(), ServiceError> {
+    async fn prompt_done(&self) -> Result<(), ServiceError> {
         // This is only does check if the prompt is tracked on Service
         let path = &self.prompt_path;
         if let Some(prompt) = self.service.prompt(path).await {
-            self.service.object_server().remove::<Prompt, _>(path).await?;
+            self.service
+                .object_server()
+                .remove::<Prompt, _>(path)
+                .await?;
             self.service.remove_prompt(path).await;
         }
-        self.service.object_server().remove::<Self, _>(&self.path).await?;
+        self.service
+            .object_server()
+            .remove::<Self, _>(&self.path)
+            .await?;
 
         Ok(())
     }
@@ -179,8 +201,14 @@ impl PrompterCallback {
         prompt_path: OwnedObjectPath,
     ) -> Result<Self, oo7::crypto::Error> {
         let index = service.prompt_index().await;
+        let private_key = Arc::new(Key::generate_private_key()?);
+        let public_key = Arc::new(crate::gnome::crypto::generate_public_key(&private_key)?);
         Ok(Self {
             window_id: window_id.map(ToOwned::to_owned),
+            public_key,
+            private_key,
+            aes_key: Default::default(),
+            exchange: Default::default(),
             path: OwnedObjectPath::try_from(format!("/org/gnome/keyring/Prompt/p{index}")).unwrap(),
             service,
             prompt_path,
@@ -189,5 +217,142 @@ impl PrompterCallback {
 
     pub fn path(&self) -> &OwnedObjectPath {
         &self.path
+    }
+
+    async fn prompter_init(&self, role: PromptRole) -> Result<(), ServiceError> {
+        // TODO: figure out the appropriate label to use here
+        let label = "";
+        let connection = self.service.connection();
+        let exchange = secret_exchange::begin(&self.public_key);
+        self.exchange.set(exchange).unwrap();
+
+        let (properties, prompt_type) = match role {
+            PromptRole::Lock => (
+                Properties::for_lock(&label, self.window_id.as_deref()),
+                PromptType::Confirm,
+            ),
+            PromptRole::Unlock => {
+                let aes_key =
+                    secret_exchange::handshake(&self.private_key, self.exchange.get().unwrap())
+                        .map_err(|err| {
+                            ServiceError::ZBus(zbus::Error::FDO(Box::new(
+                                zbus::fdo::Error::Failed(format!(
+                                    "Failed to generate AES key for SecretExchange {err}."
+                                )),
+                            )))
+                        })?;
+                self.aes_key.set(aes_key).unwrap();
+
+                (
+                    Properties::for_unlock(&label, None, self.window_id.as_deref()),
+                    PromptType::Password,
+                )
+            }
+            PromptRole::CreateCollection => todo!(),
+        };
+
+        let prompter = PrompterProxy::new(connection).await?;
+        let path = self.path.clone();
+        let exchange = self.exchange.get().unwrap().clone();
+        tokio::spawn(async move {
+            prompter
+                .perform_prompt(path, prompt_type, properties, &exchange)
+                .await
+        });
+        Ok(())
+    }
+
+    async fn prompter_done(&self, prompt: &Prompt, exchange: &str) -> Result<(), ServiceError> {
+        let label = "";
+        let prompter = PrompterProxy::new(self.service.connection()).await?;
+
+        match prompt.role() {
+            PromptRole::Lock => {
+                let service = self.service.clone();
+                let objects = prompt.objects().to_owned();
+                tokio::spawn(async move {
+                    let _ = service.set_locked(true, &objects, true).await;
+                });
+            }
+            PromptRole::Unlock => {
+                let Some(aes_key) = self.aes_key.get() else {
+                    return Err(custom_service_error(
+                        "Failed to retrieve AES key for SecretExchange.",
+                    ));
+                };
+                let Some(secret) = secret_exchange::retrieve(exchange, aes_key) else {
+                    return Err(custom_service_error(
+                        "Failed to retrieve keyring secret from SecretExchange.",
+                    ));
+                };
+
+                // TODO: this should check if the service has a keyring, check the secret
+                // without opening it again.
+                match oo7::file::Keyring::open(label, secret).await {
+                    Ok(_) => tracing::debug!("Keyring secret matches for {label}."),
+                    Err(oo7::file::Error::IncorrectSecret) => {
+                        tracing::error!("Keyring {label} failed to unlock, incorrect secret.");
+                        let properties = Properties::for_unlock(
+                            &label,
+                            Some("The unlock password was incorrect"),
+                            self.window_id.as_deref(),
+                        );
+                        let server_exchange = self
+                            .exchange
+                            .get()
+                            .expect("Exchange cannot be empty at this stage")
+                            .clone();
+                        let path = self.path.clone();
+
+                        tokio::spawn(async move {
+                            prompter
+                                .perform_prompt(
+                                    path,
+                                    PromptType::Password,
+                                    properties,
+                                    &server_exchange,
+                                )
+                                .await
+                        });
+
+                        return Ok(());
+                    }
+                    Err(err) => {
+                        return Err(custom_service_error(&format!(
+                            "Failed to unlock {label} keyring: {err}."
+                        )))
+                    }
+                }
+            }
+            PromptRole::CreateCollection => todo!(),
+        }
+
+        let path = self.path.clone();
+        tokio::spawn(async move { prompter.stop_prompting(path).await });
+
+        let signal_emitter = self.service.signal_emitter(prompt.path().clone())?;
+        let result = zvariant::Value::new(prompt.objects())
+            .try_to_owned()
+            .unwrap();
+
+        tokio::spawn(async move {
+            tracing::debug!("Prompt completed.");
+            Prompt::completed(&signal_emitter, false, result).await
+        });
+        Ok(())
+    }
+
+    async fn prompter_dismissed(&self, prompt_path: &OwnedObjectPath) -> Result<(), ServiceError> {
+        let path = self.path.clone();
+        let prompter = PrompterProxy::new(self.service.connection()).await?;
+
+        tokio::spawn(async move { prompter.stop_prompting(path).await });
+        let signal_emitter = self.service.signal_emitter(prompt_path.clone())?;
+        let result = zvariant::Value::new::<Vec<OwnedObjectPath>>(vec![])
+            .try_to_owned()
+            .unwrap();
+
+        tokio::spawn(async move { Prompt::completed(&signal_emitter, true, result).await });
+        Ok(())
     }
 }

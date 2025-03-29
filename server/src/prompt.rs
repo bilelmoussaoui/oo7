@@ -45,7 +45,6 @@ impl std::fmt::Debug for Prompt {
     }
 }
 
-
 #[interface(name = "org.freedesktop.Secret.Prompt")]
 impl Prompt {
     pub async fn prompt(&self, window_id: Optional<&str>) -> Result<(), ServiceError> {
@@ -65,7 +64,9 @@ impl Prompt {
 
         let path = callback.path().clone();
 
-        self.callback.set(callback.clone()).expect("A prompt callback is only set once");
+        self.callback
+            .set(callback.clone())
+            .expect("A prompt callback is only set once");
 
         self.service.object_server().at(&path, callback).await?;
         tracing::debug!("Prompt `{}` created.", self.path);
@@ -81,17 +82,21 @@ impl Prompt {
 
     pub async fn dismiss(&self) -> Result<(), ServiceError> {
         if let Some(_callback) = self.callback.get() {
-            //TODO: figure out if we should destroy the un-export the callback here?
+            // TODO: figure out if we should destroy the un-export the callback
+            // here?
         }
 
-        self.service.object_server().remove::<Self, _>(&self.path).await?;
+        self.service
+            .object_server()
+            .remove::<Self, _>(&self.path)
+            .await?;
         self.service.remove_prompt(&self.path).await;
 
         Ok(())
     }
 
     #[zbus(signal, name = "Completed")]
-    async fn completed(
+    pub async fn completed(
         signal_emitter: &SignalEmitter<'_>,
         dismissed: bool,
         result: OwnedValue,
