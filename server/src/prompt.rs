@@ -19,6 +19,7 @@ use crate::{
 pub enum PromptRole {
     Lock,
     Unlock,
+    #[allow(unused)]
     CreateCollection,
 }
 
