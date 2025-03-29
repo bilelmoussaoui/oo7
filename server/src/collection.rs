@@ -17,7 +17,10 @@ use tokio::sync::{Mutex, RwLock};
 use zbus::{interface, object_server::SignalEmitter, proxy::Defaults, zvariant};
 use zvariant::{ObjectPath, OwnedObjectPath};
 
-use crate::{error::Error, item, Service};
+use crate::{
+    error::{custom_service_error, Error},
+    item, Service,
+};
 
 #[derive(Debug, Clone)]
 pub struct Collection {
@@ -95,11 +98,8 @@ impl Collection {
         };
 
         let secret = match session.aes_key() {
-            Some(key) => oo7::crypto::decrypt(secret, &key, &iv).map_err(|err| {
-                ServiceError::ZBus(zbus::Error::FDO(Box::new(zbus::fdo::Error::Failed(
-                    format!("Failed to decrypt secret {err}."),
-                ))))
-            })?,
+            Some(key) => oo7::crypto::decrypt(secret, &key, &iv)
+                .map_err(|err| custom_service_error(&format!("Failed to decrypt secret {err}.")))?,
             None => zeroize::Zeroizing::new(secret),
         };
 
@@ -107,11 +107,7 @@ impl Collection {
             .keyring
             .create_item(label, &attributes, secret, replace)
             .await
-            .map_err(|err| {
-                ServiceError::ZBus(zbus::Error::FDO(Box::new(zbus::fdo::Error::Failed(
-                    format!("Failed to create a new item {err}."),
-                ))))
-            })?;
+            .map_err(|err| custom_service_error(&format!("Failed to create a new item {err}.")))?;
 
         let n_items = *self.item_index.read().await;
         let item = item::Item::new(item, false, self.service.clone(), &self.path, n_items);
@@ -319,11 +315,10 @@ impl Collection {
         }
 
         let attributes = item.attributes().await;
-        self.keyring.delete(&attributes).await.map_err(|err| {
-            ServiceError::ZBus(zbus::Error::FDO(Box::new(zbus::fdo::Error::Failed(
-                format!("Failed to deleted item {err}."),
-            ))))
-        })?;
+        self.keyring
+            .delete(&attributes)
+            .await
+            .map_err(|err| custom_service_error(&format!("Failed to deleted item {err}.")))?;
 
         let mut items = self.items.lock().await;
         items.retain(|item| item.path() != path);

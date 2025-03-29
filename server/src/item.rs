@@ -12,7 +12,7 @@ use oo7::{
 use tokio::sync::Mutex;
 use zbus::zvariant::OwnedObjectPath;
 
-use crate::{collection::Collection, Service};
+use crate::{collection::Collection, error::custom_service_error, Service};
 
 #[derive(Debug, Clone)]
 pub struct Item {
@@ -84,14 +84,10 @@ impl Item {
         match session.aes_key() {
             Some(key) => {
                 let iv = oo7::crypto::generate_iv().map_err(|err| {
-                    ServiceError::ZBus(zbus::Error::FDO(Box::new(zbus::fdo::Error::Failed(
-                        format!("Failed to generate iv {err}."),
-                    ))))
+                    custom_service_error(&format!("Failed to generate iv {err}."))
                 })?;
                 let encrypted = oo7::crypto::encrypt(secret, &key, &iv).map_err(|err| {
-                    ServiceError::ZBus(zbus::Error::FDO(Box::new(zbus::fdo::Error::Failed(
-                        format!("Failed to encrypt secret {err}."),
-                    ))))
+                    custom_service_error(&format!("Failed to encrypt secret {err}."))
                 })?;
 
                 Ok((DBusSecretInner(
@@ -126,9 +122,7 @@ impl Item {
         match session.aes_key() {
             Some(key) => {
                 let decrypted = oo7::crypto::decrypt(secret, &key, &iv).map_err(|err| {
-                    ServiceError::ZBus(zbus::Error::FDO(Box::new(zbus::fdo::Error::Failed(
-                        format!("Failed to decrypt secret {err}."),
-                    ))))
+                    custom_service_error(&format!("Failed to decrypt secret {err}."))
                 })?;
                 inner.set_secret(decrypted);
             }
