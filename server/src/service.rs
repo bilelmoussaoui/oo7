@@ -12,6 +12,7 @@ use oo7::{
     Key, Secret,
 };
 use tokio::sync::{Mutex, RwLock};
+use tokio_stream::StreamExt;
 use zbus::{
     object_server::SignalEmitter,
     proxy::Defaults,
@@ -37,6 +38,8 @@ pub struct Service {
     // prompts mapped to their corresponding object path on the bus
     prompts: Arc<Mutex<HashMap<OwnedObjectPath, Prompt>>>,
     prompt_index: Arc<RwLock<u32>>,
+    // client UniqueNames mapped to their session object paths
+    clients: Arc<Mutex<HashMap<String, OwnedObjectPath>>>,
 }
 
 #[zbus::interface(name = "org.freedesktop.Secret.Service")]
@@ -46,6 +49,7 @@ impl Service {
         &self,
         algorithm: Algorithm,
         input: Value<'_>,
+        #[zbus(header)] header: zbus::message::Header<'_>,
         #[zbus(object_server)] object_server: &zbus::ObjectServer,
     ) -> Result<(OwnedValue, OwnedObjectPath), ServiceError> {
         let (public_key, aes_key) = match algorithm {
@@ -75,6 +79,14 @@ impl Service {
             .lock()
             .await
             .insert(path.clone(), session.clone());
+
+        if let Some(sender) = header.sender() {
+            tracing::info!("Client {} connected.", sender);
+            self.clients
+                .lock()
+                .await
+                .insert(sender.as_str().to_owned(), path.clone());
+        }
 
         object_server.at(&path, session).await?;
 
@@ -297,6 +309,7 @@ impl Service {
             session_index: Default::default(),
             prompts: Default::default(),
             prompt_index: Default::default(),
+            clients: Default::default(),
         };
 
         object_server
@@ -334,6 +347,9 @@ impl Service {
         object_server
             .at(collection.path().clone(), collection)
             .await?;
+
+        let service = service.clone();
+        tokio::spawn(async move { service.cleanup_sessions_on_client_disconnect().await });
 
         Ok(())
     }
@@ -457,5 +473,43 @@ impl Service {
         let signal_emitter = zbus::object_server::SignalEmitter::new(&self.connection, path)?;
 
         Ok(signal_emitter)
+    }
+
+    pub async fn remove_client(&self, old_owner: &str) -> Option<OwnedObjectPath> {
+        self.clients.lock().await.remove(old_owner)
+    }
+
+    pub async fn cleanup_sessions_on_client_disconnect(&self) -> Result<(), Error> {
+        let rule = zbus::MatchRule::builder()
+            .msg_type(zbus::message::Type::Signal)
+            .sender("org.freedesktop.DBus")?
+            .member("NameOwnerChanged")?
+            .build();
+        let mut stream = zbus::MessageStream::for_match_rule(rule, &self.connection, None).await?;
+
+        while let Some(message) = stream.try_next().await? {
+            let Ok((_name, old_owner, new_owner)) =
+                message.body().deserialize::<(String, String, String)>()
+            else {
+                continue;
+            };
+
+            if new_owner.is_empty() {
+                if let Some(session_path) = self.remove_client(&old_owner).await {
+                    if let Some(session) = self.session(&session_path).await {
+                        match session.close(self.object_server()).await {
+                            Ok(_) => tracing::info!(
+                                "Client {} disconnected, session: {} closed.",
+                                old_owner,
+                                session_path
+                            ),
+                            Err(_) => tracing::info!("Failed to close session: {}.", session_path),
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 }
