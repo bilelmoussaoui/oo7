@@ -22,6 +22,7 @@ rpassword = "7.3"
 serde.workspace = true
 sha2 = { version = "0.10", optional = true }
 tokio = { workspace = true, features = ["full"] }
+tokio-stream = "0.1"
 tracing = "0.1"
 tracing-subscriber.workspace = true
 zbus.workspace = true
