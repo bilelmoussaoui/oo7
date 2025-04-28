@@ -229,7 +229,16 @@ impl Collection {
         let mut items = Vec::new();
 
         for item in self.items.lock().await.iter() {
-            if item.attributes().await == *attributes {
+            let item_attributes = item.attributes().await;
+
+            // Check if the (key, value) pairs in the requested attributes are
+            // a subset of the attributes in the item being checked for in the
+            // collection.
+            let attributes_are_subset = attributes
+                .iter()
+                .all(|(key, value)| item_attributes.get(key) == Some(value));
+
+            if attributes_are_subset {
                 items.push(item.clone());
             }
         }
