@@ -179,14 +179,14 @@ impl Item {
         item: file::Item,
         locked: bool,
         service: Service,
-        collection_path: &OwnedObjectPath,
+        collection_path: OwnedObjectPath,
         item_index: u32,
     ) -> Self {
         Self {
             locked: Arc::new(AtomicBool::new(locked)),
             inner: Arc::new(Mutex::new(item)),
-            collection_path: collection_path.clone(),
             path: OwnedObjectPath::try_from(format!("{collection_path}/{item_index}")).unwrap(),
+            collection_path,
             service,
         }
     }
