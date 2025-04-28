@@ -110,7 +110,13 @@ impl Collection {
             .map_err(|err| custom_service_error(&format!("Failed to create a new item {err}.")))?;
 
         let n_items = *self.item_index.read().await;
-        let item = item::Item::new(item, false, self.service.clone(), &self.path, n_items);
+        let item = item::Item::new(
+            item,
+            false,
+            self.service.clone(),
+            self.path.clone(),
+            n_items,
+        );
         *self.item_index.write().await = n_items + 1;
 
         self.items.lock().await.push(item.clone());
@@ -291,7 +297,7 @@ impl Collection {
                 keyring_item.map_err(Error::InvalidItem)?,
                 self.is_locked().await,
                 self.service.clone(),
-                &self.path,
+                self.path.clone(),
                 n_items,
             );
             n_items += 1;
