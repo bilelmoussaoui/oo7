@@ -56,6 +56,10 @@ async fn send_secret_to_app(app_id: &AppID, fd: std::os::fd::OwnedFd) -> Result<
     std_stream.set_nonblocking(true)?;
     let mut stream = tokio::net::UnixStream::from_std(std_stream)?;
 
+    if collection.is_locked().await? {
+        collection.unlock(None).await?;
+    }
+
     if let Some(item) = collection.search_items(&attributes).await?.first() {
         stream.write_all(&item.secret().await?).await?;
     } else {
