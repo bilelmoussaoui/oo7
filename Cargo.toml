@@ -22,7 +22,7 @@ rust-version = "1.80"
 exclude = ["org.freedesktop.Secrets.xml"]
 
 [workspace.dependencies]
-zvariant = { version = "5.2", default-features = false, features = ["gvariant"]}
+zvariant = { version = "5.5", default-features = false, features = ["gvariant"]}
 ashpd = {version = "0.11", default-features = false}
 endi = "1.1"
 clap = { version = "4.5", features = [ "cargo", "derive" ] }
