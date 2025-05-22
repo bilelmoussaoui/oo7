@@ -3,7 +3,7 @@ use std::sync::Arc;
 use oo7::{dbus::ServiceError, Key};
 use serde::{Deserialize, Serialize};
 use tokio::sync::OnceCell;
-use zbus::zvariant::{self, DeserializeDict, Optional, OwnedObjectPath, SerializeDict, Type};
+use zbus::zvariant::{self, as_value, Optional, OwnedObjectPath, Type};
 
 use super::secret_exchange;
 use crate::{
@@ -12,31 +12,36 @@ use crate::{
     service::Service,
 };
 
-#[derive(Debug, DeserializeDict, SerializeDict, Type)]
+#[derive(Debug, Serialize, Deserialize, Type)]
 #[zvariant(signature = "dict")]
 // GcrPrompt properties <https://gitlab.gnome.org/GNOME/gcr/-/blob/main/gcr/gcr-prompt.c#L95>
-// This struct causes "Unexpected non-0 padding byte `1`" error.
-// See <https://github.com/dbus2/zbus/issues/1303>
+// This would fail to serialize till <https://gitlab.gnome.org/GNOME/gcr/-/merge_requests/169>
+// is resolved.
 struct Properties {
+    #[serde(with = "as_value::optional", skip_serializing_if = "Option::is_none")]
     title: Option<String>,
+    #[serde(with = "as_value::optional", skip_serializing_if = "Option::is_none")]
     message: Option<String>,
+    #[serde(with = "as_value::optional", skip_serializing_if = "Option::is_none")]
     description: Option<String>,
+    #[serde(with = "as_value::optional", skip_serializing_if = "Option::is_none")]
     warning: Option<String>,
-    #[zvariant(rename = "password-new")]
+    #[serde(with = "as_value::optional", skip_serializing_if = "Option::is_none")]
     password_new: Option<bool>,
-    #[zvariant(rename = "password-strength")]
+    #[serde(with = "as_value::optional", skip_serializing_if = "Option::is_none")]
     password_strength: Option<u32>,
-    #[zvariant(rename = "choice-label")]
+    #[serde(with = "as_value::optional", skip_serializing_if = "Option::is_none")]
     choice_label: Option<String>,
-    #[zvariant(rename = "choice-chosen")]
+    #[serde(with = "as_value::optional", skip_serializing_if = "Option::is_none")]
     choice_chosen: Option<bool>,
-    #[zvariant(rename = "caller-window")]
+    #[serde(with = "as_value::optional", skip_serializing_if = "Option::is_none")]
     caller_window: Option<String>,
-    #[zvariant(rename = "continue-label")]
+    #[serde(with = "as_value::optional", skip_serializing_if = "Option::is_none")]
     continue_label: Option<String>,
-    #[zvariant(rename = "cancel-label")]
+    #[serde(with = "as_value::optional", skip_serializing_if = "Option::is_none")]
     cancel_label: Option<String>,
 }
+
 impl Properties {
     fn for_lock(keyring: &str, window_id: Option<&str>) -> Self {
         Self {
