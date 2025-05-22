@@ -10,30 +10,32 @@ use crate::Service;
 #[derive(Debug, Clone)]
 pub struct Session {
     aes_key: Option<Arc<Key>>,
+    client_name: String,
     service: Service,
     path: OwnedObjectPath,
 }
 
 #[interface(name = "org.freedesktop.Secret.Session")]
 impl Session {
-    pub async fn close(
-        &self,
-        #[zbus(object_server)] object_server: &zbus::ObjectServer,
-    ) -> Result<(), ServiceError> {
+    pub async fn close(&self) -> Result<(), ServiceError> {
         self.service.remove_session(&self.path).await;
-        object_server.remove::<Self, _>(&self.path).await?;
+        self.service
+            .object_server()
+            .remove::<Self, _>(&self.path)
+            .await?;
 
         Ok(())
     }
 }
 
 impl Session {
-    pub async fn new(aes_key: Option<Arc<Key>>, service: Service) -> Self {
+    pub async fn new(aes_key: Option<Arc<Key>>, client_name: String, service: Service) -> Self {
         let index = service.session_index().await;
         Self {
             path: OwnedObjectPath::try_from(format!("/org/freedesktop/secrets/session/s{index}"))
                 .unwrap(),
             aes_key,
+            client_name,
             service,
         }
     }
@@ -44,5 +46,9 @@ impl Session {
 
     pub fn aes_key(&self) -> Option<Arc<Key>> {
         self.aes_key.as_ref().map(Arc::clone)
+    }
+
+    pub fn client_name(&self) -> &str {
+        &self.client_name
     }
 }
