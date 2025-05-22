@@ -311,7 +311,7 @@ impl Service {
         if let Some(secret) = secret {
             let collection = Collection::new(
                 "login",
-                "default",
+                oo7::dbus::Service::DEFAULT_COLLECTION,
                 false,
                 service.clone(),
                 Arc::new(Keyring::open("login", secret).await?),
@@ -325,7 +325,7 @@ impl Service {
 
         let collection = Collection::new(
             "session",
-            "session",
+            oo7::dbus::Service::SESSION_COLLECTION,
             false,
             service.clone(),
             Arc::new(Keyring::temporary(Secret::random().unwrap()).await?),
