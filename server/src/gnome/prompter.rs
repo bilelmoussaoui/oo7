@@ -14,6 +14,7 @@ use crate::{
 
 #[derive(Debug, Serialize, Deserialize, Type)]
 #[zvariant(signature = "dict")]
+#[serde(rename_all = "kebab-case")]
 // GcrPrompt properties <https://gitlab.gnome.org/GNOME/gcr/-/blob/main/gcr/gcr-prompt.c#L95>
 // This would fail to serialize till <https://gitlab.gnome.org/GNOME/gcr/-/merge_requests/169>
 // is resolved.
