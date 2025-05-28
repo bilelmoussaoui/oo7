@@ -1,6 +1,6 @@
 // org.freedesktop.Secret.Prompt
 
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use oo7::dbus::ServiceError;
 use tokio::sync::OnceCell;
@@ -56,11 +56,17 @@ impl Prompt {
             ));
         };
 
-        let callback = PrompterCallback::new(*window_id, self.service.clone(), self.path.clone())
-            .await
-            .map_err(|err| {
-                custom_service_error(&format!("Failed to create PrompterCallback {err}."))
-            })?;
+        let callback = PrompterCallback::new(
+            (*window_id)
+                .map(|w| ashpd::WindowIdentifierType::from_str(w).ok())
+                .flatten(),
+            self.service.clone(),
+            self.path.clone(),
+        )
+        .await
+        .map_err(|err| {
+            custom_service_error(&format!("Failed to create PrompterCallback {err}."))
+        })?;
 
         let path = callback.path().clone();
 

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use oo7::{dbus::ServiceError, Key};
+use oo7::{ashpd::WindowIdentifierType, dbus::ServiceError, Key};
 use serde::{Deserialize, Serialize};
 use tokio::sync::OnceCell;
 use zbus::zvariant::{self, as_value, Optional, OwnedObjectPath, Type};
@@ -36,7 +36,7 @@ struct Properties {
     #[serde(with = "as_value::optional", skip_serializing_if = "Option::is_none")]
     choice_chosen: Option<bool>,
     #[serde(with = "as_value::optional", skip_serializing_if = "Option::is_none")]
-    caller_window: Option<String>,
+    caller_window: Option<WindowIdentifierType>,
     #[serde(with = "as_value::optional", skip_serializing_if = "Option::is_none")]
     continue_label: Option<String>,
     #[serde(with = "as_value::optional", skip_serializing_if = "Option::is_none")]
@@ -44,7 +44,7 @@ struct Properties {
 }
 
 impl Properties {
-    fn for_lock(keyring: &str, window_id: Option<&str>) -> Self {
+    fn for_lock(keyring: &str, window_id: Option<WindowIdentifierType>) -> Self {
         Self {
             title: None,
             message: Some("Lock Keyring".to_owned()),
@@ -54,13 +54,17 @@ impl Properties {
             password_strength: None,
             choice_label: None,
             choice_chosen: None,
-            caller_window: window_id.map(ToOwned::to_owned),
+            caller_window: window_id,
             continue_label: Some("Lock".to_owned()),
             cancel_label: Some("Cancel".to_owned()),
         }
     }
 
-    fn for_unlock(keyring: &str, warning: Option<&str>, window_id: Option<&str>) -> Self {
+    fn for_unlock(
+        keyring: &str,
+        warning: Option<&str>,
+        window_id: Option<WindowIdentifierType>,
+    ) -> Self {
         Self {
             title: Some("Unlock Keyring".to_owned()),
             message: Some("Authentication required".to_owned()),
@@ -73,7 +77,7 @@ impl Properties {
             password_strength: None,
             choice_label: None,
             choice_chosen: None,
-            caller_window: window_id.map(ToOwned::to_owned),
+            caller_window: window_id,
             continue_label: Some("Unlock".to_owned()),
             cancel_label: Some("Cancel".to_owned()),
         }
@@ -138,7 +142,7 @@ pub trait Prompter {
 
 #[derive(Debug, Clone)]
 pub struct PrompterCallback {
-    window_id: Option<String>,
+    window_id: Option<WindowIdentifierType>,
     private_key: Arc<Key>,
     public_key: Arc<Key>,
     aes_key: Arc<OnceCell<Key>>,
@@ -202,7 +206,7 @@ impl PrompterCallback {
 
 impl PrompterCallback {
     pub async fn new(
-        window_id: Option<&str>,
+        window_id: Option<WindowIdentifierType>,
         service: Service,
         prompt_path: OwnedObjectPath,
     ) -> Result<Self, oo7::crypto::Error> {
@@ -210,7 +214,7 @@ impl PrompterCallback {
         let private_key = Arc::new(Key::generate_private_key()?);
         let public_key = Arc::new(crate::gnome::crypto::generate_public_key(&private_key)?);
         Ok(Self {
-            window_id: window_id.map(ToOwned::to_owned),
+            window_id,
             public_key,
             private_key,
             aes_key: Default::default(),
@@ -236,7 +240,7 @@ impl PrompterCallback {
 
         let (properties, prompt_type) = match prompt.role() {
             PromptRole::Lock => (
-                Properties::for_lock(&label, self.window_id.as_deref()),
+                Properties::for_lock(&label, self.window_id.clone()),
                 PromptType::Confirm,
             ),
             PromptRole::Unlock => {
@@ -250,7 +254,7 @@ impl PrompterCallback {
                 self.aes_key.set(aes_key).unwrap();
 
                 (
-                    Properties::for_unlock(&label, None, self.window_id.as_deref()),
+                    Properties::for_unlock(&label, None, self.window_id.clone()),
                     PromptType::Password,
                 )
             }
@@ -304,7 +308,7 @@ impl PrompterCallback {
                         let properties = Properties::for_unlock(
                             &label,
                             Some("The unlock password was incorrect"),
-                            self.window_id.as_deref(),
+                            self.window_id.clone(),
                         );
                         let server_exchange = self
                             .exchange
