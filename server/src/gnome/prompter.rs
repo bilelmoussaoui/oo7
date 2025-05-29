@@ -44,7 +44,7 @@ struct Properties {
 }
 
 impl Properties {
-    fn for_lock(keyring: &str, window_id: Option<WindowIdentifierType>) -> Self {
+    fn for_lock(keyring: &str, window_id: Option<&WindowIdentifierType>) -> Self {
         Self {
             title: None,
             message: Some("Lock Keyring".to_owned()),
@@ -54,7 +54,7 @@ impl Properties {
             password_strength: None,
             choice_label: None,
             choice_chosen: None,
-            caller_window: window_id,
+            caller_window: window_id.map(ToOwned::to_owned),
             continue_label: Some("Lock".to_owned()),
             cancel_label: Some("Cancel".to_owned()),
         }
@@ -63,7 +63,7 @@ impl Properties {
     fn for_unlock(
         keyring: &str,
         warning: Option<&str>,
-        window_id: Option<WindowIdentifierType>,
+        window_id: Option<&WindowIdentifierType>,
     ) -> Self {
         Self {
             title: Some("Unlock Keyring".to_owned()),
@@ -77,7 +77,7 @@ impl Properties {
             password_strength: None,
             choice_label: None,
             choice_chosen: None,
-            caller_window: window_id,
+            caller_window: window_id.map(ToOwned::to_owned),
             continue_label: Some("Unlock".to_owned()),
             cancel_label: Some("Cancel".to_owned()),
         }
@@ -240,7 +240,7 @@ impl PrompterCallback {
 
         let (properties, prompt_type) = match prompt.role() {
             PromptRole::Lock => (
-                Properties::for_lock(&label, self.window_id.clone()),
+                Properties::for_lock(&label, self.window_id.as_ref()),
                 PromptType::Confirm,
             ),
             PromptRole::Unlock => {
@@ -254,7 +254,7 @@ impl PrompterCallback {
                 self.aes_key.set(aes_key).unwrap();
 
                 (
-                    Properties::for_unlock(&label, None, self.window_id.clone()),
+                    Properties::for_unlock(&label, None, self.window_id.as_ref()),
                     PromptType::Password,
                 )
             }
@@ -308,7 +308,7 @@ impl PrompterCallback {
                         let properties = Properties::for_unlock(
                             &label,
                             Some("The unlock password was incorrect"),
-                            self.window_id.clone(),
+                            self.window_id.as_ref(),
                         );
                         let server_exchange = self
                             .exchange

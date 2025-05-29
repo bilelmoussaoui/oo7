@@ -57,9 +57,7 @@ impl Prompt {
         };
 
         let callback = PrompterCallback::new(
-            (*window_id)
-                .map(|w| ashpd::WindowIdentifierType::from_str(w).ok())
-                .flatten(),
+            (*window_id).and_then(|w| ashpd::WindowIdentifierType::from_str(w).ok()),
             self.service.clone(),
             self.path.clone(),
         )
