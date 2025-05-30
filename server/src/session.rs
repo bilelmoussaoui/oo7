@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use oo7::{dbus::ServiceError, Key};
-use zbus::{interface, zvariant::OwnedObjectPath};
+use zbus::{interface, names::UniqueName, zvariant::OwnedObjectPath};
 
 use crate::Service;
 
@@ -12,30 +12,40 @@ pub struct Session {
     aes_key: Option<Arc<Key>>,
     service: Service,
     path: OwnedObjectPath,
+    sender: UniqueName<'static>,
 }
 
 #[interface(name = "org.freedesktop.Secret.Session")]
 impl Session {
-    pub async fn close(
-        &self,
-        #[zbus(object_server)] object_server: &zbus::ObjectServer,
-    ) -> Result<(), ServiceError> {
+    pub async fn close(&self) -> Result<(), ServiceError> {
         self.service.remove_session(&self.path).await;
-        object_server.remove::<Self, _>(&self.path).await?;
+        self.service
+            .object_server()
+            .remove::<Self, _>(&self.path)
+            .await?;
 
         Ok(())
     }
 }
 
 impl Session {
-    pub async fn new(aes_key: Option<Arc<Key>>, service: Service) -> Self {
+    pub async fn new(
+        aes_key: Option<Arc<Key>>,
+        service: Service,
+        sender: UniqueName<'static>,
+    ) -> Self {
         let index = service.session_index().await;
         Self {
             path: OwnedObjectPath::try_from(format!("/org/freedesktop/secrets/session/s{index}"))
                 .unwrap(),
             aes_key,
             service,
+            sender,
         }
+    }
+
+    pub fn sender(&self) -> &UniqueName<'static> {
+        &self.sender
     }
 
     pub fn path(&self) -> &OwnedObjectPath {

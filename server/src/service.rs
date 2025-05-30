@@ -12,7 +12,9 @@ use oo7::{
     Key, Secret,
 };
 use tokio::sync::{Mutex, RwLock};
+use tokio_stream::StreamExt;
 use zbus::{
+    names::{OwnedUniqueName, UniqueName},
     object_server::SignalEmitter,
     proxy::Defaults,
     zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Value},
@@ -46,6 +48,7 @@ impl Service {
         &self,
         algorithm: Algorithm,
         input: Value<'_>,
+        #[zbus(header)] header: zbus::message::Header<'_>,
         #[zbus(object_server)] object_server: &zbus::ObjectServer,
     ) -> Result<(OwnedValue, OwnedObjectPath), ServiceError> {
         let (public_key, aes_key) = match algorithm {
@@ -68,7 +71,13 @@ impl Service {
             }
         };
 
-        let session = Session::new(aes_key.map(Arc::new), self.clone()).await;
+        let sender = header
+            .sender()
+            .ok_or_else(|| custom_service_error("Failed to get sender from header."))?;
+
+        tracing::info!("Client {} connected", sender);
+
+        let session = Session::new(aes_key.map(Arc::new), self.clone(), sender.to_owned()).await;
         let path = session.path().clone();
 
         self.sessions
@@ -335,6 +344,40 @@ impl Service {
             .at(collection.path().clone(), collection)
             .await?;
 
+        let service = service.clone();
+        tokio::spawn(async move { service.on_client_disconnect().await });
+        Ok(())
+    }
+
+    async fn on_client_disconnect(&self) -> zbus::Result<()> {
+        let rule = zbus::MatchRule::builder()
+            .msg_type(zbus::message::Type::Signal)
+            .sender("org.freedesktop.DBus")?
+            .interface("org.freedesktop.DBus")?
+            .member("NameOwnerChanged")?
+            .arg(2, "")?
+            .build();
+        let mut stream = zbus::MessageStream::for_match_rule(rule, &self.connection, None).await?;
+        while let Some(message) = stream.try_next().await? {
+            let Ok((_name, old_owner, new_owner)) =
+                message
+                    .body()
+                    .deserialize::<(String, OwnedUniqueName, OwnedUniqueName)>()
+            else {
+                continue;
+            };
+            assert_eq!(new_owner, ""); // We enforce that in the matching rule
+            if let Some(session) = self.session_from_sender(old_owner.as_ref()).await {
+                match session.close().await {
+                    Ok(_) => tracing::info!(
+                        "Client {} disconnected. Session: {} closed.",
+                        old_owner,
+                        session.path()
+                    ),
+                    Err(err) => tracing::error!("Failed to close session: {}", err),
+                }
+            }
+        }
         Ok(())
     }
 
@@ -421,6 +464,18 @@ impl Service {
         *self.session_index.write().await = n_sessions;
 
         n_sessions
+    }
+
+    async fn session_from_sender<'a>(&self, sender: UniqueName<'a>) -> Option<Session> {
+        let sessions = self.sessions.lock().await;
+
+        for session in sessions.values() {
+            if session.sender() == &sender {
+                return Some(session.clone());
+            }
+        }
+
+        None
     }
 
     pub async fn session(&self, path: &OwnedObjectPath) -> Option<Session> {
