@@ -9,7 +9,6 @@ pub enum Error {
     SetGid(nix::Error),
     SetUid(nix::Error),
     InsufficientCapabilities,
-    NoCapabilities,
 }
 
 impl std::fmt::Display for Error {
@@ -24,9 +23,6 @@ impl std::fmt::Display for Error {
                 f,
                 "Insufficient process capabilities, insecure memory might get used"
             ),
-            Self::NoCapabilities => {
-                write!(f, "No process capabilities, insecure memory might get used")
-            }
         }
     }
 }
@@ -58,7 +54,8 @@ pub fn drop_unnecessary_capabilities() -> Result<(), Error> {
             return Err(Error::InsufficientCapabilities);
         }
     } else if permitted_caps.is_empty() {
-        return Err(Error::NoCapabilities);
+        tracing::warn!("No process capabilities, insecure memory might get used");
+        return Ok(());
     } else {
         return Err(Error::InsufficientCapabilities);
     }
