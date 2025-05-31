@@ -1,9 +1,37 @@
 [Unit]
 Description=Secret service (oo7 implementation)
+
 [Service]
 Type=simple
 StandardError=journal
 ExecStart=@libexecdir@/@binary@
 Restart=on-failure
+TimeoutStartSec=30s
+TimeoutStopSec=30s
+
+# Only allow CAP_IPC_LOCK
+CapabilityBoundingSet=CAP_IPC_LOCK
+AmbientCapabilities=CAP_IPC_LOCK
+
+# Prevent privilege escalation (blocks suid, new caps, etc.)
+NoNewPrivileges=true
+
+# Clear supplementary groups
+SupplementaryGroups=
+
+# Restrict filesystem access
+ProtectSystem=full
+PrivateTmp=yes
+PrivateDevices=yes
+
+# No network needed
+PrivateNetwork=yes
+
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+MemoryDenyWriteExecute=yes
+ProtectClock=yes
+
 [Install]
 WantedBy=default.target
