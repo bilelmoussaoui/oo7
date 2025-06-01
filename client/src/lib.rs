@@ -41,7 +41,7 @@ pub use ashpd;
 pub use error::{Error, Result};
 pub use keyring::{Item, Keyring};
 pub use migration::migrate;
-pub use secret::Secret;
+pub use secret::{ContentType, Secret};
 pub use zbus;
 
 /// A schema attribute.

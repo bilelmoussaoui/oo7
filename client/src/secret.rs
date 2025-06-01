@@ -54,9 +54,9 @@ impl ContentType {
 /// A wrapper around a combination of (secret, content-type).
 #[derive(Debug, Clone, PartialEq, Eq, Zeroize, ZeroizeOnDrop)]
 pub enum Secret {
-    /// Corresponds to `text/plain`
+    /// Corresponds to [`ContentType::Text`]
     Text(String),
-    /// Corresponds to `application/octet-stream`
+    /// Corresponds to [`ContentType::Blob`]
     Blob(Vec<u8>),
 }
 
