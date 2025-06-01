@@ -254,7 +254,7 @@ mod tests {
         assert_eq!(items[0].label(), "foo");
         assert_eq!(items[0].secret(), Secret::blob("foo"));
         let attributes = items[0].attributes();
-        assert_eq!(attributes.len(), 1);
+        assert_eq!(attributes.len(), 2); // also content-type
         assert_eq!(
             attributes
                 .get(crate::XDG_SCHEMA_ATTRIBUTE)

@@ -403,9 +403,9 @@ mod tests {
         assert_eq!(items.len(), 1);
         let item = items.remove(0);
         assert_eq!(item.label().await?, "my item");
-        assert_eq!(item.secret().await?, Secret::blob("my_secret"));
+        assert_eq!(item.secret().await?, Secret::text("my_secret"));
         let attrs = item.attributes().await?;
-        assert_eq!(attrs.len(), 1);
+        assert_eq!(attrs.len(), 2);
         assert_eq!(attrs.get("key").unwrap(), "value");
 
         item.set_attributes(&vec![("key", "changed_value"), ("new_key", "new_value")])
@@ -415,9 +415,9 @@ mod tests {
         assert_eq!(items.len(), 1);
         let item = items.remove(0);
         assert_eq!(item.label().await?, "my item");
-        assert_eq!(item.secret().await?, Secret::blob("my_secret"));
+        assert_eq!(item.secret().await?, Secret::text("my_secret"));
         let attrs = item.attributes().await?;
-        assert_eq!(attrs.len(), 2);
+        assert_eq!(attrs.len(), 3);
         assert_eq!(attrs.get("key").unwrap(), "changed_value");
         assert_eq!(attrs.get("new_key").unwrap(), "new_value");
 

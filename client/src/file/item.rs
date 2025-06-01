@@ -7,7 +7,11 @@ use super::{
     api::{AttributeValue, EncryptedItem, GVARIANT_ENCODING},
     Error,
 };
-use crate::{crypto, AsAttributes, Key, Secret};
+use crate::{
+    crypto,
+    secret::{BLOB_CONTENT_TYPE, TEXT_CONTENT_TYPE},
+    AsAttributes, Key, Secret, CONTENT_TYPE_ATTRIBUTE
+};
 
 /// An item stored in the file backend.
 #[derive(Deserialize, Serialize, zvariant::Type, Clone, Debug, Zeroize, ZeroizeOnDrop)]
@@ -34,16 +38,27 @@ impl Item {
             .unwrap()
             .as_secs();
 
+        let mut item_attributes: HashMap<String, AttributeValue> = attributes
+            .as_attributes()
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v.into()))
+            .collect();
+
+        let secret = secret.into();
+        // Set default MIME type if not provided
+        if !item_attributes.contains_key(CONTENT_TYPE_ATTRIBUTE) {
+            item_attributes.insert(
+                CONTENT_TYPE_ATTRIBUTE.to_owned(),
+                secret.content_type().into(),
+            );
+        }
+
         Self {
-            attributes: attributes
-                .as_attributes()
-                .into_iter()
-                .map(|(k, v)| (k.to_string(), v.into()))
-                .collect(),
+            attributes: item_attributes,
             label: label.to_string(),
             created: now,
             modified: now,
-            secret: secret.into().as_bytes().to_vec(),
+            secret: secret.as_bytes().to_vec(),
         }
     }
 
@@ -54,11 +69,29 @@ impl Item {
 
     /// Update the item attributes.
     pub fn set_attributes(&mut self, attributes: &impl AsAttributes) {
-        self.attributes = attributes
+        let mut new_attributes: HashMap<String, AttributeValue> = attributes
             .as_attributes()
             .into_iter()
             .map(|(k, v)| (k.to_string(), v.into()))
             .collect();
+
+        // Preserve MIME type if not explicitly set in new attributes
+        if !new_attributes.contains_key(CONTENT_TYPE_ATTRIBUTE) {
+            if let Some(existing_mime_type) = self.attributes.get(CONTENT_TYPE_ATTRIBUTE) {
+                new_attributes.insert(
+                    CONTENT_TYPE_ATTRIBUTE.to_string(),
+                    existing_mime_type.clone(),
+                );
+            } else {
+                new_attributes.insert(CONTENT_TYPE_ATTRIBUTE.to_owned(), BLOB_CONTENT_TYPE.into());
+            }
+        }
+
+        self.attributes = new_attributes;
+        self.modified = std::time::SystemTime::UNIX_EPOCH
+            .elapsed()
+            .unwrap()
+            .as_secs();
     }
 
     /// The item label.
@@ -77,7 +110,18 @@ impl Item {
 
     /// Retrieve the currently stored secret.
     pub fn secret(&self) -> Secret {
-        Secret::blob(&self.secret)
+        let content_type = self
+            .attributes
+            .get(CONTENT_TYPE_ATTRIBUTE)
+            .map(|attr| attr.to_string())
+            .unwrap_or(BLOB_CONTENT_TYPE.to_string());
+
+        match content_type.as_str() {
+            TEXT_CONTENT_TYPE => String::from_utf8(self.secret.clone())
+                .map(Secret::text)
+                .unwrap_or(Secret::blob(&self.secret)),
+            _ => Secret::blob(&self.secret),
+        }
     }
 
     /// Store a new secret.
@@ -130,8 +174,17 @@ impl TryFrom<&[u8]> for Item {
     type Error = Error;
 
     fn try_from(value: &[u8]) -> Result<Self, Error> {
-        Ok(zvariant::serialized::Data::new(value, *GVARIANT_ENCODING)
+        let mut item: Item = zvariant::serialized::Data::new(value, *GVARIANT_ENCODING)
             .deserialize()?
-            .0)
+            .0;
+
+        // Ensure MIME type attribute exists for backward compatibility
+        if !item.attributes.contains_key(CONTENT_TYPE_ATTRIBUTE)
+        {
+            item.attributes
+                .insert(CONTENT_TYPE_ATTRIBUTE.to_owned(), BLOB_CONTENT_TYPE.into());
+        }
+
+        Ok(item)
     }
 }
