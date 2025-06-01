@@ -1,4 +1,4 @@
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, str::FromStr, time::Duration};
 
 use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
@@ -7,11 +7,7 @@ use super::{
     api::{AttributeValue, EncryptedItem, GVARIANT_ENCODING},
     Error,
 };
-use crate::{
-    crypto,
-    secret::{BLOB_CONTENT_TYPE, TEXT_CONTENT_TYPE},
-    AsAttributes, Key, Secret, CONTENT_TYPE_ATTRIBUTE
-};
+use crate::{crypto, secret::ContentType, AsAttributes, Key, Secret, CONTENT_TYPE_ATTRIBUTE};
 
 /// An item stored in the file backend.
 #[derive(Deserialize, Serialize, zvariant::Type, Clone, Debug, Zeroize, ZeroizeOnDrop)]
@@ -49,7 +45,7 @@ impl Item {
         if !item_attributes.contains_key(CONTENT_TYPE_ATTRIBUTE) {
             item_attributes.insert(
                 CONTENT_TYPE_ATTRIBUTE.to_owned(),
-                secret.content_type().into(),
+                secret.content_type().as_str().into(),
             );
         }
 
@@ -83,7 +79,10 @@ impl Item {
                     existing_mime_type.clone(),
                 );
             } else {
-                new_attributes.insert(CONTENT_TYPE_ATTRIBUTE.to_owned(), BLOB_CONTENT_TYPE.into());
+                new_attributes.insert(
+                    CONTENT_TYPE_ATTRIBUTE.to_owned(),
+                    ContentType::default().as_str().into(),
+                );
             }
         }
 
@@ -113,15 +112,10 @@ impl Item {
         let content_type = self
             .attributes
             .get(CONTENT_TYPE_ATTRIBUTE)
-            .map(|attr| attr.to_string())
-            .unwrap_or(BLOB_CONTENT_TYPE.to_string());
+            .and_then(|c| ContentType::from_str(c).ok())
+            .unwrap_or_default();
 
-        match content_type.as_str() {
-            TEXT_CONTENT_TYPE => String::from_utf8(self.secret.clone())
-                .map(Secret::text)
-                .unwrap_or(Secret::blob(&self.secret)),
-            _ => Secret::blob(&self.secret),
-        }
+        Secret::with_content_type(content_type, &self.secret)
     }
 
     /// Store a new secret.
@@ -179,10 +173,11 @@ impl TryFrom<&[u8]> for Item {
             .0;
 
         // Ensure MIME type attribute exists for backward compatibility
-        if !item.attributes.contains_key(CONTENT_TYPE_ATTRIBUTE)
-        {
-            item.attributes
-                .insert(CONTENT_TYPE_ATTRIBUTE.to_owned(), BLOB_CONTENT_TYPE.into());
+        if !item.attributes.contains_key(CONTENT_TYPE_ATTRIBUTE) {
+            item.attributes.insert(
+                CONTENT_TYPE_ATTRIBUTE.to_owned(),
+                ContentType::default().as_str().into(),
+            );
         }
 
         Ok(item)
