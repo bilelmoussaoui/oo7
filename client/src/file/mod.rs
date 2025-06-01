@@ -668,7 +668,7 @@ mod tests {
         assert_eq!(items[0].label(), "foo");
         assert_eq!(items[0].secret(), Secret::blob("foo"));
         let attributes = items[0].attributes();
-        assert_eq!(attributes.len(), 1);
+        assert_eq!(attributes.len(), 2);
         assert_eq!(
             attributes
                 .get(crate::XDG_SCHEMA_ATTRIBUTE)
@@ -910,6 +910,46 @@ mod tests {
         assert_eq!(keyring.delete_broken_items().await?, 0);
 
         fs::remove_file(keyring_path).await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn content_type() -> Result<(), Error> {
+        use crate::secret::{BLOB_CONTENT_TYPE, TEXT_CONTENT_TYPE};
+
+        let keyring = Keyring::temporary(Secret::blob("test_password")).await?;
+
+        // Add items with different MIME types
+        keyring
+            .create_item(
+                "Text",
+                &HashMap::from([("type", "text")]),
+                Secret::text("Hello, World!"),
+                false,
+            )
+            .await?;
+
+        keyring
+            .create_item(
+                "Password",
+                &HashMap::from([("type", "password")]),
+                Secret::blob("super_secret_password"),
+                false,
+            )
+            .await?;
+
+        let items = keyring
+            .search_items(&HashMap::from([("type", "text")]))
+            .await?;
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].secret().content_type(), TEXT_CONTENT_TYPE);
+
+        let items = keyring
+            .search_items(&HashMap::from([("type", "password")]))
+            .await?;
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].secret().content_type(), BLOB_CONTENT_TYPE);
 
         Ok(())
     }

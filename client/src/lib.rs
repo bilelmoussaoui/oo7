@@ -50,6 +50,11 @@ pub use zbus;
 /// to map a Rust struct of simple types to an item attributes with type check.
 pub const XDG_SCHEMA_ATTRIBUTE: &str = "xdg:schema";
 
+/// A content type attribute.
+///
+/// Defines the type of the secret stored in the item.
+pub const CONTENT_TYPE_ATTRIBUTE: &str = "xdg:content-type";
+
 /// An item/collection attributes.
 pub trait AsAttributes {
     fn as_attributes(&self) -> HashMap<&str, &str>;
