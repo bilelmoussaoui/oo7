@@ -916,7 +916,7 @@ mod tests {
 
     #[tokio::test]
     async fn content_type() -> Result<(), Error> {
-        use crate::secret::{BLOB_CONTENT_TYPE, TEXT_CONTENT_TYPE};
+        use crate::secret::ContentType;
 
         let keyring = Keyring::temporary(Secret::blob("test_password")).await?;
 
@@ -943,13 +943,13 @@ mod tests {
             .search_items(&HashMap::from([("type", "text")]))
             .await?;
         assert_eq!(items.len(), 1);
-        assert_eq!(items[0].secret().content_type(), TEXT_CONTENT_TYPE);
+        assert_eq!(items[0].secret().content_type(), ContentType::Text);
 
         let items = keyring
             .search_items(&HashMap::from([("type", "password")]))
             .await?;
         assert_eq!(items.len(), 1);
-        assert_eq!(items[0].secret().content_type(), BLOB_CONTENT_TYPE);
+        assert_eq!(items[0].secret().content_type(), ContentType::Blob);
 
         Ok(())
     }

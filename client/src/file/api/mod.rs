@@ -335,6 +335,7 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
+    use crate::secret::ContentType;
 
     const SECRET: [u8; 64] = [
         44, 173, 251, 20, 203, 56, 241, 169, 91, 54, 51, 244, 40, 40, 202, 92, 71, 233, 174, 17,
@@ -387,7 +388,7 @@ mod tests {
             loaded_keyring.search_items(&HashMap::from([("my-tag", "my tag value")]), &key)?;
 
         assert_eq!(loaded_items[0].secret(), Secret::text("A Password"));
-        assert_eq!(loaded_items[0].secret().content_type(), "text/plain");
+        assert_eq!(loaded_items[0].secret().content_type(), ContentType::Text);
 
         let _silent = std::fs::remove_file("/tmp/test.keyring");
 

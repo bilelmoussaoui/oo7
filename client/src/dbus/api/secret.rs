@@ -5,17 +5,17 @@ use zbus::zvariant::{OwnedObjectPath, Type};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use super::Session;
-use crate::{
-    crypto,
-    dbus::Error,
-    secret::{BLOB_CONTENT_TYPE, TEXT_CONTENT_TYPE},
-    Key, Secret,
-};
+use crate::{crypto, dbus::Error, secret::ContentType, Key, Secret};
 
 #[derive(Debug, Serialize, Deserialize, Type)]
 #[zvariant(signature = "(oayays)")]
 /// Same as [`DBusSecret`] without tying the session path to a [`Session`] type.
-pub struct DBusSecretInner(pub OwnedObjectPath, pub Vec<u8>, pub Vec<u8>, pub String);
+pub struct DBusSecretInner(
+    pub OwnedObjectPath,
+    pub Vec<u8>,
+    pub Vec<u8>,
+    pub ContentType,
+);
 
 #[derive(Debug, Type, Zeroize, ZeroizeOnDrop)]
 #[zvariant(signature = "(oayays)")]
@@ -25,7 +25,7 @@ pub struct DBusSecret<'a> {
     pub(crate) parameters: Vec<u8>,
     pub(crate) value: Vec<u8>,
     #[zeroize(skip)]
-    pub(crate) content_type: String,
+    pub(crate) content_type: ContentType,
 }
 
 impl<'a> DBusSecret<'a> {
@@ -35,7 +35,7 @@ impl<'a> DBusSecret<'a> {
             session,
             parameters: vec![],
             value: secret.as_bytes().to_vec(),
-            content_type: secret.content_type().to_owned(),
+            content_type: secret.content_type(),
         }
     }
 
@@ -50,7 +50,7 @@ impl<'a> DBusSecret<'a> {
             session,
             value: crypto::encrypt(secret.as_bytes(), aes_key, &iv)?,
             parameters: iv,
-            content_type: secret.content_type().to_owned(),
+            content_type: secret.content_type(),
         })
     }
 
@@ -71,21 +71,7 @@ impl<'a> DBusSecret<'a> {
             Some(key) => &crypto::decrypt(&self.value, key, &self.parameters)?,
             None => &self.value,
         };
-        match self.content_type.as_str() {
-            TEXT_CONTENT_TYPE => {
-                match String::from_utf8(value.to_vec()) {
-                    Ok(text) => Ok(Secret::Text(text)),
-                    // Workaround gnome-keyring always reporting text/plain even if it is not one.
-                    Err(_) => Ok(Secret::blob(value)),
-                }
-            }
-            BLOB_CONTENT_TYPE => Ok(Secret::blob(value)),
-            e => {
-                #[cfg(feature = "tracing")]
-                tracing::warn!("Unsupported content-type {e}, falling back to blob");
-                Ok(Secret::blob(value))
-            }
-        }
+        Ok(Secret::with_content_type(self.content_type, value))
     }
 
     /// Session used to encode the secret
@@ -104,8 +90,8 @@ impl<'a> DBusSecret<'a> {
     }
 
     /// Content type of the secret
-    pub fn content_type(&self) -> &str {
-        &self.content_type
+    pub fn content_type(&self) -> ContentType {
+        self.content_type
     }
 }
 
@@ -118,7 +104,7 @@ impl Serialize for DBusSecret<'_> {
         tuple_serializer.serialize_element(self.session().inner().path())?;
         tuple_serializer.serialize_element(self.parameters())?;
         tuple_serializer.serialize_element(self.value())?;
-        tuple_serializer.serialize_element(self.content_type())?;
+        tuple_serializer.serialize_element(self.content_type().as_str())?;
         tuple_serializer.end()
     }
 }

@@ -1,7 +1,55 @@
+use std::str::FromStr;
+
+use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
-pub(crate) const TEXT_CONTENT_TYPE: &str = "text/plain";
-pub(crate) const BLOB_CONTENT_TYPE: &str = "application/octet-stream";
+#[derive(Default, PartialEq, Eq, Copy, Clone, Debug, zvariant::Type)]
+#[zvariant(signature = "s")]
+pub enum ContentType {
+    Text,
+    #[default]
+    Blob,
+}
+
+impl Serialize for ContentType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.as_str().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for ContentType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Self::from_str(&s).map_err(serde::de::Error::custom)
+    }
+}
+
+impl FromStr for ContentType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "text/plain" => Ok(Self::Text),
+            "application/octet-stream" => Ok(Self::Blob),
+            e => Err(format!("Invalid content type: {}", e)),
+        }
+    }
+}
+
+impl ContentType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Text => "text/plain",
+            Self::Blob => "application/octet-stream",
+        }
+    }
+}
 
 /// A wrapper around a combination of (secret, content-type).
 #[derive(Debug, Clone, PartialEq, Eq, Zeroize, ZeroizeOnDrop)]
@@ -33,10 +81,10 @@ impl Secret {
         Self::Blob(value.as_ref().to_owned())
     }
 
-    pub fn content_type(&self) -> &'static str {
+    pub fn content_type(&self) -> ContentType {
         match self {
-            Self::Text(_) => TEXT_CONTENT_TYPE,
-            Self::Blob(_) => BLOB_CONTENT_TYPE,
+            Self::Text(_) => ContentType::Text,
+            Self::Blob(_) => ContentType::Blob,
         }
     }
 
@@ -44,6 +92,24 @@ impl Secret {
         match self {
             Self::Text(text) => text.as_bytes(),
             Self::Blob(bytes) => bytes.as_ref(),
+        }
+    }
+
+    pub fn with_content_type(content_type: ContentType, secret: impl AsRef<[u8]>) -> Self {
+        match content_type {
+            ContentType::Text => match String::from_utf8(secret.as_ref().to_owned()) {
+                Ok(text) => Secret::text(text),
+                Err(_e) => {
+                    #[cfg(feature = "tracing")]
+                    tracing::error!(
+                        "Failed to decode secret as UTF-8: {}, falling back to blob",
+                        _e
+                    );
+
+                    Secret::blob(secret)
+                }
+            },
+            _ => Secret::blob(secret),
         }
     }
 }
