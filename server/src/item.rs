@@ -77,7 +77,7 @@ impl Item {
 
         let inner = self.inner.lock().await;
         let secret = inner.secret();
-        let content_type = secret.content_type().to_owned();
+        let content_type = secret.content_type();
 
         tracing::debug!("Secret retrieved from the item: {}.", self.path);
 
