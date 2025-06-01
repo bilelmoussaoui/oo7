@@ -32,10 +32,11 @@ struct Args {
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     tracing_subscriber::fmt::init();
-    capability::drop_unnecessary_capabilities()?;
 
     let args = Args::parse();
     let mut secret = None;
+
+    capability::drop_unnecessary_capabilities()?;
 
     if args.login {
         let password = rpassword::prompt_password("Enter the login password: ")?;
