@@ -490,6 +490,9 @@ fn print_item_common(
         if let Some(schema) = attributes.remove(oo7::XDG_SCHEMA_ATTRIBUTE) {
             writeln!(&mut result, "schema = {schema} ").unwrap();
         }
+        if let Some(content_type) = attributes.remove(oo7::CONTENT_TYPE_ATTRIBUTE) {
+            writeln!(&mut result, "content_type = {content_type} ").unwrap();
+        }
         writeln!(&mut result, "attributes = {attributes:?} ").unwrap();
         print!("{result}");
     }
