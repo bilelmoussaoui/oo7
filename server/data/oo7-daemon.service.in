@@ -8,6 +8,7 @@ ExecStart=@libexecdir@/@binary@
 Restart=on-failure
 TimeoutStartSec=30s
 TimeoutStopSec=30s
+ImportCredential=oo7.keyring-encryption-password
 
 # Prevent privilege escalation (blocks suid, new caps, etc.)
 NoNewPrivileges=true
