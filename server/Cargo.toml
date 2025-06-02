@@ -12,7 +12,7 @@ version.workspace = true
 [dependencies]
 ashpd = {workspace = true, features = ["backend", "tracing"]}
 base64 = "0.22"
-caps = "0.4"
+caps = "0.5"
 clap.workspace = true
 enumflags2 = "0.7"
 hkdf = { version = "0.12", optional = true }
