@@ -110,26 +110,27 @@ impl Collection {
             .map_err(|err| custom_service_error(&format!("Failed to create a new item {err}.")))?;
 
         let n_items = *self.item_index.read().await;
+        let item_path = OwnedObjectPath::try_from(format!("{}/{n_items}", self.path)).unwrap();
+
         let item = item::Item::new(
             item,
             false,
             self.service.clone(),
             self.path.clone(),
-            n_items,
+            item_path.clone(),
         );
         *self.item_index.write().await = n_items + 1;
 
         self.items.lock().await.push(item.clone());
 
-        let path = item.path().clone();
-        object_server.at(path.clone(), item).await?;
+        object_server.at(&item_path, item).await?;
 
-        Self::item_created(&signal_emitter, &path).await?;
+        Self::item_created(&signal_emitter, &item_path).await?;
         self.items_changed(&signal_emitter).await?;
 
-        tracing::info!("Item `{}` created.", &path);
+        tracing::info!("Item `{item_path}` created.");
 
-        Ok((path, OwnedObjectPath::default()))
+        Ok((item_path, OwnedObjectPath::default()))
     }
 
     #[zbus(property, name = "Items")]
@@ -293,17 +294,18 @@ impl Collection {
         let mut n_items = 1;
 
         for keyring_item in keyring_items {
+            let item_path = OwnedObjectPath::try_from(format!("{}/{n_items}", self.path)).unwrap();
             let item = item::Item::new(
                 keyring_item.map_err(Error::InvalidItem)?,
                 self.is_locked().await,
                 self.service.clone(),
                 self.path.clone(),
-                n_items,
+                item_path.clone(),
             );
             n_items += 1;
 
             items.push(item.clone());
-            object_server.at(item.path().clone(), item).await?;
+            object_server.at(item_path, item).await?;
         }
 
         *self.item_index.write().await = n_items;
