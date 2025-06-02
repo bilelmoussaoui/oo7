@@ -80,7 +80,7 @@ async fn main() -> Result<(), Error> {
     } else if let Ok(credential_dir) = std::env::var("CREDENTIALS_DIRECTORY") {
         // We try to unlock the login keyring with a system credential.
         let mut contents = Vec::new();
-        let cred_path = Path::new(&credential_dir).join("oo7-keyring-encryption-password");
+        let cred_path = Path::new(&credential_dir).join("oo7.keyring-encryption-password");
 
         match tokio::fs::File::open(&cred_path).await {
             Ok(mut cred_file) => {
