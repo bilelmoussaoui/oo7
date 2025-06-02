@@ -41,15 +41,7 @@ impl ashpd::backend::secret::SecretImpl for Secret {
 async fn send_secret_to_app(app_id: &AppID, fd: std::os::fd::OwnedFd) -> Result<()> {
     let service = Service::new().await?;
     let collection = service.default_collection().await?;
-    // Generic schema, used by gnome-keyring-daemon and used for backward
-    // compatibility purposes TODO: figure out if kwallet or other portal
-    // implementations make use of it, or if it is even useful
-    const GENERIC_SCHEMA_VALUE: &str = "org.freedesktop.Secret.Generic";
-
-    let attributes = HashMap::from([
-        (oo7::XDG_SCHEMA_ATTRIBUTE, GENERIC_SCHEMA_VALUE),
-        ("app_id", app_id),
-    ]);
+    let attributes = HashMap::from([("app_id", app_id)]);
 
     // Write the secret to the FD.
     let std_stream = UnixStream::from(fd);
