@@ -219,7 +219,7 @@ impl Service {
 
         for collection in collections.iter() {
             if collection.alias().await == name {
-                tracing::info!(
+                tracing::debug!(
                     "Collection: {} found for alias: {}.",
                     collection.path(),
                     name
