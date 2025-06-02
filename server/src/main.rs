@@ -41,10 +41,17 @@ struct Args {
     is_verbose: bool,
 }
 
+/// Whether the daemon should exit if the password provided for unlocking the
+/// session keyring is incorrect.
+enum ShouldErrorOut {
+    Yes,
+    No,
+}
+
 async fn inner_main(args: Args) -> Result<(), Error> {
     capability::drop_unnecessary_capabilities()?;
 
-    let secret = if args.login {
+    let secret_info = if args.login {
         let mut stdin = std::io::stdin().lock();
         if stdin.is_terminal() {
             let password = rpassword::prompt_password("Enter the login password: ")?;
@@ -53,19 +60,15 @@ async fn inner_main(args: Args) -> Result<(), Error> {
                 return Err(Error::EmptyPassword);
             }
 
-            Some(oo7::Secret::text(password))
+            Some((oo7::Secret::text(password), ShouldErrorOut::Yes))
         } else {
             let mut buff = vec![];
             stdin.read_to_end(&mut buff)?;
 
-            Some(oo7::Secret::from(buff))
+            Some((oo7::Secret::from(buff), ShouldErrorOut::No))
         }
     } else if let Ok(credential_dir) = std::env::var("CREDENTIALS_DIRECTORY") {
         // We try to unlock the login keyring with a system credential.
-        //
-        // FIXME We should not exit the service if the provided password is not
-        // the correct one in this branch. The credential might run out of sync
-        // and this is only a fallback.
         let mut contents = Vec::new();
         let cred_path = Path::new(&credential_dir).join("oo7.keyring-encryption-password");
 
@@ -74,7 +77,7 @@ async fn inner_main(args: Args) -> Result<(), Error> {
                 tracing::info!("Unlocking session keyring with user's systemd credentials");
                 cred_file.read_to_end(&mut contents).await?;
                 let secret = oo7::Secret::from(contents);
-                Some(secret)
+                Some((secret, ShouldErrorOut::No))
             }
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => None,
             Err(err) => {
@@ -88,15 +91,30 @@ async fn inner_main(args: Args) -> Result<(), Error> {
 
     tracing::info!("Starting {BINARY_NAME}");
 
-    Service::run(secret, args.replace)
-        .await
-        .inspect_err(|err| {
-            if let Error::Zbus(zbus::Error::NameTaken) = err {
+    if let Some((secret, should_error_out)) = secret_info {
+        let res = Service::run(Some(secret), args.replace).await;
+        match res {
+            Ok(()) => (),
+            // TODO Create a unit test that verifies that this is the correct
+            // error type.
+            Err(Error::File(oo7::file::Error::ChecksumMismatch))
+                if matches!(should_error_out, ShouldErrorOut::No) =>
+            {
+                tracing::warn!(
+                    "Failed to unlock session keyring: credential contains wrong password"
+                )
+            }
+            Err(Error::Zbus(zbus::Error::NameTaken)) if !args.replace => {
                 tracing::error!(
                     "There is an instance already running. Run with --replace to replace it."
                 );
+                Err(Error::Zbus(zbus::Error::NameTaken))?
             }
-        })?;
+            Err(err) => Err(err)?,
+        }
+    } else {
+        Service::run(None, args.replace).await?;
+    }
 
     tracing::debug!("Starting loop");
 
