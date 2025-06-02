@@ -9,10 +9,6 @@ Restart=on-failure
 TimeoutStartSec=30s
 TimeoutStopSec=30s
 
-# Only allow CAP_IPC_LOCK
-CapabilityBoundingSet=CAP_IPC_LOCK
-AmbientCapabilities=CAP_IPC_LOCK
-
 # Prevent privilege escalation (blocks suid, new caps, etc.)
 NoNewPrivileges=true
 
