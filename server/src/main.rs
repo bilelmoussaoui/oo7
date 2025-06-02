@@ -9,9 +9,11 @@ mod service;
 mod session;
 
 use std::io::{IsTerminal, Read};
+use std::path::Path;
 
 use clap::Parser;
 use service::Service;
+use tokio::io::AsyncReadExt;
 
 use crate::error::Error;
 
@@ -67,6 +69,28 @@ async fn main() -> Result<(), Error> {
             stdin.read_to_end(&mut buff)?;
 
             Some(oo7::Secret::from(buff))
+        }
+    } else if let Ok(credential_dir) = std::env::var("CREDENTIALS_DIRECTORY") {
+        // We try to unlock the login keyring with a system credential.
+        //
+        // FIXME We should not exit the service if the provided password is not
+        // the correct one in this branch. The credential might run out of sync
+        // and this is only a fallback.
+        let mut contents = Vec::new();
+        let cred_path = Path::new(&credential_dir).join("oo7-keyring-encryption-password");
+
+        match tokio::fs::File::open(&cred_path).await {
+            Ok(mut cred_file) => {
+                tracing::info!("Unlocking session keyring with user's systemd credentials");
+                cred_file.read_to_end(&mut contents).await?;
+                let secret = oo7::Secret::from(contents);
+                Some(secret)
+            }
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => None,
+            Err(err) => {
+                tracing::error!("Failed to open system credential {err:?}");
+                Err(err)?
+            }
         }
     } else {
         None
