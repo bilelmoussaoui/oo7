@@ -81,13 +81,26 @@ struct Args {
     /// Replace a running instance
     #[arg(short, long)]
     replace: bool,
+    #[arg(
+        short = 'v',
+        long = "verbose",
+        help = "Print debug information during command processing."
+    )]
+    is_verbose: bool,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
 
-    tracing_subscriber::fmt::init();
+    if args.is_verbose {
+        tracing_subscriber::fmt()
+            .with_max_level(tracing_subscriber::filter::LevelFilter::DEBUG)
+            .init();
+        tracing::debug!("Running in verbose mode");
+    } else {
+        tracing_subscriber::fmt::init();
+    }
 
     tracing::info!(
         "Initializing {} {}",
