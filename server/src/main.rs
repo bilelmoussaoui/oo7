@@ -40,7 +40,6 @@ struct Args {
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     let args = Args::parse();
-    let mut secret = None;
 
     if args.is_verbose {
         tracing_subscriber::fmt()
@@ -53,7 +52,7 @@ async fn main() -> Result<(), Error> {
 
     capability::drop_unnecessary_capabilities()?;
 
-    if args.login {
+    let secret = if args.login {
         let mut stdin = std::io::stdin().lock();
         if stdin.is_terminal() {
             let password = rpassword::prompt_password("Enter the login password: ")?;
@@ -61,13 +60,17 @@ async fn main() -> Result<(), Error> {
                 tracing::error!("Login password can't be empty.");
                 return Err(Error::EmptyPassword);
             }
-            secret = Some(oo7::Secret::text(password));
+
+            Some(oo7::Secret::text(password))
         } else {
             let mut buff = vec![];
             stdin.read_to_end(&mut buff)?;
-            secret = Some(oo7::Secret::from(buff));
+
+            Some(oo7::Secret::from(buff))
         }
-    }
+    } else {
+        None
+    };
 
     let mut flags = zbus::fdo::RequestNameFlags::AllowReplacement.into();
     if args.replace {
