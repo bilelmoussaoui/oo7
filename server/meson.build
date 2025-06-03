@@ -2,7 +2,7 @@ project(
   'oo7-daemon',
   'rust',
   version: '0.1.0',
-  meson_version: '>= 0.59.0',
+  meson_version: '>= 0.61.0',
 )
 
 is_devel = get_option('profile') == 'development'
