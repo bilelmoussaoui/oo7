@@ -157,12 +157,7 @@ impl Commands {
         // We get the secret first from the app-id, then if the --keyring is set, we try
         // to use the --secret variable.
         let (secret, path) = if let Some(app_id) = &args.app_id {
-            const GENERIC_SCHEMA_VALUE: &str = "org.freedesktop.Secret.Generic";
-
-            let attributes = HashMap::from([
-                (oo7::XDG_SCHEMA_ATTRIBUTE, GENERIC_SCHEMA_VALUE),
-                ("app_id", app_id),
-            ]);
+            let attributes = HashMap::from([("app_id", app_id)]);
             let default_collection = service.default_collection().await?;
             let secret =
                 if let Some(item) = default_collection.search_items(&attributes).await?.first() {
