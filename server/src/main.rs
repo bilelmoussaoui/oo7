@@ -8,6 +8,8 @@ mod prompt;
 mod service;
 mod session;
 
+use std::io::{IsTerminal, Read};
+
 use clap::Parser;
 use service::Service;
 
@@ -52,12 +54,19 @@ async fn main() -> Result<(), Error> {
     capability::drop_unnecessary_capabilities()?;
 
     if args.login {
-        let password = rpassword::prompt_password("Enter the login password: ")?;
-        if password.is_empty() {
-            tracing::error!("Login password can't be empty.");
-            return Err(Error::EmptyPassword);
+        let mut stdin = std::io::stdin().lock();
+        if stdin.is_terminal() {
+            let password = rpassword::prompt_password("Enter the login password: ")?;
+            if password.is_empty() {
+                tracing::error!("Login password can't be empty.");
+                return Err(Error::EmptyPassword);
+            }
+            secret = Some(oo7::Secret::text(password));
+        } else {
+            let mut buff = vec![];
+            stdin.read_to_end(&mut buff)?;
+            secret = Some(oo7::Secret::from(buff));
         }
-        secret = Some(oo7::Secret::text(password));
     }
 
     let mut flags = zbus::fdo::RequestNameFlags::AllowReplacement.into();
