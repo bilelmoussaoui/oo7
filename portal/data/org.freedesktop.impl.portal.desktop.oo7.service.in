@@ -1,4 +1,4 @@
 [D-BUS Service]
 Name=@dbus_name@
-Exec=@libexecdir@/@bin_name@
+Exec=/bin/false
 SystemdService=@service_name@.service
