@@ -14,6 +14,7 @@ NoNewPrivileges=true
 
 # Clear supplementary groups
 SupplementaryGroups=
+PrivateUsers=yes
 
 # Restrict filesystem access
 ProtectSystem=full
