@@ -9,9 +9,11 @@ mod service;
 mod session;
 
 use std::io::{IsTerminal, Read};
+use std::path::Path;
 
 use clap::Parser;
 use service::Service;
+use tokio::io::AsyncReadExt;
 
 use crate::error::Error;
 
@@ -37,6 +39,13 @@ struct Args {
     is_verbose: bool,
 }
 
+/// Whether the daemon should exit if the password provided for unlocking the
+/// session keyring is incorrect.
+enum ShouldErrorOut {
+    Yes,
+    No,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     let args = Args::parse();
@@ -52,7 +61,7 @@ async fn main() -> Result<(), Error> {
 
     capability::drop_unnecessary_capabilities()?;
 
-    let secret = if args.login {
+    let secret_info = if args.login {
         let mut stdin = std::io::stdin().lock();
         if stdin.is_terminal() {
             let password = rpassword::prompt_password("Enter the login password: ")?;
@@ -61,12 +70,30 @@ async fn main() -> Result<(), Error> {
                 return Err(Error::EmptyPassword);
             }
 
-            Some(oo7::Secret::text(password))
+            Some((oo7::Secret::text(password), ShouldErrorOut::Yes))
         } else {
             let mut buff = vec![];
             stdin.read_to_end(&mut buff)?;
 
-            Some(oo7::Secret::from(buff))
+            Some((oo7::Secret::from(buff), ShouldErrorOut::No))
+        }
+    } else if let Ok(credential_dir) = std::env::var("CREDENTIALS_DIRECTORY") {
+        // We try to unlock the login keyring with a system credential.
+        let mut contents = Vec::new();
+        let cred_path = Path::new(&credential_dir).join("oo7.keyring-encryption-password");
+
+        match tokio::fs::File::open(&cred_path).await {
+            Ok(mut cred_file) => {
+                tracing::info!("Unlocking session keyring with user's systemd credentials");
+                cred_file.read_to_end(&mut contents).await?;
+                let secret = oo7::Secret::from(contents);
+                Some((secret, ShouldErrorOut::No))
+            }
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => None,
+            Err(err) => {
+                tracing::error!("Failed to open system credential {err:?}");
+                Err(err)?
+            }
         }
     } else {
         None
@@ -79,7 +106,24 @@ async fn main() -> Result<(), Error> {
 
     tracing::info!("Starting {}", BINARY_NAME);
 
-    Service::run(secret, flags).await?;
+    if let Some((secret, should_error_out)) = secret_info {
+        let res = Service::run(Some(secret), flags).await;
+        match res {
+            Ok(()) => (),
+            // TODO Create a unit test that verifies that this is the correct
+            // error type.
+            Err(Error::File(oo7::file::Error::ChecksumMismatch))
+                if matches!(should_error_out, ShouldErrorOut::No) =>
+            {
+                tracing::warn!(
+                    "Failed to unlock session keyring: credential contains wrong password"
+                )
+            }
+            Err(err) => Err(err)?,
+        }
+    } else {
+        Service::run(None, flags).await?;
+    }
 
     std::future::pending::<()>().await;
 
