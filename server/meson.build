@@ -6,6 +6,8 @@ project(
 )
 
 is_devel = get_option('profile') == 'development'
+dbus_known_name = 'org.freedesktop.secrets'
+service_name = meson.project_name()
 
 prefix = get_option('prefix')
 datadir = get_option('datadir')
@@ -30,6 +32,7 @@ endif
 libexecdir_conf = configuration_data()
 libexecdir_conf.set('binary', meson.project_name())
 libexecdir_conf.set('libexecdir', prefix / libexecdir)
+libexecdir_conf.set('dbus_known_name', dbus_known_name)
 
 summary({
   'prefix': prefix,
