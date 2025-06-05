@@ -128,6 +128,8 @@ async fn main() -> Result<()> {
             }
         })?;
 
+    tracing::debug!("Starting loop");
+
     loop {
         pending::<()>().await;
     }
