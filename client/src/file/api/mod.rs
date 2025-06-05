@@ -22,7 +22,7 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "tokio")]
 use tokio::{fs, io, io::AsyncWriteExt};
-use zbus::zvariant::{serialized::Context, Endian, Type};
+use zbus::zvariant::{self, serialized::Context, Endian, Type};
 
 /// Used for newly created [`Keyring`]s
 const DEFAULT_ITERATION_COUNT: u32 = 100000;

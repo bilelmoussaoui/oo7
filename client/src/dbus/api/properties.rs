@@ -4,7 +4,7 @@ use serde::{
     ser::{Serialize, SerializeMap},
     Deserialize,
 };
-use zbus::zvariant::{Type, Value};
+use zbus::zvariant::{self, Type, Value};
 
 use crate::AsAttributes;
 

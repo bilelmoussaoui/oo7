@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use zbus::zvariant;
 
 #[derive(Debug, zvariant::Type, PartialEq, Eq, Copy, Clone)]
 #[zvariant(signature = "s")]

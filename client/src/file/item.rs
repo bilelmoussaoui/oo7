@@ -1,6 +1,7 @@
 use std::{collections::HashMap, str::FromStr, time::Duration};
 
 use serde::{Deserialize, Serialize};
+use zbus::zvariant;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 use super::{

@@ -22,7 +22,6 @@ rust-version = "1.80"
 exclude = ["org.freedesktop.Secrets.xml"]
 
 [workspace.dependencies]
-zvariant = { version = "5.2", default-features = false, features = ["gvariant"]}
 ashpd = {version = "0.11", default-features = false}
 endi = "1.1"
 clap = { version = "4.5", features = [ "cargo", "derive" ] }
@@ -35,6 +34,8 @@ tokio = { version = "1.45", default-features = false }
 tempfile = "3.20"
 tracing = "0.1"
 tracing-subscriber = "0.3"
-zbus = { version = "5.7", default-features = false }
-zbus_macros = {version = "5.5", features = ["gvariant"]}
+zbus = { version = "5.7", default-features = false, features = ["gvariant"] }
 zeroize = { version = "1", features = ["zeroize_derive"] }
+
+[patch.crates-io]
+zbus = { git = 'https://github.com/A6GibKm/zbus', branch = "add-gvariant-feature" }

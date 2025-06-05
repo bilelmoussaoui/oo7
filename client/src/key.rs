@@ -1,5 +1,5 @@
+use zbus::zvariant::{self, Type};
 use zeroize::{Zeroize, ZeroizeOnDrop};
-use zvariant::Type;
 
 use crate::{crypto, file};
 
