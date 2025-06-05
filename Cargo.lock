@@ -2147,7 +2147,7 @@ dependencies = [
 [[package]]
 name = "zbus"
 version = "5.7.1"
-source = "git+https://github.com/A6GibKm/zbus?branch=add-gvariant-feature#32ed146c1aa6ce6d438519017e5cd0a43b9dfeaf"
+source = "git+https://github.com/A6GibKm/zbus?branch=add-builder-for-flags#70daa4da96296211c18e231712f71b8097511b7c"
 dependencies = [
  "async-broadcast",
  "async-executor",
@@ -2180,7 +2180,7 @@ dependencies = [
 [[package]]
 name = "zbus_macros"
 version = "5.7.1"
-source = "git+https://github.com/A6GibKm/zbus?branch=add-gvariant-feature#32ed146c1aa6ce6d438519017e5cd0a43b9dfeaf"
+source = "git+https://github.com/A6GibKm/zbus?branch=add-builder-for-flags#70daa4da96296211c18e231712f71b8097511b7c"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -2194,7 +2194,7 @@ dependencies = [
 [[package]]
 name = "zbus_names"
 version = "4.2.0"
-source = "git+https://github.com/A6GibKm/zbus?branch=add-gvariant-feature#32ed146c1aa6ce6d438519017e5cd0a43b9dfeaf"
+source = "git+https://github.com/A6GibKm/zbus?branch=add-builder-for-flags#70daa4da96296211c18e231712f71b8097511b7c"
 dependencies = [
  "serde",
  "winnow",
@@ -2298,7 +2298,7 @@ dependencies = [
 [[package]]
 name = "zvariant"
 version = "5.5.3"
-source = "git+https://github.com/A6GibKm/zbus?branch=add-gvariant-feature#32ed146c1aa6ce6d438519017e5cd0a43b9dfeaf"
+source = "git+https://github.com/A6GibKm/zbus?branch=add-builder-for-flags#70daa4da96296211c18e231712f71b8097511b7c"
 dependencies = [
  "endi",
  "enumflags2",
@@ -2312,7 +2312,7 @@ dependencies = [
 [[package]]
 name = "zvariant_derive"
 version = "5.5.3"
-source = "git+https://github.com/A6GibKm/zbus?branch=add-gvariant-feature#32ed146c1aa6ce6d438519017e5cd0a43b9dfeaf"
+source = "git+https://github.com/A6GibKm/zbus?branch=add-builder-for-flags#70daa4da96296211c18e231712f71b8097511b7c"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -2324,7 +2324,7 @@ dependencies = [
 [[package]]
 name = "zvariant_utils"
 version = "3.2.0"
-source = "git+https://github.com/A6GibKm/zbus?branch=add-gvariant-feature#32ed146c1aa6ce6d438519017e5cd0a43b9dfeaf"
+source = "git+https://github.com/A6GibKm/zbus?branch=add-builder-for-flags#70daa4da96296211c18e231712f71b8097511b7c"
 dependencies = [
  "proc-macro2",
  "quote",

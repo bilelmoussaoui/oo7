@@ -38,4 +38,4 @@ zbus = { version = "5.7", default-features = false, features = ["gvariant"] }
 zeroize = { version = "1", features = ["zeroize_derive"] }
 
 [patch.crates-io]
-zbus = { git = 'https://github.com/A6GibKm/zbus', branch = "add-gvariant-feature" }
+zbus = { git = 'https://github.com/A6GibKm/zbus', branch = "add-builder-for-flags" }

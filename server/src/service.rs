@@ -1,6 +1,9 @@
 // org.freedesktop.Secret.Service
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, OnceLock},
+};
 
 use enumflags2::BitFlags;
 use oo7::{
@@ -32,7 +35,7 @@ pub struct Service {
     // Properties
     collections: Arc<Mutex<Vec<Collection>>>,
     // Other attributes
-    connection: zbus::Connection,
+    connection: OnceLock<zbus::Connection>,
     // sessions mapped to their corresponding object path on the bus
     sessions: Arc<Mutex<HashMap<OwnedObjectPath, Session>>>,
     session_index: Arc<RwLock<u32>>,
@@ -291,29 +294,29 @@ impl Service {
         secret: Option<Secret>,
         flags: BitFlags<zbus::fdo::RequestNameFlags>,
     ) -> Result<(), Error> {
-        let connection = zbus::Connection::session().await?;
-        connection
-            .request_name_with_flags(
-                oo7::dbus::api::Service::DESTINATION.as_deref().unwrap(),
-                flags,
-            )
-            .await?;
-        let object_server = connection.object_server();
         let service = Self {
             collections: Default::default(),
-            connection: connection.clone(),
+            connection: OnceLock::new(),
             sessions: Default::default(),
             session_index: Default::default(),
             prompts: Default::default(),
             prompt_index: Default::default(),
         };
 
-        object_server
-            .at(
+        let connection = zbus::connection::Builder::session()?
+            .name_with_flags(
+                oo7::dbus::api::Service::DESTINATION.as_deref().unwrap(),
+                flags,
+            )?
+            .serve_at(
                 oo7::dbus::api::Service::PATH.as_deref().unwrap(),
                 service.clone(),
-            )
+            )?
+            .build()
             .await?;
+
+        service.connection.set(connection.clone()).unwrap();
+        let object_server = connection.object_server();
 
         let mut collections = service.collections.lock().await;
 
@@ -357,7 +360,7 @@ impl Service {
             .member("NameOwnerChanged")?
             .arg(2, "")?
             .build();
-        let mut stream = zbus::MessageStream::for_match_rule(rule, &self.connection, None).await?;
+        let mut stream = zbus::MessageStream::for_match_rule(rule, self.connection(), None).await?;
         while let Some(message) = stream.try_next().await? {
             let Ok((_name, old_owner, new_owner)) =
                 message
@@ -440,11 +443,11 @@ impl Service {
     }
 
     pub fn connection(&self) -> &zbus::Connection {
-        &self.connection
+        self.connection.get().unwrap()
     }
 
     pub fn object_server(&self) -> &zbus::ObjectServer {
-        self.connection.object_server()
+        self.connection().object_server()
     }
 
     pub async fn collection_from_path(&self, path: &OwnedObjectPath) -> Option<Collection> {
@@ -509,7 +512,7 @@ impl Service {
         P: TryInto<ObjectPath<'a>>,
         P::Error: Into<zbus::Error>,
     {
-        let signal_emitter = zbus::object_server::SignalEmitter::new(&self.connection, path)?;
+        let signal_emitter = zbus::object_server::SignalEmitter::new(self.connection(), path)?;
 
         Ok(signal_emitter)
     }
