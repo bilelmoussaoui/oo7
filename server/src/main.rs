@@ -89,6 +89,8 @@ async fn main() -> Result<(), Error> {
         }
     })?;
 
+    tracing::debug!("Starting loop");
+
     std::future::pending::<()>().await;
 
     Ok(())
