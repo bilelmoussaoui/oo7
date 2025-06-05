@@ -5,7 +5,7 @@ use ashpd::{
     async_trait,
     desktop::HandleToken,
     zbus::{self, zvariant::OwnedValue},
-    AppID,
+    AppID, PortalError,
 };
 use clap::Parser;
 pub use error::Result;
@@ -111,13 +111,22 @@ async fn main() -> Result<()> {
     let mut flags = zbus::fdo::RequestNameFlags::AllowReplacement.into();
     if args.replace {
         flags |= zbus::fdo::RequestNameFlags::ReplaceExisting;
+    } else {
+        flags |= zbus::fdo::RequestNameFlags::DoNotQueue;
     }
 
     ashpd::backend::Builder::new(PORTAL_NAME)?
         .secret(Secret)
         .with_flags(flags)
         .build()
-        .await?;
+        .await
+        .inspect_err(|err| {
+            if let PortalError::ZBus(zbus::Error::NameTaken) = err {
+                tracing::error!(
+                    "There is an instance already running. Run with --replace to replace it."
+                );
+            }
+        })?;
 
     loop {
         pending::<()>().await;
