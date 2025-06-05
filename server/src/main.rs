@@ -75,11 +75,19 @@ async fn main() -> Result<(), Error> {
     let mut flags = zbus::fdo::RequestNameFlags::AllowReplacement.into();
     if args.replace {
         flags |= zbus::fdo::RequestNameFlags::ReplaceExisting;
+    } else {
+        flags |= zbus::fdo::RequestNameFlags::DoNotQueue;
     }
 
     tracing::info!("Starting {}", BINARY_NAME);
 
-    Service::run(secret, flags).await?;
+    Service::run(secret, flags).await.inspect_err(|err| {
+        if let Error::Zbus(zbus::Error::NameTaken) = err {
+            tracing::error!(
+                "There is an instance already running. Run with --replace to replace it."
+            );
+        }
+    })?;
 
     std::future::pending::<()>().await;
 
