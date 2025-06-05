@@ -1,12 +1,12 @@
 configure_file(
-  input: 'oo7-portal.desktop.in',
+  input: '@0@.desktop.in'.format(service_name),
   output: '@BASENAME@',
   configuration: conf,
   install_dir: datadir / 'applications',
 )
 
 configure_file(
-  input: 'oo7-portal.portal.in',
+  input: '@0@.portal.in'.format(service_name),
   output: '@BASENAME@',
   configuration: conf,
   install_dir: portal_dir,
@@ -22,7 +22,7 @@ if systemduserunitdir != ''
 endif
 
 configure_file(
-  input: 'org.freedesktop.impl.portal.desktop.oo7.service.in',
+  input: '@0@.service.in'.format(dbus_name),
   output: '@BASENAME@',
   configuration: conf,
   install_dir: dbus_service_dir,
