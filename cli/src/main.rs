@@ -452,7 +452,7 @@ fn print_item_common(
         // we still fallback to hex if it is not a string
         if as_hex {
             let hex = hex::encode(bytes);
-            writeln!(&mut result, "secret = {hex}").unwrap();
+            writeln!(&mut result, "hex encoded secret = {hex}").unwrap();
         } else {
             match std::str::from_utf8(bytes) {
                 Ok(secret) => {
@@ -460,7 +460,7 @@ fn print_item_common(
                 }
                 Err(_) => {
                     let hex = hex::encode(bytes);
-                    writeln!(&mut result, "secret = {hex}").unwrap();
+                    writeln!(&mut result, "hex encoded secret = {hex}").unwrap();
                 }
             }
         }
