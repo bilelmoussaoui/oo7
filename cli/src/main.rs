@@ -65,7 +65,7 @@ enum Commands {
     )]
     Delete {
         #[arg(
-            help = "List of attributes. This is a space separated list of pairs of key value",
+            help = "List of attributes. This is a space-separated list of pairs key=value",
             value_parser = parse_key_val::<String, String>,
             required = true, num_args = 1
         )]
@@ -79,7 +79,7 @@ enum Commands {
     )]
     Lookup {
         #[arg(
-            help = "List of attributes. This is a space separated list of pairs of key value",
+            help = "List of attributes. This is a space-separated list of pairs key=value",
             value_parser = parse_key_val::<String, String>,
             required = true,
             num_args = 1
@@ -104,7 +104,7 @@ enum Commands {
         )]
         all: bool,
         #[arg(
-            help = "List of attributes. This is a space separated list of pairs of key value",
+            help = "List of attributes. This is a space-separated list of pairs key=value",
             value_parser = parse_key_val::<String, String>
         )]
         attributes: Vec<(String, String)>,
@@ -123,7 +123,7 @@ enum Commands {
         #[arg(help = "Description for the secret")]
         label: String,
         #[arg(
-            help = "List of attributes. This is a space separated list of pairs of key value",
+            help = "List of attributes. This is a space-separated list of pairs key=value",
             value_parser = parse_key_val::<String, String>,
             required = true, num_args = 1
         )]
