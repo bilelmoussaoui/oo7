@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
+use zbus::zvariant;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 #[derive(Default, PartialEq, Eq, Copy, Clone, Debug, zvariant::Type)]
