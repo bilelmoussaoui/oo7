@@ -101,7 +101,7 @@ impl Secret {
                 Ok(text) => Secret::text(text),
                 Err(_e) => {
                     #[cfg(feature = "tracing")]
-                    tracing::error!(
+                    tracing::warn!(
                         "Failed to decode secret as UTF-8: {}, falling back to blob",
                         _e
                     );
