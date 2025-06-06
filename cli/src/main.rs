@@ -12,6 +12,7 @@ use oo7::dbus::Service;
 use time::{OffsetDateTime, UtcOffset};
 
 const BINARY_NAME: &str = env!("CARGO_BIN_NAME");
+const H_STYLE: anstyle::Style = anstyle::Style::new().bold().underline();
 
 struct Error(String);
 
@@ -61,7 +62,7 @@ enum Commands {
     #[command(
         name = "delete",
         about = "Delete a secret",
-        after_help = format!("Will delete all secrets with matching attributes.\n\nExample:\n  {} delete smtp-port=1025", BINARY_NAME)
+        after_help = format!("Will delete all secrets with matching attributes.\n\n{H_STYLE}Example:{H_STYLE:#}\n  {} delete smtp-port=1025", BINARY_NAME)
     )]
     Delete {
         #[arg(
@@ -75,7 +76,7 @@ enum Commands {
     #[command(
         name = "lookup",
         about = "Retrieve a secret",
-        after_help = format!("Examples:\n  {} lookup smtp-port=1025\n  {0} lookup --secret-only mysql-port=1234 | systemd-creds encrypt --name=mysql-password -p - -", BINARY_NAME)
+        after_help = format!("{H_STYLE}Examples:{H_STYLE:#}\n  {} lookup smtp-port=1025\n  {0} lookup --secret-only mysql-port=1234 | systemd-creds encrypt --name=mysql-password -p - -", BINARY_NAME)
     )]
     Lookup {
         #[arg(
@@ -94,7 +95,7 @@ enum Commands {
     #[command(
         name = "search",
         about = "Search entries with matching attributes",
-        after_help = format!("Example:\n  {} search --all smtp-port=1025", BINARY_NAME)
+        after_help = format!("{H_STYLE}Example:{H_STYLE:#}\n  {} search --all smtp-port=1025", BINARY_NAME)
     )]
     Search {
         #[arg(
@@ -117,7 +118,7 @@ enum Commands {
     #[command(
         name = "store",
         about = "Store a secret",
-        after_help = format!("The contents of the secret will be asked afterwards or read from stdin.\n\nExamples:\n  {} store 'My Personal Mail' smtp-port=1025 imap-port=143\n  systemd-ask-password -n | {0} store 'My Secret' lang=en", BINARY_NAME)
+        after_help = format!("The contents of the secret will be asked afterwards or read from stdin.\n\n{H_STYLE}Examples:{H_STYLE:#}\n  {} store 'My Personal Mail' smtp-port=1025 imap-port=143\n  systemd-ask-password -n | {0} store 'My Secret' lang=en", BINARY_NAME)
     )]
     Store {
         #[arg(help = "Description for the secret")]
