@@ -72,11 +72,10 @@ async fn main() -> Result<(), Error> {
         None
     };
 
-    let mut flags = zbus::fdo::RequestNameFlags::AllowReplacement.into();
+    let mut flags =
+        zbus::fdo::RequestNameFlags::AllowReplacement | zbus::fdo::RequestNameFlags::DoNotQueue;
     if args.replace {
         flags |= zbus::fdo::RequestNameFlags::ReplaceExisting;
-    } else {
-        flags |= zbus::fdo::RequestNameFlags::DoNotQueue;
     }
 
     tracing::info!("Starting {}", BINARY_NAME);
