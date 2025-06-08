@@ -148,7 +148,7 @@ impl Keyring {
             Err(err) => return Err(err.into()),
             Ok(mut file) => {
                 #[cfg(feature = "tracing")]
-                tracing::debug!("Keyring file found, loading it content");
+                tracing::debug!("Keyring file found, loading its content");
                 let mtime = file.metadata().await?.modified().ok();
 
                 let mut content = Vec::new();
