@@ -78,7 +78,7 @@ async fn main() -> Result<(), Error> {
         flags |= zbus::fdo::RequestNameFlags::ReplaceExisting;
     }
 
-    tracing::info!("Starting {}", BINARY_NAME);
+    tracing::info!("Starting {BINARY_NAME}");
 
     Service::run(secret, flags).await.inspect_err(|err| {
         if let Error::Zbus(zbus::Error::NameTaken) = err {
