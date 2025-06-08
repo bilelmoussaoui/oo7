@@ -295,6 +295,11 @@ impl Service {
         flags: BitFlags<zbus::fdo::RequestNameFlags>,
     ) -> Result<(), Error> {
         let connection = zbus::Connection::session().await?;
+
+        if let Some(unique_name) = connection.unique_name() {
+            tracing::info!("Unique name {unique_name} acquired");
+        }
+
         connection
             .request_name_with_flags(
                 oo7::dbus::api::Service::DESTINATION.as_deref().unwrap(),
