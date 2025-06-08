@@ -300,6 +300,8 @@ impl Service {
             tracing::info!("Unique name {unique_name} acquired");
         }
 
+        connect_name_acquired(&connection).await?;
+
         connection
             .request_name_with_flags(
                 oo7::dbus::api::Service::DESTINATION.as_deref().unwrap(),
@@ -524,4 +526,25 @@ impl Service {
 
         Ok(signal_emitter)
     }
+}
+
+async fn connect_name_acquired(connection: &zbus::Connection) -> Result<(), zbus::Error> {
+    let proxy = zbus::fdo::DBusProxy::new(connection).await?;
+    let mut name_acquired_stream = proxy.receive_name_acquired().await?;
+
+    tokio::spawn(async move {
+        if let Some(name_acquired) = name_acquired_stream.next().await {
+            match name_acquired.args() {
+                Ok(name_acquired_args) => {
+                    let name = name_acquired_args.name();
+                    tracing::info!("Requested name {name} acquired");
+                }
+                Err(err) => {
+                    tracing::error!("Could not read name acquired signal: {err}");
+                }
+            };
+        }
+    });
+
+    Ok(())
 }
