@@ -322,7 +322,7 @@ impl Service {
 
         if let Some(secret) = secret {
             let collection = Collection::new(
-                "login",
+                "Login",
                 oo7::dbus::Service::DEFAULT_COLLECTION,
                 false,
                 service.clone(),
