@@ -27,6 +27,9 @@ use crate::{
     session::Session,
 };
 
+const DEFAULT_COLLECTION_ALIAS_PATH: ObjectPath<'static> =
+    ObjectPath::from_static_str_unchecked("/org/freedesktop/secrets/aliases/default");
+
 #[derive(Debug, Clone)]
 pub struct Service {
     // Properties
@@ -328,7 +331,10 @@ impl Service {
             collections.push(collection.clone());
             collection.dispatch_items().await?;
             object_server
-                .at(collection.path().clone(), collection)
+                .at(collection.path(), collection.clone())
+                .await?;
+            object_server
+                .at(DEFAULT_COLLECTION_ALIAS_PATH, collection)
                 .await?;
         }
 
