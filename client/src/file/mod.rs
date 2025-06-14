@@ -160,7 +160,7 @@ impl Keyring {
             }
         };
 
-        if validate_items {
+        let key = if validate_items {
             let key = keyring.derive_key(&secret)?;
 
             let mut n_broken_items = 0;
@@ -190,14 +190,16 @@ impl Keyring {
                 return Err(Error::IncorrectSecret);
             }
 
-            drop(key);
-        }
+            Some(Arc::new(key))
+        } else {
+            None
+        };
 
         Ok(Self {
             keyring: Arc::new(RwLock::new(keyring)),
             path: Some(path.as_ref().to_path_buf()),
             mtime: Mutex::new(mtime),
-            key: Default::default(),
+            key: Mutex::new(key),
             secret: Mutex::new(Arc::new(secret)),
         })
     }
