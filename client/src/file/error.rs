@@ -39,6 +39,8 @@ pub enum Error {
     IncorrectSecret,
     /// Crypto related error.
     Crypto(crate::crypto::Error),
+    /// The keyring is locked.
+    LockedKeyring,
 }
 
 impl From<zvariant::Error> for Error {
@@ -111,6 +113,10 @@ impl std::fmt::Display for Error {
             Self::AlgorithmMismatch(e) => write!(f, "Unknown algorithm {e}"),
             Self::IncorrectSecret => write!(f, "Incorrect secret"),
             Self::Crypto(e) => write!(f, "Failed to do a cryptography operation, {e}"),
+            Self::LockedKeyring => write!(
+                f,
+                "Operation cannot be performed while the keyring is locked"
+            ),
         }
     }
 }
