@@ -28,8 +28,6 @@
 //! # }
 //! ```
 
-#[cfg(feature = "async-std")]
-use std::io;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -44,7 +42,7 @@ use async_lock::{Mutex, RwLock};
 use futures_lite::AsyncReadExt;
 #[cfg(feature = "tokio")]
 use tokio::{
-    fs, io,
+    fs,
     io::AsyncReadExt,
     sync::{Mutex, RwLock},
 };
@@ -109,7 +107,9 @@ impl Keyring {
     /// * `path` - The path to the file backend.
     /// * `secret` - The service key, usually retrieved from the Secrets portal.
     pub async fn load(path: impl AsRef<Path>, secret: Secret) -> Result<Self, Error> {
-        Self::load_inner(path, secret, true).await
+        let locked = LockedKeyring::load(path.as_ref().to_owned()).await?;
+        let unlocked = locked.unlock(secret).await?;
+        Ok(unlocked)
     }
 
     /// Load from a keyring file.
@@ -131,79 +131,9 @@ impl Keyring {
         path: impl AsRef<Path>,
         secret: Secret,
     ) -> Result<Self, Error> {
-        Self::load_inner(path, secret, false).await
-    }
-
-    async fn load_inner(
-        path: impl AsRef<Path>,
-        secret: Secret,
-        validate_items: bool,
-    ) -> Result<Self, Error> {
-        #[cfg(feature = "tracing")]
-        tracing::debug!("Trying to load keyring file at {:?}", path.as_ref());
-        let (mtime, keyring) = match fs::File::open(path.as_ref()).await {
-            Err(err) if err.kind() == io::ErrorKind::NotFound => {
-                #[cfg(feature = "tracing")]
-                tracing::debug!("Keyring file not found, creating a new one");
-                (None, api::Keyring::new())
-            }
-            Err(err) => return Err(err.into()),
-            Ok(mut file) => {
-                #[cfg(feature = "tracing")]
-                tracing::debug!("Keyring file found, loading its content");
-                let mtime = file.metadata().await?.modified().ok();
-
-                let mut content = Vec::new();
-                file.read_to_end(&mut content).await?;
-
-                let keyring = api::Keyring::try_from(content.as_slice())?;
-
-                (mtime, keyring)
-            }
-        };
-
-        let key = if validate_items {
-            let key = keyring.derive_key(&secret)?;
-
-            let mut n_broken_items = 0;
-            let mut n_valid_items = 0;
-            for encrypted_item in &keyring.items {
-                if encrypted_item.clone().decrypt(&key).is_err() {
-                    n_broken_items += 1;
-                } else {
-                    n_valid_items += 1;
-                }
-            }
-            if n_valid_items == 0 && n_broken_items != 0 {
-                #[cfg(feature = "tracing")]
-                tracing::error!("Keyring cannot be decrypted. Invalid secret.");
-                return Err(Error::IncorrectSecret);
-            } else if n_broken_items > n_valid_items {
-                #[cfg(feature = "tracing")]
-                {
-                    tracing::warn!(
-                        "The file contains {n_broken_items} broken items and {n_valid_items} valid ones."
-                    );
-                    tracing::info!(
-                        "Please switch to `Keyring::load_unchecked` to load the keyring without the secret validation.
-                        `Keyring::delete_broken_items` can be used to remove them or alternatively with `oo7-cli --repair`."
-                    );
-                }
-                return Err(Error::IncorrectSecret);
-            }
-
-            Some(Arc::new(key))
-        } else {
-            None
-        };
-
-        Ok(Self {
-            keyring: Arc::new(RwLock::new(keyring)),
-            path: Some(path.as_ref().to_path_buf()),
-            mtime: Mutex::new(mtime),
-            key: Mutex::new(key),
-            secret: Mutex::new(Arc::new(secret)),
-        })
+        let locked = LockedKeyring::load(path.as_ref().to_owned()).await?;
+        let unlocked = unsafe { locked.unlock_unchecked(secret).await? };
+        Ok(unlocked)
     }
 
     /// Creates a temporary backend, that is never stored on disk.
