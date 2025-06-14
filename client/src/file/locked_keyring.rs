@@ -46,8 +46,6 @@ impl LockedKeyring {
             let mut n_valid_items = 0;
             for encrypted_item in &inner_keyring.items {
                 if let Err(_err) = encrypted_item.clone().decrypt(&key) {
-                    #[cfg(feature = "tracing")]
-                    tracing::warn!("Failed to decrypt item, incorrect secret?: {_err}");
                     n_broken_items += 1;
                 } else {
                     n_valid_items += 1;
@@ -56,16 +54,20 @@ impl LockedKeyring {
 
             drop(inner_keyring);
 
-            if n_broken_items > n_valid_items {
+            if n_valid_items == 0 && n_broken_items != 0 {
+                #[cfg(feature = "tracing")]
+                tracing::error!("Keyring cannot be decrypted. Invalid secret.");
+                return Err(Error::IncorrectSecret);
+            } else if n_broken_items > n_valid_items {
                 #[cfg(feature = "tracing")]
                 {
                     tracing::warn!(
                         "The file contains {n_broken_items} broken items and {n_valid_items} valid ones."
                     );
                     tracing::info!(
-                        "Please switch to Keyring::load_unchecked to load the keyring without the secret validation"
+                        "Please switch to `Keyring::load_unchecked` to load the keyring without the secret validation.
+                        `Keyring::delete_broken_items` can be used to remove them or alternatively with `oo7-cli --repair`."
                     );
-                    tracing::info!("Keyring::delete_broken_items can be used to remove them");
                 }
                 return Err(Error::IncorrectSecret);
             }
