@@ -69,7 +69,20 @@ type ItemDefinition = (String, HashMap<String, String>, Secret, bool);
 
 /// File backed keyring.
 #[derive(Debug)]
-pub struct Keyring {
+pub enum Keyring {
+    Unlocked(UnlockedKeyring),
+    Locked(LockedKeyring),
+}
+
+#[derive(Debug)]
+pub struct LockedKeyring {
+    keyring: Arc<RwLock<api::Keyring>>,
+    path: Option<PathBuf>,
+    mtime: Mutex<Option<std::time::SystemTime>>,
+}
+
+#[derive(Debug)]
+pub struct UnlockedKeyring {
     keyring: Arc<RwLock<api::Keyring>>,
     path: Option<PathBuf>,
     /// Times are stored before reading the file to detect
@@ -107,7 +120,8 @@ impl Keyring {
     /// * `path` - The path to the file backend.
     /// * `secret` - The service key, usually retrieved from the Secrets portal.
     pub async fn load(path: impl AsRef<Path>, secret: Secret) -> Result<Self, Error> {
-        Self::load_inner(path, secret, true).await
+        let inner = UnlockedKeyring::load_inner(path, secret, true).await?;
+        Ok(Self::Unlocked(inner))
     }
 
     /// Load from a keyring file.
@@ -129,7 +143,348 @@ impl Keyring {
         path: impl AsRef<Path>,
         secret: Secret,
     ) -> Result<Self, Error> {
+        let inner = unsafe { UnlockedKeyring::load_unchecked(path, secret).await? };
+        Ok(Self::Unlocked(inner))
+    }
+
+    /// Creates a temporary backend, that is never stored on disk.
+    pub async fn temporary(secret: Secret) -> Result<Self, Error> {
+        let keyring = api::Keyring::new();
+        Ok(Self::Unlocked(UnlockedKeyring {
+            keyring: Arc::new(RwLock::new(keyring)),
+            path: None,
+            mtime: Default::default(),
+            key: Default::default(),
+            secret: Mutex::new(Arc::new(secret)),
+        }))
+    }
+
+    /// Open a keyring with given name from the default directory.
+    ///
+    /// This function will automatically migrate the keyring to the
+    /// latest format.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the keyring.
+    /// * `secret` - The service key, usually retrieved from the Secrets portal.
+    pub async fn open(name: &str, secret: Secret) -> Result<Self, Error> {
+        let v1_path = api::Keyring::path(name, api::MAJOR_VERSION)?;
+        if v1_path.exists() {
+            return Keyring::load(v1_path, secret).await;
+        }
+
+        let v0_path = api::Keyring::path(name, api::LEGACY_MAJOR_VERSION)?;
+        if v0_path.exists() {
+            #[cfg(feature = "tracing")]
+            tracing::debug!("Trying to load keyring file at {:?}", v0_path);
+            match fs::File::open(&v0_path).await {
+                Err(err) => Err(err.into()),
+                Ok(mut file) => {
+                    let inner = UnlockedKeyring::migrate(&mut file, v1_path, secret).await?;
+                    Ok(Self::Unlocked(inner))
+                }
+            }
+        } else {
+            Ok(Self::Unlocked(UnlockedKeyring {
+                keyring: Arc::new(RwLock::new(api::Keyring::new())),
+                path: Some(v1_path),
+                mtime: Default::default(),
+                key: Default::default(),
+                secret: Mutex::new(Arc::new(secret)),
+            }))
+        }
+    }
+
+    /// Retrieve the number of items
+    ///
+    /// This function will not trigger a key derivation and can therefore be
+    /// faster than [`items().len()`](Self::items).
+    pub async fn n_items(&self) -> usize {
+        match self {
+            Self::Unlocked(keyring) => keyring.keyring.read().await.items.len(),
+            Self::Locked(_keyring) => todo!(),
+        }
+    }
+
+    /// Retrieve the list of available [`Item`]s.
+    ///
+    /// If items cannot be decrypted, [`InvalidItemError`]s are returned for
+    /// them instead of [`Item`]s.
+    pub async fn items(&self) -> Result<Vec<Result<Item, InvalidItemError>>, Error> {
+        match self {
+            Self::Unlocked(keyring) => {
+                let key = keyring.derive_key().await?;
+                let keyring = keyring.keyring.read().await;
+                Ok(keyring
+                    .items
+                    .iter()
+                    .map(|e| {
+                        (*e).clone().decrypt(&key).map_err(|err| {
+                            InvalidItemError::new(
+                                err,
+                                e.hashed_attributes.keys().map(|x| x.to_string()).collect(),
+                            )
+                        })
+                    })
+                    .collect())
+            }
+            Self::Locked(_keyring) => Err(crate::file::error::Error::LockedKeyring),
+        }
+    }
+
+    /// Search items matching the attributes.
+    pub async fn search_items(&self, attributes: &impl AsAttributes) -> Result<Vec<Item>, Error> {
+        match self {
+            Self::Unlocked(keyring) => {
+                let key = keyring.derive_key().await?;
+                let keyring = keyring.keyring.read().await;
+                keyring.search_items(attributes, &key)
+            }
+            Self::Locked(_keyring) => Err(crate::file::error::Error::LockedKeyring),
+        }
+    }
+
+    /// Find the first item matching the attributes.
+    pub async fn lookup_item(&self, attributes: &impl AsAttributes) -> Result<Option<Item>, Error> {
+        match self {
+            Self::Unlocked(keyring) => keyring.lookup_item(attributes).await,
+            Self::Locked(_keyring) => Err(crate::file::error::Error::LockedKeyring),
+        }
+    }
+
+    /// Find the index in the list of items of the first item matching the
+    /// attributes.
+    pub async fn lookup_item_index(
+        &self,
+        attributes: &impl AsAttributes,
+    ) -> Result<Option<usize>, Error> {
+        match self {
+            Self::Unlocked(keyring) => keyring.lookup_item_index(attributes).await,
+            Self::Locked(_keyring) => Err(crate::file::error::Error::LockedKeyring),
+        }
+    }
+
+    /// Delete an item.
+    pub async fn delete(&self, attributes: &impl AsAttributes) -> Result<(), Error> {
+        match self {
+            Self::Unlocked(keyring) => keyring.delete(attributes).await,
+            Self::Locked(_keyring) => Err(crate::file::error::Error::LockedKeyring),
+        }
+    }
+
+    /// Create a new item
+    ///
+    /// # Arguments
+    ///
+    /// * `label` - A user visible label of the item.
+    /// * `attributes` - A map of key/value attributes, used to find the item
+    ///   later.
+    /// * `secret` - The secret to store.
+    /// * `replace` - Whether to replace the value if the `attributes` matches
+    ///   an existing `secret`.
+    pub async fn create_item(
+        &self,
+        label: &str,
+        attributes: &impl AsAttributes,
+        secret: impl Into<Secret>,
+        replace: bool,
+    ) -> Result<Item, Error> {
+        match self {
+            Self::Unlocked(keyring) => {
+                keyring
+                    .create_item(label, attributes, secret, replace)
+                    .await
+            }
+            Self::Locked(_keyring) => Err(crate::file::error::Error::LockedKeyring),
+        }
+    }
+
+    /// Replaces item at the given index.
+    ///
+    /// The `index` refers to the index of the [`Vec`] returned by
+    /// [`items()`](Self::items). If the index does not exist, the functions
+    /// returns an error.
+    pub async fn replace_item_index(&self, index: usize, item: &Item) -> Result<(), Error> {
+        match self {
+            Self::Unlocked(keyring) => keyring.replace_item_index(index, item).await,
+            Self::Locked(_keyring) => Err(crate::file::error::Error::LockedKeyring),
+        }
+    }
+
+    /// Deletes item at the given index.
+    ///
+    /// The `index` refers to the index of the [`Vec`] returned by
+    /// [`items()`](Self::items). If the index does not exist, the functions
+    /// returns an error.
+    pub async fn delete_item_index(&self, index: usize) -> Result<(), Error> {
+        match self {
+            Self::Unlocked(keyring) => keyring.delete_item_index(index).await,
+            Self::Locked(_keyring) => Err(crate::file::error::Error::LockedKeyring),
+        }
+    }
+
+    /// Helper used for migration to avoid re-writing the file multiple times
+    pub(crate) async fn create_items(&self, items: Vec<ItemDefinition>) -> Result<(), Error> {
+        match self {
+            Self::Unlocked(keyring) => keyring.create_items(items).await,
+            Self::Locked(_keyring) => Err(crate::file::error::Error::LockedKeyring),
+        }
+    }
+
+    /// Write the changes to the keyring file.
+    pub async fn write(&self) -> Result<(), Error> {
+        match self {
+            Self::Unlocked(keyring) => keyring.write().await,
+            Self::Locked(_keyring) => Err(crate::file::error::Error::LockedKeyring),
+        }
+    }
+
+    /// Change keyring secret
+    ///
+    /// # Arguments
+    ///
+    /// * `secret` - The new secret to store.
+    pub async fn change_secret(&self, secret: Secret) -> Result<(), Error> {
+        match self {
+            Self::Unlocked(keyring) => keyring.change_secret(secret).await,
+            Self::Locked(_keyring) => Err(crate::file::error::Error::LockedKeyring),
+        }
+    }
+
+    /// Delete any item that cannot be decrypted with the key associated to the
+    /// keyring.
+    ///
+    /// This can only happen if an item was created using
+    /// [`Self::load_unchecked`] or prior to 0.4 where we didn't validate
+    /// the secret when using [`Self::load`] or modified externally.
+    pub async fn delete_broken_items(&self) -> Result<usize, Error> {
+        match self {
+            Self::Unlocked(keyring) => keyring.delete_broken_items().await,
+            Self::Locked(_keyring) => Err(crate::file::error::Error::LockedKeyring),
+        }
+    }
+}
+
+impl UnlockedKeyring {
+    async fn lookup_item(&self, attributes: &impl AsAttributes) -> Result<Option<Item>, Error> {
+        let key = self.derive_key().await?;
+        let keyring = self.keyring.read().await;
+        keyring.lookup_item(attributes, &key)
+    }
+
+    async unsafe fn load_unchecked(path: impl AsRef<Path>, secret: Secret) -> Result<Self, Error> {
         Self::load_inner(path, secret, false).await
+    }
+
+    /// Return key, derive and store it first if not initialized
+    async fn derive_key(&self) -> Result<Arc<Key>, crate::crypto::Error> {
+        let keyring = Arc::clone(&self.keyring);
+        let secret_lock = self.secret.lock().await;
+        let secret = Arc::clone(&secret_lock);
+        drop(secret_lock);
+
+        let mut key_lock = self.key.lock().await;
+        if key_lock.is_none() {
+            #[cfg(feature = "async-std")]
+            let key = blocking::unblock(move || {
+                async_io::block_on(async { keyring.read().await.derive_key(&secret) })
+            })
+            .await?;
+            #[cfg(feature = "tokio")]
+            let key =
+                tokio::task::spawn_blocking(move || keyring.blocking_read().derive_key(&secret))
+                    .await
+                    .unwrap()?;
+
+            *key_lock = Some(Arc::new(key));
+        }
+
+        Ok(Arc::clone(key_lock.as_ref().unwrap()))
+    }
+
+    async fn delete_broken_items(&self) -> Result<usize, Error> {
+        let key = self.derive_key().await?;
+        let mut keyring = self.keyring.write().await;
+        let mut broken_items = vec![];
+        for (index, encrypted_item) in keyring.items.iter().enumerate() {
+            if let Err(_err) = encrypted_item.clone().decrypt(&key) {
+                broken_items.push(index);
+            }
+        }
+        let n_broken_items = broken_items.len();
+        for index in broken_items {
+            keyring.items.remove(index);
+        }
+        drop(keyring);
+
+        self.write().await?;
+        Ok(n_broken_items)
+    }
+
+    /// Write the changes to the keyring file.
+    async fn write(&self) -> Result<(), Error> {
+        #[cfg(feature = "tracing")]
+        tracing::debug!("Writing keyring back to the file {:?}", self.path);
+        let mut mtime = self.mtime.lock().await;
+        {
+            let mut keyring = self.keyring.write().await;
+            #[cfg(feature = "tracing")]
+            tracing::debug!("Current modified time {:?}", mtime);
+            if let Some(ref path) = self.path {
+                keyring.dump(path, *mtime).await?;
+            }
+        };
+        let Some(ref path) = self.path else {
+            return Ok(());
+        };
+        if let Ok(modified) = fs::metadata(path).await?.modified() {
+            #[cfg(feature = "tracing")]
+            tracing::debug!("New modified time {:?}", modified);
+            *mtime = Some(modified);
+        }
+        Ok(())
+    }
+
+    pub async fn change_secret(&self, secret: Secret) -> Result<(), Error> {
+        #[cfg(feature = "tracing")]
+        tracing::debug!("Changing keyring secret and key");
+
+        let keyring = self.keyring.read().await;
+        let key = self.key.lock().await.take().unwrap();
+
+        let mut items = Vec::with_capacity(keyring.items.len());
+        for item in &keyring.items {
+            items.push(item.clone().decrypt(&key)?);
+        }
+        drop(keyring);
+
+        let secret = Arc::new(secret);
+        let mut secret_lock = self.secret.lock().await;
+        *secret_lock = Arc::clone(&secret);
+        drop(secret_lock);
+
+        let mut key_lock = self.key.lock().await;
+        // Unset the old key
+        *key_lock = None;
+        drop(key_lock);
+
+        // Reset UnlockedKeyring content before setting the new key
+        let mut keyring = self.keyring.write().await;
+        keyring.reset();
+        drop(keyring);
+
+        // Set new key
+        let key = self.derive_key().await?;
+
+        let mut keyring = self.keyring.write().await;
+        for item in items {
+            let encrypted_item = item.encrypt(&key)?;
+            keyring.items.push(encrypted_item);
+        }
+        drop(keyring);
+
+        self.write().await
     }
 
     async fn load_inner(
@@ -203,16 +558,94 @@ impl Keyring {
         })
     }
 
-    /// Creates a temporary backend, that is never stored on disk.
-    pub async fn temporary(secret: Secret) -> Result<Self, Error> {
-        let keyring = api::Keyring::new();
-        Ok(Self {
-            keyring: Arc::new(RwLock::new(keyring)),
-            path: None,
-            mtime: Default::default(),
-            key: Default::default(),
-            secret: Mutex::new(Arc::new(secret)),
-        })
+    pub async fn lookup_item_index(
+        &self,
+        attributes: &impl AsAttributes,
+    ) -> Result<Option<usize>, Error> {
+        let key = self.derive_key().await?;
+        let keyring = self.keyring.read().await;
+        Ok(keyring.lookup_item_index(attributes, &key))
+    }
+
+    /// Delete an item.
+    pub async fn delete(&self, attributes: &impl AsAttributes) -> Result<(), Error> {
+        {
+            let key = self.derive_key().await?;
+            let mut keyring = self.keyring.write().await;
+            keyring.remove_items(attributes, &key)?;
+        };
+        self.write().await
+    }
+
+    pub async fn create_item(
+        &self,
+        label: &str,
+        attributes: &impl AsAttributes,
+        secret: impl Into<Secret>,
+        replace: bool,
+    ) -> Result<Item, Error> {
+        let item = {
+            let key = self.derive_key().await?;
+            let mut keyring = self.keyring.write().await;
+            if replace {
+                keyring.remove_items(attributes, &key)?;
+            }
+            let item = Item::new(label, attributes, secret);
+            let encrypted_item = item.encrypt(&key)?;
+            keyring.items.push(encrypted_item);
+            item
+        };
+        match self.write().await {
+            Err(e) => Err(e),
+            Ok(_) => Ok(item),
+        }
+    }
+
+    pub async fn replace_item_index(&self, index: usize, item: &Item) -> Result<(), Error> {
+        {
+            let key = self.derive_key().await?;
+            let mut keyring = self.keyring.write().await;
+
+            if let Some(item_store) = keyring.items.get_mut(index) {
+                *item_store = item.encrypt(&key)?;
+            } else {
+                return Err(Error::InvalidItemIndex(index));
+            }
+        }
+        self.write().await
+    }
+
+    pub async fn delete_item_index(&self, index: usize) -> Result<(), Error> {
+        {
+            let mut keyring = self.keyring.write().await;
+
+            if index < keyring.items.len() {
+                keyring.items.remove(index);
+            } else {
+                return Err(Error::InvalidItemIndex(index));
+            }
+        }
+        self.write().await
+    }
+
+    pub(crate) async fn create_items(&self, items: Vec<ItemDefinition>) -> Result<(), Error> {
+        let key = self.derive_key().await?;
+        let mut keyring = self.keyring.write().await;
+        for (label, attributes, secret, replace) in items {
+            if replace {
+                keyring.remove_items(&attributes, &key)?;
+            }
+            let item = Item::new(label, &attributes, secret);
+            let encrypted_item = item.encrypt(&key)?;
+            keyring.items.push(encrypted_item);
+        }
+
+        #[cfg(feature = "tracing")]
+        tracing::debug!("Writing keyring back to the file");
+        if let Some(ref path) = self.path {
+            keyring.dump(path, *self.mtime.lock().await).await?;
+        }
+        Ok(())
     }
 
     async fn migrate(
@@ -256,315 +689,6 @@ impl Keyring {
             }
             Err(err) => Err(err),
         }
-    }
-
-    /// Open a keyring with given name from the default directory.
-    ///
-    /// This function will automatically migrate the keyring to the
-    /// latest format.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The name of the keyring.
-    /// * `secret` - The service key, usually retrieved from the Secrets portal.
-    pub async fn open(name: &str, secret: Secret) -> Result<Self, Error> {
-        let v1_path = api::Keyring::path(name, api::MAJOR_VERSION)?;
-        if v1_path.exists() {
-            return Keyring::load(v1_path, secret).await;
-        }
-
-        let v0_path = api::Keyring::path(name, api::LEGACY_MAJOR_VERSION)?;
-        if v0_path.exists() {
-            #[cfg(feature = "tracing")]
-            tracing::debug!("Trying to load keyring file at {:?}", v0_path);
-            match fs::File::open(&v0_path).await {
-                Err(err) => Err(err.into()),
-                Ok(mut file) => Self::migrate(&mut file, v1_path, secret).await,
-            }
-        } else {
-            Ok(Self {
-                keyring: Arc::new(RwLock::new(api::Keyring::new())),
-                path: Some(v1_path),
-                mtime: Default::default(),
-                key: Default::default(),
-                secret: Mutex::new(Arc::new(secret)),
-            })
-        }
-    }
-
-    /// Retrieve the number of items
-    ///
-    /// This function will not trigger a key derivation and can therefore be
-    /// faster than [`items().len()`](Self::items).
-    pub async fn n_items(&self) -> usize {
-        self.keyring.read().await.items.len()
-    }
-
-    /// Retrieve the list of available [`Item`]s.
-    ///
-    /// If items cannot be decrypted, [`InvalidItemError`]s are returned for
-    /// them instead of [`Item`]s.
-    pub async fn items(&self) -> Result<Vec<Result<Item, InvalidItemError>>, Error> {
-        let key = self.derive_key().await?;
-        let keyring = self.keyring.read().await;
-        Ok(keyring
-            .items
-            .iter()
-            .map(|e| {
-                (*e).clone().decrypt(&key).map_err(|err| {
-                    InvalidItemError::new(
-                        err,
-                        e.hashed_attributes.keys().map(|x| x.to_string()).collect(),
-                    )
-                })
-            })
-            .collect())
-    }
-
-    /// Search items matching the attributes.
-    pub async fn search_items(&self, attributes: &impl AsAttributes) -> Result<Vec<Item>, Error> {
-        let key = self.derive_key().await?;
-        let keyring = self.keyring.read().await;
-        keyring.search_items(attributes, &key)
-    }
-
-    /// Find the first item matching the attributes.
-    pub async fn lookup_item(&self, attributes: &impl AsAttributes) -> Result<Option<Item>, Error> {
-        let key = self.derive_key().await?;
-        let keyring = self.keyring.read().await;
-        keyring.lookup_item(attributes, &key)
-    }
-
-    /// Find the index in the list of items of the first item matching the
-    /// attributes.
-    pub async fn lookup_item_index(
-        &self,
-        attributes: &impl AsAttributes,
-    ) -> Result<Option<usize>, Error> {
-        let key = self.derive_key().await?;
-        let keyring = self.keyring.read().await;
-        Ok(keyring.lookup_item_index(attributes, &key))
-    }
-
-    /// Delete an item.
-    pub async fn delete(&self, attributes: &impl AsAttributes) -> Result<(), Error> {
-        {
-            let key = self.derive_key().await?;
-            let mut keyring = self.keyring.write().await;
-            keyring.remove_items(attributes, &key)?;
-        };
-        self.write().await
-    }
-
-    /// Create a new item
-    ///
-    /// # Arguments
-    ///
-    /// * `label` - A user visible label of the item.
-    /// * `attributes` - A map of key/value attributes, used to find the item
-    ///   later.
-    /// * `secret` - The secret to store.
-    /// * `replace` - Whether to replace the value if the `attributes` matches
-    ///   an existing `secret`.
-    pub async fn create_item(
-        &self,
-        label: &str,
-        attributes: &impl AsAttributes,
-        secret: impl Into<Secret>,
-        replace: bool,
-    ) -> Result<Item, Error> {
-        let item = {
-            let key = self.derive_key().await?;
-            let mut keyring = self.keyring.write().await;
-            if replace {
-                keyring.remove_items(attributes, &key)?;
-            }
-            let item = Item::new(label, attributes, secret);
-            let encrypted_item = item.encrypt(&key)?;
-            keyring.items.push(encrypted_item);
-            item
-        };
-        match self.write().await {
-            Err(e) => Err(e),
-            Ok(_) => Ok(item),
-        }
-    }
-
-    /// Replaces item at the given index.
-    ///
-    /// The `index` refers to the index of the [`Vec`] returned by
-    /// [`items()`](Self::items). If the index does not exist, the functions
-    /// returns an error.
-    pub async fn replace_item_index(&self, index: usize, item: &Item) -> Result<(), Error> {
-        {
-            let key = self.derive_key().await?;
-            let mut keyring = self.keyring.write().await;
-
-            if let Some(item_store) = keyring.items.get_mut(index) {
-                *item_store = item.encrypt(&key)?;
-            } else {
-                return Err(Error::InvalidItemIndex(index));
-            }
-        }
-        self.write().await
-    }
-
-    /// Deletes item at the given index.
-    ///
-    /// The `index` refers to the index of the [`Vec`] returned by
-    /// [`items()`](Self::items). If the index does not exist, the functions
-    /// returns an error.
-    pub async fn delete_item_index(&self, index: usize) -> Result<(), Error> {
-        {
-            let mut keyring = self.keyring.write().await;
-
-            if index < keyring.items.len() {
-                keyring.items.remove(index);
-            } else {
-                return Err(Error::InvalidItemIndex(index));
-            }
-        }
-        self.write().await
-    }
-
-    /// Helper used for migration to avoid re-writing the file multiple times
-    pub(crate) async fn create_items(&self, items: Vec<ItemDefinition>) -> Result<(), Error> {
-        let key = self.derive_key().await?;
-        let mut keyring = self.keyring.write().await;
-        for (label, attributes, secret, replace) in items {
-            if replace {
-                keyring.remove_items(&attributes, &key)?;
-            }
-            let item = Item::new(label, &attributes, secret);
-            let encrypted_item = item.encrypt(&key)?;
-            keyring.items.push(encrypted_item);
-        }
-
-        #[cfg(feature = "tracing")]
-        tracing::debug!("Writing keyring back to the file");
-        if let Some(ref path) = self.path {
-            keyring.dump(path, *self.mtime.lock().await).await?;
-        }
-        Ok(())
-    }
-
-    /// Write the changes to the keyring file.
-    pub async fn write(&self) -> Result<(), Error> {
-        #[cfg(feature = "tracing")]
-        tracing::debug!("Writing keyring back to the file {:?}", self.path);
-        let mut mtime = self.mtime.lock().await;
-        {
-            let mut keyring = self.keyring.write().await;
-            #[cfg(feature = "tracing")]
-            tracing::debug!("Current modified time {:?}", mtime);
-            if let Some(ref path) = self.path {
-                keyring.dump(path, *mtime).await?;
-            }
-        };
-        let Some(ref path) = self.path else {
-            return Ok(());
-        };
-        if let Ok(modified) = fs::metadata(path).await?.modified() {
-            #[cfg(feature = "tracing")]
-            tracing::debug!("New modified time {:?}", modified);
-            *mtime = Some(modified);
-        }
-        Ok(())
-    }
-
-    /// Return key, derive and store it first if not initialized
-    async fn derive_key(&self) -> Result<Arc<Key>, crate::crypto::Error> {
-        let keyring = Arc::clone(&self.keyring);
-        let secret_lock = self.secret.lock().await;
-        let secret = Arc::clone(&secret_lock);
-        drop(secret_lock);
-
-        let mut key_lock = self.key.lock().await;
-        if key_lock.is_none() {
-            #[cfg(feature = "async-std")]
-            let key = blocking::unblock(move || {
-                async_io::block_on(async { keyring.read().await.derive_key(&secret) })
-            })
-            .await?;
-            #[cfg(feature = "tokio")]
-            let key =
-                tokio::task::spawn_blocking(move || keyring.blocking_read().derive_key(&secret))
-                    .await
-                    .unwrap()?;
-
-            *key_lock = Some(Arc::new(key));
-        }
-
-        Ok(Arc::clone(key_lock.as_ref().unwrap()))
-    }
-
-    /// Change keyring secret
-    ///
-    /// # Arguments
-    ///
-    /// * `secret` - The new secret to store.
-    pub async fn change_secret(&self, secret: Secret) -> Result<(), Error> {
-        #[cfg(feature = "tracing")]
-        tracing::debug!("Changing keyring secret and key");
-
-        let keyring = self.keyring.read().await;
-        let key = self.derive_key().await?;
-        let mut items = Vec::with_capacity(keyring.items.len());
-        for item in &keyring.items {
-            items.push(item.clone().decrypt(&key)?);
-        }
-        drop(keyring);
-
-        let mut secret_lock = self.secret.lock().await;
-        *secret_lock = Arc::new(secret);
-        drop(secret_lock);
-
-        let mut key_lock = self.key.lock().await;
-        // Unset the old key
-        *key_lock = None;
-        drop(key_lock);
-
-        // Reset Keyring content before setting the new key
-        let mut keyring = self.keyring.write().await;
-        keyring.reset();
-        drop(keyring);
-
-        // Set new key
-        let key = self.derive_key().await?;
-
-        let mut keyring = self.keyring.write().await;
-        for item in items {
-            let encrypted_item = item.encrypt(&key)?;
-            keyring.items.push(encrypted_item);
-        }
-        drop(keyring);
-
-        self.write().await
-    }
-
-    /// Delete any item that cannot be decrypted with the key associated to the
-    /// keyring.
-    ///
-    /// This can only happen if an item was created using
-    /// [`Self::load_unchecked`] or prior to 0.4 where we didn't validate
-    /// the secret when using [`Self::load`] or modified externally.
-    pub async fn delete_broken_items(&self) -> Result<usize, Error> {
-        let key = self.derive_key().await?;
-        let mut keyring = self.keyring.write().await;
-        let mut broken_items = vec![];
-        for (index, encrypted_item) in keyring.items.iter().enumerate() {
-            if let Err(_err) = encrypted_item.clone().decrypt(&key) {
-                broken_items.push(index);
-            }
-        }
-        let n_broken_items = broken_items.len();
-        for index in broken_items {
-            keyring.items.remove(index);
-        }
-        drop(keyring);
-
-        self.write().await?;
-        Ok(n_broken_items)
     }
 }
 
