@@ -120,8 +120,9 @@ impl Keyring {
     /// * `path` - The path to the file backend.
     /// * `secret` - The service key, usually retrieved from the Secrets portal.
     pub async fn load(path: impl AsRef<Path>, secret: Secret) -> Result<Self, Error> {
-        let inner = UnlockedKeyring::load_inner(path, secret, true).await?;
-        Ok(Self::Unlocked(inner))
+        let locked = LockedKeyring::load(path.as_ref().to_owned()).await?;
+        let unlocked = locked.unlock(secret).await?;
+        Ok(Self::Unlocked(unlocked))
     }
 
     /// Load from a keyring file.
@@ -143,8 +144,9 @@ impl Keyring {
         path: impl AsRef<Path>,
         secret: Secret,
     ) -> Result<Self, Error> {
-        let inner = unsafe { UnlockedKeyring::load_unchecked(path, secret).await? };
-        Ok(Self::Unlocked(inner))
+        let locked = LockedKeyring::load(path.as_ref().to_owned()).await?;
+        let unlocked = unsafe { locked.unlock_unchecked(secret).await? };
+        Ok(Self::Unlocked(unlocked))
     }
 
     /// Creates a temporary backend, that is never stored on disk.
@@ -381,10 +383,6 @@ impl UnlockedKeyring {
         keyring.lookup_item(attributes, &key)
     }
 
-    async unsafe fn load_unchecked(path: impl AsRef<Path>, secret: Secret) -> Result<Self, Error> {
-        Self::load_inner(path, secret, false).await
-    }
-
     /// Return key, derive and store it first if not initialized
     async fn derive_key(&self) -> Result<Arc<Key>, crate::crypto::Error> {
         let keyring = Arc::clone(&self.keyring);
@@ -493,77 +491,6 @@ impl UnlockedKeyring {
         drop(keyring);
 
         self.write().await
-    }
-
-    async fn load_inner(
-        path: impl AsRef<Path>,
-        secret: Secret,
-        validate_items: bool,
-    ) -> Result<Self, Error> {
-        #[cfg(feature = "tracing")]
-        tracing::debug!("Trying to load keyring file at {:?}", path.as_ref());
-        let (mtime, keyring) = match fs::File::open(path.as_ref()).await {
-            Err(err) if err.kind() == io::ErrorKind::NotFound => {
-                #[cfg(feature = "tracing")]
-                tracing::debug!("Keyring file not found, creating a new one");
-                (None, api::Keyring::new())
-            }
-            Err(err) => return Err(err.into()),
-            Ok(mut file) => {
-                #[cfg(feature = "tracing")]
-                tracing::debug!("Keyring file found, loading it content");
-                let mtime = file.metadata().await?.modified().ok();
-
-                let mut content = Vec::new();
-                file.read_to_end(&mut content).await?;
-
-                let keyring = api::Keyring::try_from(content.as_slice())?;
-
-                (mtime, keyring)
-            }
-        };
-
-        let key = if validate_items {
-            let key = keyring.derive_key(&secret)?;
-
-            let mut n_broken_items = 0;
-            let mut n_valid_items = 0;
-            for encrypted_item in &keyring.items {
-                if let Err(_err) = encrypted_item.clone().decrypt(&key) {
-                    #[cfg(feature = "tracing")]
-                    tracing::warn!("Failed to decrypt item, incorrect secret?: {_err}");
-                    n_broken_items += 1;
-                } else {
-                    n_valid_items += 1;
-                }
-            }
-
-            if n_broken_items > n_valid_items {
-                #[cfg(feature = "tracing")]
-                {
-                    tracing::warn!(
-                        "The file contains {n_broken_items} broken items and {n_valid_items} valid ones."
-                    );
-                    tracing::info!(
-                        "Please switch to Keyring::load_unchecked to load the keyring without the secret validation"
-                    );
-                    tracing::info!("Keyring::delete_broken_items can be used to remove them");
-                }
-                return Err(Error::IncorrectSecret);
-            }
-
-            Some(Arc::new(key))
-        } else {
-            None
-        };
-
-        Ok(Self {
-            keyring: Arc::new(RwLock::new(keyring)),
-            path: Some(path.as_ref().to_path_buf()),
-            mtime: Mutex::new(mtime),
-            key: Mutex::new(key),
-            secret: Mutex::new(Arc::new(secret)),
-        })
     }
 
     pub async fn lookup_item_index(
