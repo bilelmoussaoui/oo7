@@ -3,7 +3,7 @@ use std::sync::Arc;
 use oo7::{Key, ashpd::WindowIdentifierType, dbus::ServiceError};
 use serde::{Deserialize, Serialize};
 use tokio::sync::OnceCell;
-use zbus::zvariant::{self, Optional, OwnedObjectPath, Type, as_value};
+use zbus::zvariant::{self, ObjectPath, Optional, OwnedObjectPath, Type, as_value};
 
 use super::secret_exchange;
 use crate::{
@@ -126,17 +126,17 @@ enum PromptType {
     gen_blocking = false
 )]
 pub trait Prompter {
-    fn begin_prompting(&self, callback: &OwnedObjectPath) -> Result<(), ServiceError>;
+    fn begin_prompting(&self, callback: &ObjectPath<'_>) -> Result<(), ServiceError>;
 
     fn perform_prompt(
         &self,
-        callback: OwnedObjectPath,
+        callback: &ObjectPath<'_>,
         type_: PromptType,
         properties: Properties,
         exchange: &str,
     ) -> Result<(), ServiceError>;
 
-    fn stop_prompting(&self, callback: OwnedObjectPath) -> Result<(), ServiceError>;
+    fn stop_prompting(&self, callback: &ObjectPath<'_>) -> Result<(), ServiceError>;
 }
 
 #[derive(Debug, Clone)]
@@ -178,7 +178,8 @@ impl PrompterCallback {
             }
             // Dismissed prompt
             Some(Reply::No) => {
-                self.prompter_dismissed(prompt.path()).await?;
+                self.prompter_dismissed(prompt.path().clone().into())
+                    .await?;
             }
         };
         Ok(())
@@ -224,7 +225,7 @@ impl PrompterCallback {
         })
     }
 
-    pub fn path(&self) -> &OwnedObjectPath {
+    pub fn path(&self) -> &ObjectPath<'_> {
         &self.path
     }
 
@@ -265,7 +266,7 @@ impl PrompterCallback {
         let exchange = self.exchange.get().unwrap().clone();
         tokio::spawn(async move {
             prompter
-                .perform_prompt(path, prompt_type, properties, &exchange)
+                .perform_prompt(&path, prompt_type, properties, &exchange)
                 .await
         });
         Ok(())
@@ -319,7 +320,7 @@ impl PrompterCallback {
                         tokio::spawn(async move {
                             prompter
                                 .perform_prompt(
-                                    path,
+                                    &path,
                                     PromptType::Password,
                                     properties,
                                     &server_exchange,
@@ -340,9 +341,10 @@ impl PrompterCallback {
         }
 
         let path = self.path.clone();
-        tokio::spawn(async move { prompter.stop_prompting(path).await });
+        let prompt_path = OwnedObjectPath::from(prompt.path().clone());
+        tokio::spawn(async move { prompter.stop_prompting(&path).await });
 
-        let signal_emitter = self.service.signal_emitter(prompt.path().clone())?;
+        let signal_emitter = self.service.signal_emitter(prompt_path)?;
         let result = zvariant::Value::new(prompt.objects())
             .try_to_owned()
             .unwrap();
@@ -372,18 +374,18 @@ impl PrompterCallback {
             .map(|(parent, _)| parent)?;
         let collection = self
             .service
-            .collection_from_path(&OwnedObjectPath::try_from(path).unwrap())
+            .collection_from_path(&ObjectPath::try_from(path).unwrap())
             .await?;
 
         Some(collection.label().await)
     }
 
-    async fn prompter_dismissed(&self, prompt_path: &OwnedObjectPath) -> Result<(), ServiceError> {
+    async fn prompter_dismissed(&self, prompt_path: OwnedObjectPath) -> Result<(), ServiceError> {
         let path = self.path.clone();
         let prompter = PrompterProxy::new(self.service.connection()).await?;
 
-        tokio::spawn(async move { prompter.stop_prompting(path).await });
-        let signal_emitter = self.service.signal_emitter(prompt_path.clone())?;
+        tokio::spawn(async move { prompter.stop_prompting(&path).await });
+        let signal_emitter = self.service.signal_emitter(prompt_path)?;
         let result = zvariant::Value::new::<Vec<OwnedObjectPath>>(vec![])
             .try_to_owned()
             .unwrap();
