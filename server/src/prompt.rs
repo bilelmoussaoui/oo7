@@ -7,7 +7,7 @@ use tokio::sync::OnceCell;
 use zbus::{
     interface,
     object_server::SignalEmitter,
-    zvariant::{Optional, OwnedObjectPath, OwnedValue},
+    zvariant::{ObjectPath, Optional, OwnedObjectPath, OwnedValue},
 };
 
 use crate::{
@@ -66,7 +66,7 @@ impl Prompt {
             custom_service_error(&format!("Failed to create PrompterCallback {err}."))
         })?;
 
-        let path = callback.path().clone();
+        let path = OwnedObjectPath::from(callback.path().clone());
 
         self.callback
             .set(callback.clone())
@@ -120,7 +120,7 @@ impl Prompt {
         }
     }
 
-    pub fn path(&self) -> &OwnedObjectPath {
+    pub fn path(&self) -> &ObjectPath<'_> {
         &self.path
     }
 

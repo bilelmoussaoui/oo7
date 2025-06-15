@@ -152,7 +152,7 @@ impl Service {
         let (unlocked, not_unlocked) = self.set_locked(false, &objects, false).await?;
         if !not_unlocked.is_empty() {
             let prompt = Prompt::new(self.clone(), not_unlocked, PromptRole::Unlock).await;
-            let path = prompt.path().clone();
+            let path = OwnedObjectPath::from(prompt.path().clone());
             self.prompts
                 .lock()
                 .await
@@ -173,7 +173,7 @@ impl Service {
         let (locked, not_locked) = self.set_locked(true, &objects, false).await?;
         if !not_locked.is_empty() {
             let prompt = Prompt::new(self.clone(), not_locked, PromptRole::Lock).await;
-            let path = prompt.path().clone();
+            let path = OwnedObjectPath::from(prompt.path().clone());
             self.prompts
                 .lock()
                 .await
