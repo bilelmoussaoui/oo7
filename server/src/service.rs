@@ -274,19 +274,19 @@ impl Service {
     #[zbus(signal, name = "CollectionCreated")]
     async fn collection_created(
         signal_emitter: &SignalEmitter<'_>,
-        collection: OwnedObjectPath,
+        collection: &ObjectPath<'_>,
     ) -> zbus::Result<()>;
 
     #[zbus(signal, name = "CollectionDeleted")]
     async fn collection_deleted(
         signal_emitter: &SignalEmitter<'_>,
-        collection: OwnedObjectPath,
+        collection: &ObjectPath<'_>,
     ) -> zbus::Result<()>;
 
     #[zbus(signal, name = "CollectionChanged")]
     pub async fn collection_changed(
         signal_emitter: &SignalEmitter<'_>,
-        collection: &OwnedObjectPath,
+        collection: &ObjectPath<'_>,
     ) -> zbus::Result<()>;
 }
 
