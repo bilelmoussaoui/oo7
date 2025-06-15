@@ -253,13 +253,7 @@ impl Collection {
     pub async fn item_from_path(&self, path: &ObjectPath<'_>) -> Option<item::Item> {
         let items = self.items.lock().await;
 
-        for item in items.iter() {
-            if item.path() == path {
-                return Some(item.clone());
-            }
-        }
-
-        None
+        items.iter().find(|i| i.path() == path).cloned()
     }
 
     pub async fn set_locked(&self, locked: bool) -> Result<(), ServiceError> {
