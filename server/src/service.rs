@@ -457,13 +457,7 @@ impl Service {
     pub async fn collection_from_path(&self, path: &ObjectPath<'_>) -> Option<Collection> {
         let collections = self.collections.lock().await;
 
-        for collection in collections.iter() {
-            if *collection.path() == **path {
-                return Some(collection.clone());
-            }
-        }
-
-        None
+        collections.iter().find(|c| c.path() == path).cloned()
     }
 
     pub async fn session_index(&self) -> u32 {
