@@ -295,6 +295,13 @@ impl Service {
         flags: BitFlags<zbus::fdo::RequestNameFlags>,
     ) -> Result<(), Error> {
         let connection = zbus::Connection::session().await?;
+
+        if let Some(unique_name) = connection.unique_name() {
+            tracing::info!("Got unique name {unique_name} on the bus");
+        }
+
+        connect_name_acquired(&connection).await?;
+
         connection
             .request_name_with_flags(
                 oo7::dbus::api::Service::DESTINATION.as_deref().unwrap(),
@@ -519,4 +526,29 @@ impl Service {
 
         Ok(signal_emitter)
     }
+}
+
+async fn connect_name_acquired(connection: &zbus::Connection) -> Result<(), zbus::Error> {
+    let proxy = zbus::fdo::DBusProxy::new(connection).await?;
+    let name_acquired_stream = proxy.receive_name_acquired().await?;
+
+    tokio::spawn(async move {
+        if let Err(err) = name_acquired_callback(name_acquired_stream).await {
+            tracing::error!("Could not read name acquired signal: {err}");
+        }
+    });
+
+    Ok(())
+}
+
+async fn name_acquired_callback(
+    mut name_acquired_stream: zbus::fdo::NameAcquiredStream,
+) -> Result<(), zbus::Error> {
+    if let Some(name_acquired) = name_acquired_stream.next().await {
+        let name_acquired_args = name_acquired.args()?;
+        let name = name_acquired_args.name();
+        tracing::info!("Acquired requested name {name} on the bus");
+    }
+
+    Ok(())
 }

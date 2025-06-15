@@ -107,11 +107,10 @@ async fn main() -> Result<()> {
         env!("CARGO_PKG_VERSION")
     );
 
-    let mut flags = zbus::fdo::RequestNameFlags::AllowReplacement.into();
+    let mut flags =
+        zbus::fdo::RequestNameFlags::AllowReplacement | zbus::fdo::RequestNameFlags::DoNotQueue;
     if args.replace {
         flags |= zbus::fdo::RequestNameFlags::ReplaceExisting;
-    } else {
-        flags |= zbus::fdo::RequestNameFlags::DoNotQueue;
     }
 
     ashpd::backend::Builder::new(PORTAL_NAME)?
