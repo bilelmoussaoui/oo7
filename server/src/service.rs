@@ -87,7 +87,7 @@ impl Service {
         tracing::info!("Client {} connected", sender);
 
         let session = Session::new(aes_key.map(Arc::new), self.clone(), sender.to_owned()).await;
-        let path = session.path().clone();
+        let path = OwnedObjectPath::from(session.path().clone());
 
         self.sessions
             .lock()
