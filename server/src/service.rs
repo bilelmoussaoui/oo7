@@ -454,7 +454,7 @@ impl Service {
         self.connection().object_server()
     }
 
-    pub async fn collection_from_path(&self, path: &OwnedObjectPath) -> Option<Collection> {
+    pub async fn collection_from_path(&self, path: &ObjectPath<'_>) -> Option<Collection> {
         let collections = self.collections.lock().await;
 
         for collection in collections.iter() {
@@ -485,11 +485,11 @@ impl Service {
         None
     }
 
-    pub async fn session(&self, path: &OwnedObjectPath) -> Option<Session> {
+    pub async fn session(&self, path: &ObjectPath<'_>) -> Option<Session> {
         self.sessions.lock().await.get(path).cloned()
     }
 
-    pub async fn remove_session(&self, path: &OwnedObjectPath) {
+    pub async fn remove_session(&self, path: &ObjectPath<'_>) {
         self.sessions.lock().await.remove(path);
     }
 
@@ -500,11 +500,11 @@ impl Service {
         n_prompts
     }
 
-    pub async fn prompt(&self, path: &OwnedObjectPath) -> Option<Prompt> {
+    pub async fn prompt(&self, path: &ObjectPath<'_>) -> Option<Prompt> {
         self.prompts.lock().await.get(path).cloned()
     }
 
-    pub async fn remove_prompt(&self, path: &OwnedObjectPath) {
+    pub async fn remove_prompt(&self, path: &ObjectPath<'_>) {
         self.prompts.lock().await.remove(path);
     }
 
