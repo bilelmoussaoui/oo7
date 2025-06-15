@@ -37,19 +37,7 @@ struct Args {
     is_verbose: bool,
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Error> {
-    let args = Args::parse();
-
-    if args.is_verbose {
-        tracing_subscriber::fmt()
-            .with_max_level(tracing_subscriber::filter::LevelFilter::DEBUG)
-            .init();
-        tracing::debug!("Running in verbose mode");
-    } else {
-        tracing_subscriber::fmt::init();
-    }
-
+async fn inner_main(args: Args) -> Result<(), Error> {
     capability::drop_unnecessary_capabilities()?;
 
     let secret = if args.login {
@@ -93,4 +81,22 @@ async fn main() -> Result<(), Error> {
     std::future::pending::<()>().await;
 
     Ok(())
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Error> {
+    let args = Args::parse();
+
+    if args.is_verbose {
+        tracing_subscriber::fmt()
+            .with_max_level(tracing_subscriber::filter::LevelFilter::DEBUG)
+            .init();
+        tracing::debug!("Running in verbose mode");
+    } else {
+        tracing_subscriber::fmt::init();
+    }
+
+    inner_main(args).await.inspect_err(|err| {
+        tracing::error!("{err:#}");
+    })
 }
