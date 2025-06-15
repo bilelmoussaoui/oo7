@@ -18,7 +18,7 @@ use crate::{Service, collection::Collection, error::custom_service_error};
 pub struct Item {
     // Properties
     locked: Arc<AtomicBool>,
-    inner: Arc<Mutex<oo7::file::Item>>,
+    inner: Arc<Mutex<file::Item>>,
     // Other attributes
     service: Service,
     collection_path: OwnedObjectPath,

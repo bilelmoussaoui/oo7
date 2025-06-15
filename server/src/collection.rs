@@ -11,7 +11,7 @@ use oo7::{
         ServiceError,
         api::{DBusSecretInner, Properties},
     },
-    file::Keyring,
+    file,
 };
 use tokio::sync::{Mutex, RwLock};
 use zbus::{interface, object_server::SignalEmitter, proxy::Defaults, zvariant};
@@ -34,7 +34,7 @@ pub struct Collection {
     // Other attributes
     alias: Arc<Mutex<String>>,
     #[allow(unused)]
-    keyring: Arc<Keyring>,
+    keyring: Arc<file::Keyring>,
     service: Service,
     item_index: Arc<RwLock<u32>>,
     path: OwnedObjectPath,
@@ -193,7 +193,7 @@ impl Collection {
         alias: &str,
         locked: bool,
         service: Service,
-        keyring: Arc<Keyring>,
+        keyring: Arc<file::Keyring>,
     ) -> Self {
         let created = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
