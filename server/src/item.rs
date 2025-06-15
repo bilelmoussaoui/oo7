@@ -90,14 +90,14 @@ impl Item {
                 })?;
 
                 Ok((DBusSecretInner(
-                    session.path().clone(),
+                    session.path().clone().into(),
                     iv,
                     encrypted,
                     content_type,
                 ),))
             }
             None => Ok((DBusSecretInner(
-                session.path().clone(),
+                session.path().clone().into(),
                 Vec::new(),
                 secret.to_vec(),
                 content_type,

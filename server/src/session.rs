@@ -3,7 +3,11 @@
 use std::sync::Arc;
 
 use oo7::{Key, dbus::ServiceError};
-use zbus::{interface, names::UniqueName, zvariant::OwnedObjectPath};
+use zbus::{
+    interface,
+    names::UniqueName,
+    zvariant::{ObjectPath, OwnedObjectPath},
+};
 
 use crate::Service;
 
@@ -48,7 +52,7 @@ impl Session {
         &self.sender
     }
 
-    pub fn path(&self) -> &OwnedObjectPath {
+    pub fn path(&self) -> &ObjectPath<'_> {
         &self.path
     }
 
