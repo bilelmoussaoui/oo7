@@ -59,10 +59,12 @@ pub(crate) use api::AttributeValue;
 
 mod error;
 mod item;
+mod locked_item;
 mod locked_keyring;
 
 pub use error::{Error, InvalidItemError, WeakKeyError};
 pub use item::Item;
+pub use locked_item::LockedItem;
 pub use locked_keyring::LockedKeyring;
 
 type ItemDefinition = (String, HashMap<String, String>, Secret, bool);
