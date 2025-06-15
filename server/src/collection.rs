@@ -171,19 +171,19 @@ impl Collection {
     #[zbus(signal, name = "ItemCreated")]
     async fn item_created(
         signal_emitter: &SignalEmitter<'_>,
-        item: &OwnedObjectPath,
+        item: &ObjectPath<'_>,
     ) -> zbus::Result<()>;
 
     #[zbus(signal, name = "ItemDeleted")]
     pub async fn item_deleted(
         signal_emitter: &SignalEmitter<'_>,
-        item: &OwnedObjectPath,
+        item: &ObjectPath<'_>,
     ) -> zbus::Result<()>;
 
     #[zbus(signal, name = "ItemChanged")]
     pub async fn item_changed(
         signal_emitter: &SignalEmitter<'_>,
-        item: &OwnedObjectPath,
+        item: &ObjectPath<'_>,
     ) -> zbus::Result<()>;
 }
 
@@ -250,11 +250,11 @@ impl Collection {
         items
     }
 
-    pub async fn item_from_path(&self, path: &OwnedObjectPath) -> Option<item::Item> {
+    pub async fn item_from_path(&self, path: &ObjectPath<'_>) -> Option<item::Item> {
         let items = self.items.lock().await;
 
         for item in items.iter() {
-            if *item.path() == **path {
+            if item.path() == path {
                 return Some(item.clone());
             }
         }
@@ -313,7 +313,7 @@ impl Collection {
         Ok(())
     }
 
-    pub async fn delete_item(&self, path: &OwnedObjectPath) -> Result<(), ServiceError> {
+    pub async fn delete_item(&self, path: &ObjectPath<'_>) -> Result<(), ServiceError> {
         let Some(item) = self.item_from_path(path).await else {
             return Err(ServiceError::NoSuchObject(format!(
                 "Item `{path}` does not exist."
