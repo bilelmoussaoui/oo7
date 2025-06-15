@@ -72,22 +72,17 @@ async fn main() -> Result<(), Error> {
         None
     };
 
-    let mut flags = zbus::fdo::RequestNameFlags::AllowReplacement.into();
-    if args.replace {
-        flags |= zbus::fdo::RequestNameFlags::ReplaceExisting;
-    } else {
-        flags |= zbus::fdo::RequestNameFlags::DoNotQueue;
-    }
-
     tracing::info!("Starting {}", BINARY_NAME);
 
-    Service::run(secret, flags).await.inspect_err(|err| {
-        if let Error::Zbus(zbus::Error::NameTaken) = err {
-            tracing::error!(
-                "There is an instance already running. Run with --replace to replace it."
-            );
-        }
-    })?;
+    Service::run(secret, args.replace)
+        .await
+        .inspect_err(|err| {
+            if let Error::Zbus(zbus::Error::NameTaken) = err {
+                tracing::error!(
+                    "There is an instance already running. Run with --replace to replace it."
+                );
+            }
+        })?;
 
     tracing::debug!("Starting loop");
 
