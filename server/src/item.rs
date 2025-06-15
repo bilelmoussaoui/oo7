@@ -10,7 +10,7 @@ use oo7::{
     file,
 };
 use tokio::sync::Mutex;
-use zbus::zvariant::OwnedObjectPath;
+use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 
 use crate::{Service, collection::Collection, error::custom_service_error};
 
@@ -191,7 +191,7 @@ impl Item {
         }
     }
 
-    pub fn path(&self) -> &OwnedObjectPath {
+    pub fn path(&self) -> &ObjectPath<'_> {
         &self.path
     }
 
