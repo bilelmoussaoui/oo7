@@ -80,6 +80,15 @@ pub struct Keyring {
 }
 
 impl Keyring {
+    /// Locks the keyring
+    pub fn lock(self) -> LockedKeyring {
+        LockedKeyring {
+            mtime: self.mtime,
+            keyring: self.keyring,
+            path: self.path,
+        }
+    }
+
     /// Load from default keyring file
     pub async fn load_default() -> Result<Self, Error> {
         #[cfg(feature = "tracing")]
