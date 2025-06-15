@@ -214,7 +214,7 @@ impl Collection {
         }
     }
 
-    pub fn path(&self) -> &OwnedObjectPath {
+    pub fn path(&self) -> &ObjectPath<'_> {
         &self.path
     }
 

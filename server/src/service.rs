@@ -233,7 +233,7 @@ impl Service {
                     collection.path(),
                     name
                 );
-                return Ok(collection.path().clone());
+                return Ok(collection.path().clone().into());
             }
         }
 
@@ -250,7 +250,7 @@ impl Service {
         let collections = self.collections.lock().await;
 
         for other_collection in collections.iter() {
-            if other_collection.path() == &collection {
+            if *other_collection.path() == *collection {
                 other_collection.set_alias(name).await;
 
                 tracing::info!("Collection: {} alias updated to {}.", collection, name);
@@ -271,7 +271,7 @@ impl Service {
             .lock()
             .await
             .iter()
-            .map(|c| c.path().to_owned())
+            .map(|c| c.path().to_owned().into())
             .collect()
     }
 
@@ -346,10 +346,10 @@ impl Service {
             service.clone(),
             Arc::new(Keyring::temporary(Secret::random().unwrap()).await?),
         );
-        collections.push(collection.clone());
         object_server
-            .at(collection.path().clone(), collection)
+            .at(collection.path(), collection.clone())
             .await?;
+        collections.push(collection);
 
         let service = service.clone();
         tokio::spawn(async move { service.on_client_disconnect().await });
@@ -401,7 +401,7 @@ impl Service {
         for object in objects {
             for collection in collections.iter() {
                 let collection_locked = collection.is_locked().await;
-                if object == collection.path() {
+                if **object == *collection.path() {
                     if collection_locked == locked {
                         tracing::debug!(
                             "Collection: {} is already {}.",
@@ -458,7 +458,7 @@ impl Service {
         let collections = self.collections.lock().await;
 
         for collection in collections.iter() {
-            if collection.path() == path {
+            if *collection.path() == **path {
                 return Some(collection.clone());
             }
         }
