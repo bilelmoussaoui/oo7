@@ -56,8 +56,8 @@ impl Collection {
             .search_inner_items(&attributes)
             .await
             .iter()
-            .map(|item| item.path().clone())
-            .collect::<Vec<_>>();
+            .map(|item| item.path().clone().into())
+            .collect::<Vec<OwnedObjectPath>>();
 
         if results.is_empty() {
             tracing::debug!(
@@ -139,7 +139,7 @@ impl Collection {
             .lock()
             .await
             .iter()
-            .map(|i| i.path().to_owned())
+            .map(|i| i.path().to_owned().into())
             .collect()
     }
 
@@ -254,7 +254,7 @@ impl Collection {
         let items = self.items.lock().await;
 
         for item in items.iter() {
-            if item.path() == path {
+            if *item.path() == **path {
                 return Some(item.clone());
             }
         }

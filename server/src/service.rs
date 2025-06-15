@@ -121,9 +121,9 @@ impl Service {
             let items = collection.search_inner_items(&attributes).await;
             for item in items {
                 if item.is_locked().await {
-                    locked.push(item.path().clone());
+                    locked.push(item.path().clone().into());
                 } else {
-                    unlocked.push(item.path().clone());
+                    unlocked.push(item.path().clone().into());
                 }
             }
         }
@@ -196,7 +196,7 @@ impl Service {
                 if let Some(item) = collection.item_from_path(item).await {
                     match item.get_secret(session.clone()).await {
                         Ok((secret,)) => {
-                            secrets.insert(item.path().clone(), secret);
+                            secrets.insert(item.path().clone().into(), secret);
                             // To avoid iterating through all the remaining collections, if the
                             // items secrets are already retrieved.
                             if secrets.len() == items.len() {
