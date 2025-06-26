@@ -172,8 +172,11 @@ impl Keyring {
                     n_valid_items += 1;
                 }
             }
-
-            if n_broken_items > n_valid_items {
+            if n_valid_items == 0 && n_broken_items != 0 {
+                #[cfg(feature = "tracing")]
+                tracing::error!("Keyring cannot be decrypted. Invalid secret.");
+                return Err(Error::IncorrectSecret);
+            } else if n_broken_items > n_valid_items {
                 #[cfg(feature = "tracing")]
                 {
                     tracing::warn!(
