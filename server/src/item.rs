@@ -15,10 +15,16 @@ use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 use crate::{Service, collection::Collection, error::custom_service_error};
 
 #[derive(Debug, Clone)]
+enum InnerItem {
+    Locked(file::LockedItem),
+    Unlocked(file::Item),
+}
+
+#[derive(Debug, Clone)]
 pub struct Item {
     // Properties
     locked: Arc<AtomicBool>,
-    inner: Arc<Mutex<file::Item>>,
+    inner: Arc<Mutex<InnerItem>>,
     // Other attributes
     service: Service,
     collection_path: OwnedObjectPath,
@@ -66,42 +72,44 @@ impl Item {
             )));
         };
 
-        if self.is_locked().await {
-            tracing::error!("Cannot get secret of a locked object `{}`", self.path);
-            return Err(ServiceError::IsLocked(format!(
-                "Cannot get secret of a locked object `{}`.",
-                self.path
-            )));
-        }
-
-        let inner = self.inner.lock().await;
-        let secret = inner.secret();
-        let content_type = secret.content_type();
-
-        tracing::debug!("Secret retrieved from the item: {}.", self.path);
-
-        match session.aes_key() {
-            Some(key) => {
-                let iv = oo7::crypto::generate_iv().map_err(|err| {
-                    custom_service_error(&format!("Failed to generate iv {err}."))
-                })?;
-                let encrypted = oo7::crypto::encrypt(secret, &key, &iv).map_err(|err| {
-                    custom_service_error(&format!("Failed to encrypt secret {err}."))
-                })?;
-
-                Ok((DBusSecretInner(
-                    session.path().clone().into(),
-                    iv,
-                    encrypted,
-                    content_type,
-                ),))
+        match &*self.inner.lock().await {
+            InnerItem::Locked(_inner) => {
+                tracing::error!("Cannot get secret of a locked object `{}`", self.path);
+                Err(ServiceError::IsLocked(format!(
+                    "Cannot get secret of a locked object `{}`.",
+                    self.path
+                )))
             }
-            None => Ok((DBusSecretInner(
-                session.path().clone().into(),
-                Vec::new(),
-                secret.to_vec(),
-                content_type,
-            ),)),
+            InnerItem::Unlocked(inner) => {
+                let secret = inner.secret();
+                let content_type = secret.content_type();
+
+                tracing::debug!("Secret retrieved from the item: {}.", self.path);
+
+                match session.aes_key() {
+                    Some(key) => {
+                        let iv = oo7::crypto::generate_iv().map_err(|err| {
+                            custom_service_error(&format!("Failed to generate iv {err}."))
+                        })?;
+                        let encrypted = oo7::crypto::encrypt(secret, &key, &iv).map_err(|err| {
+                            custom_service_error(&format!("Failed to encrypt secret {err}."))
+                        })?;
+
+                        Ok((DBusSecretInner(
+                            session.path().clone().into(),
+                            iv,
+                            encrypted,
+                            content_type,
+                        ),))
+                    }
+                    None => Ok((DBusSecretInner(
+                        session.path().clone().into(),
+                        Vec::new(),
+                        secret.to_vec(),
+                        content_type,
+                    ),)),
+                }
+            }
         }
     }
 
@@ -115,62 +123,100 @@ impl Item {
             )));
         };
 
-        let mut inner = self.inner.lock().await;
-
-        match session.aes_key() {
-            Some(key) => {
-                let decrypted = oo7::crypto::decrypt(secret, &key, &iv).map_err(|err| {
-                    custom_service_error(&format!("Failed to decrypt secret {err}."))
-                })?;
-                inner.set_secret(decrypted);
+        match &mut *self.inner.lock().await {
+            InnerItem::Locked(_inner) => {
+                tracing::error!("Cannot set secret of a locked object `{}`", self.path);
+                Err(ServiceError::IsLocked(format!(
+                    "Cannot set secret of a locked object `{}`.",
+                    self.path
+                )))
             }
-            None => {
-                inner.set_secret(secret);
+            InnerItem::Unlocked(inner) => {
+                match session.aes_key() {
+                    Some(key) => {
+                        let decrypted = oo7::crypto::decrypt(secret, &key, &iv).map_err(|err| {
+                            custom_service_error(&format!("Failed to decrypt secret {err}."))
+                        })?;
+                        inner.set_secret(decrypted);
+                    }
+                    None => {
+                        inner.set_secret(secret);
+                    }
+                }
+
+                Ok(())
             }
         }
-
-        Ok(())
     }
 
     #[zbus(property, name = "Locked")]
     pub async fn is_locked(&self) -> bool {
-        self.locked.load(std::sync::atomic::Ordering::Relaxed)
+        matches!(&*self.inner.lock().await, InnerItem::Locked(_))
     }
 
     #[zbus(property, name = "Attributes")]
     pub async fn attributes(&self) -> HashMap<String, String> {
-        self.inner
-            .lock()
-            .await
-            .attributes()
-            .iter()
-            .map(|(k, v)| (k.to_owned(), v.to_string()))
-            .collect()
+        match &*self.inner.lock().await {
+            InnerItem::Locked(_inner) => todo!(),
+            InnerItem::Unlocked(inner) => inner
+                .attributes()
+                .iter()
+                .map(|(k, v)| (k.to_owned(), v.to_string()))
+                .collect(),
+        }
     }
 
+    // TODO This should return an error if the item is locked.
+    // gnome-keyring would return, e.g. by running:
+    //
+    // busctl --user call org.freedesktop.secrets
+    // /org/freedesktop/secrets/collection/test/1 org.freedesktop.DBus.Properties
+    //
+    // Secret.Error.IsLocked ("Cannot set property on a locked object",)
     #[zbus(property, name = "Attributes")]
-    pub async fn set_attributes(&self, attributes: HashMap<String, String>) {
-        self.inner.lock().await.set_attributes(&attributes);
+    pub async fn set_attributes(
+        &self,
+        attributes: HashMap<String, String>,
+    ) -> Result<(), zbus::Error> {
+        match &mut *self.inner.lock().await {
+            InnerItem::Locked(_inner) => todo!(),
+            InnerItem::Unlocked(inner) => {
+                inner.set_attributes(&attributes);
+                Ok(())
+            }
+        }
     }
 
     #[zbus(property, name = "Label")]
     pub async fn label(&self) -> String {
-        self.inner.lock().await.label().to_owned()
+        match &mut *self.inner.lock().await {
+            InnerItem::Locked(_inner) => todo!(),
+            InnerItem::Unlocked(inner) => inner.label().to_string(),
+        }
     }
 
     #[zbus(property, name = "Label")]
     pub async fn set_label(&self, label: &str) {
-        self.inner.lock().await.set_label(label);
+        match &mut *self.inner.lock().await {
+            InnerItem::Locked(_inner) => todo!(),
+            InnerItem::Unlocked(inner) => inner.set_label(label),
+        }
     }
 
     #[zbus(property, name = "Created")]
     pub async fn created_at(&self) -> u64 {
-        self.inner.lock().await.created().as_secs()
+        match &mut *self.inner.lock().await {
+            InnerItem::Locked(_inner) => todo!(),
+            InnerItem::Unlocked(inner) => inner.created().as_secs(),
+        }
     }
 
     #[zbus(property, name = "Modified")]
     pub async fn modified_at(&self) -> u64 {
-        self.inner.lock().await.modified().as_secs()
+        match &mut *self.inner.lock().await {
+            InnerItem::Locked(_inner) => todo!(),
+            InnerItem::Unlocked(inner) => inner.modified().as_secs(),
+        }
     }
 }
 
@@ -184,7 +230,7 @@ impl Item {
     ) -> Self {
         Self {
             locked: Arc::new(AtomicBool::new(locked)),
-            inner: Arc::new(Mutex::new(item)),
+            inner: Arc::new(Mutex::new(InnerItem::Unlocked(item))),
             path,
             collection_path,
             service,
