@@ -48,7 +48,7 @@ impl Properties {
         Self {
             title: None,
             message: Some("Lock Keyring".to_owned()),
-            description: Some(format!("Confirm locking '{}' Keyring", keyring)),
+            description: Some(format!("Confirm locking '{keyring}' Keyring")),
             warning: None,
             password_new: None,
             password_strength: None,
@@ -69,8 +69,7 @@ impl Properties {
             title: Some("Unlock Keyring".to_owned()),
             message: Some("Authentication required".to_owned()),
             description: Some(format!(
-                "An application wants access to the keyring '{}', but it is locked",
-                keyring
+                "An application wants access to the keyring '{keyring}', but it is locked"
             )),
             warning: warning.map(ToOwned::to_owned),
             password_new: None,

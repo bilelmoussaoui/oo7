@@ -93,8 +93,7 @@ impl Collection {
         let Some(session) = self.service.session(&session).await else {
             tracing::error!("The session `{}` does not exist.", session);
             return Err(ServiceError::NoSession(format!(
-                "The session `{}` does not exist.",
-                session
+                "The session `{session}` does not exist."
             )));
         };
 
@@ -201,8 +200,7 @@ impl Collection {
             alias: Arc::new(Mutex::new(alias.to_owned())),
             item_index: Arc::new(RwLock::new(0)),
             path: OwnedObjectPath::try_from(format!(
-                "/org/freedesktop/secrets/collection/{}",
-                label
+                "/org/freedesktop/secrets/collection/{label}"
             ))
             .unwrap(),
             created,
@@ -312,15 +310,13 @@ impl Collection {
     pub async fn delete_item(&self, path: &OwnedObjectPath) -> Result<(), ServiceError> {
         let Some(item) = self.item_from_path(path).await else {
             return Err(ServiceError::NoSuchObject(format!(
-                "Item `{}` does not exist.",
-                path
+                "Item `{path}` does not exist."
             )));
         };
 
         if item.is_locked().await {
             return Err(ServiceError::IsLocked(format!(
-                "Cannot delete a locked item `{}`",
-                path
+                "Cannot delete a locked item `{path}`"
             )));
         }
 

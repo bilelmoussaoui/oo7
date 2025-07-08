@@ -135,7 +135,7 @@ iv=8e3N+gx553PgQlfTKRK3JA==";
         let peer_1_aes_key = handshake(&peer_1_private_key, &peer_2_exchange).unwrap();
         let peer_2_aes_key = handshake(&peer_2_private_key, &peer_1_exchange).unwrap();
         let iv = crypto::generate_iv().unwrap();
-        let encrypted = crypto::encrypt(b"password".to_vec(), &peer_1_aes_key, &iv).unwrap();
+        let encrypted = crypto::encrypt(b"password", &peer_1_aes_key, &iv).unwrap();
 
         let map = HashMap::from([
             (PUBLIC, peer_1_public_key.as_ref()),

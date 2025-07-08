@@ -13,11 +13,11 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::CapsRead(e) => write!(f, "Failed to read process capabilities: {}", e),
-            Self::CapsUpdate(e) => write!(f, "Failed updating process capabilities: {}", e),
-            Self::DropGroups(e) => write!(f, "Failed to drop supplementary groups: {}", e),
-            Self::SetGid(e) => write!(f, "Failed to setgid: {}", e),
-            Self::SetUid(e) => write!(f, "Failed to setuid: {}", e),
+            Self::CapsRead(e) => write!(f, "Failed to read process capabilities: {e}"),
+            Self::CapsUpdate(e) => write!(f, "Failed updating process capabilities: {e}"),
+            Self::DropGroups(e) => write!(f, "Failed to drop supplementary groups: {e}"),
+            Self::SetGid(e) => write!(f, "Failed to setgid: {e}"),
+            Self::SetUid(e) => write!(f, "Failed to setuid: {e}"),
         }
     }
 }

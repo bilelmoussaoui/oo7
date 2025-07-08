@@ -37,7 +37,7 @@ impl FromStr for ContentType {
         match s {
             "text/plain" => Ok(Self::Text),
             "application/octet-stream" => Ok(Self::Blob),
-            e => Err(format!("Invalid content type: {}", e)),
+            e => Err(format!("Invalid content type: {e}")),
         }
     }
 }

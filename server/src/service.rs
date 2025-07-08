@@ -255,8 +255,7 @@ impl Service {
         tracing::info!("Collection: {} does not exist.", collection);
 
         Err(ServiceError::NoSuchObject(format!(
-            "The collection: {} does not exist.",
-            collection,
+            "The collection: {collection} does not exist.",
         )))
     }
 

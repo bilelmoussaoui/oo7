@@ -62,8 +62,7 @@ impl Item {
         let Some(session) = self.service.session(&session).await else {
             tracing::error!("The session `{}` does not exist.", session);
             return Err(ServiceError::NoSession(format!(
-                "The session `{}` does not exist.",
-                session
+                "The session `{session}` does not exist."
             )));
         };
 
@@ -112,8 +111,7 @@ impl Item {
         let Some(session) = self.service.session(&session).await else {
             tracing::error!("The session `{}` does not exist.", session);
             return Err(ServiceError::NoSession(format!(
-                "The session `{}` does not exist.",
-                session
+                "The session `{session}` does not exist."
             )));
         };
 
@@ -188,7 +186,7 @@ impl Item {
             locked: Arc::new(AtomicBool::new(locked)),
             inner: Arc::new(Mutex::new(item)),
             collection_path: collection_path.clone(),
-            path: OwnedObjectPath::try_from(format!("{}/{}", collection_path, item_index)).unwrap(),
+            path: OwnedObjectPath::try_from(format!("{collection_path}/{item_index}")).unwrap(),
             service,
         }
     }

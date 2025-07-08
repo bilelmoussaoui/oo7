@@ -260,9 +260,9 @@ impl Keyring {
         if let Some(mut path) = data_dir() {
             path.push("keyrings");
             if version > 0 {
-                path.push(format!("v{}", version));
+                path.push(format!("v{version}"));
             }
-            path.push(format!("{}.keyring", name));
+            path.push(format!("{name}.keyring"));
             Ok(path)
         } else {
             Err(Error::NoDataDir)
