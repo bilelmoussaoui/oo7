@@ -199,10 +199,8 @@ impl Collection {
             modified: Arc::new(Mutex::new(created)),
             alias: Arc::new(Mutex::new(alias.to_owned())),
             item_index: Arc::new(RwLock::new(0)),
-            path: OwnedObjectPath::try_from(format!(
-                "/org/freedesktop/secrets/collection/{label}"
-            ))
-            .unwrap(),
+            path: OwnedObjectPath::try_from(format!("/org/freedesktop/secrets/collection/{label}"))
+                .unwrap(),
             created,
             service,
             keyring,
