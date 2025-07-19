@@ -75,7 +75,7 @@ impl<'a> DBusSecret<'a> {
     }
 
     /// Session used to encode the secret
-    pub fn session(&self) -> &Session {
+    pub fn session(&self) -> &Session<'_> {
         &self.session
     }
 

@@ -39,7 +39,7 @@ impl<'a> Service<'a> {
             .map_err(From::from)
     }
 
-    pub fn inner(&self) -> &zbus::Proxy {
+    pub fn inner(&self) -> &zbus::Proxy<'_> {
         &self.0
     }
 
