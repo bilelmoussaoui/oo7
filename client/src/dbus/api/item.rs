@@ -57,7 +57,7 @@ impl<'a> Item<'a> {
         Ok(items)
     }
 
-    pub fn inner(&self) -> &zbus::Proxy {
+    pub fn inner(&self) -> &zbus::Proxy<'_> {
         &self.0
     }
 

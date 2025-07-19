@@ -49,7 +49,7 @@ impl<'a> Prompt<'a> {
         }
     }
 
-    pub fn inner(&self) -> &zbus::Proxy {
+    pub fn inner(&self) -> &zbus::Proxy<'_> {
         &self.0
     }
 

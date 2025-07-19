@@ -104,7 +104,7 @@ impl Service {
         &self,
         _properties: Properties,
         _alias: &str,
-    ) -> Result<(OwnedObjectPath, ObjectPath), ServiceError> {
+    ) -> Result<(OwnedObjectPath, ObjectPath<'_>), ServiceError> {
         todo!()
     }
 

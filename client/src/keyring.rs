@@ -184,7 +184,7 @@ impl Keyring {
     }
 
     /// Get the inner DBus backend if the keyring is backed by one.
-    pub fn as_dbus(&self) -> &dbus::Collection {
+    pub fn as_dbus(&self) -> &dbus::Collection<'_> {
         match self {
             Self::DBus(collection) => collection,
             _ => unreachable!(),

@@ -43,7 +43,7 @@ pub struct Collection {
 #[interface(name = "org.freedesktop.Secret.Collection")]
 impl Collection {
     #[zbus(out_args("prompt"))]
-    pub async fn delete(&self) -> Result<ObjectPath, ServiceError> {
+    pub async fn delete(&self) -> Result<ObjectPath<'_>, ServiceError> {
         todo!()
     }
 
