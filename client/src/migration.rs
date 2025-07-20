@@ -1,4 +1,4 @@
-use crate::{AsAttributes, Result, dbus::Service, file::Keyring};
+use crate::{AsAttributes, Result, dbus::Service};
 
 /// Helper to migrate your secrets from the host Secret Service
 /// to the sandboxed file backend.
@@ -7,7 +7,7 @@ use crate::{AsAttributes, Result, dbus::Service, file::Keyring};
 /// Secret Service.
 pub async fn migrate(attributes: Vec<impl AsAttributes>, replace: bool) -> Result<()> {
     let service = Service::new().await?;
-    let file_backend = match Keyring::load_default().await {
+    let file_backend = match crate::file::UnlockedKeyring::load_default().await {
         Ok(file) => Ok(file),
         Err(super::file::Error::Portal(ashpd::Error::PortalNotFound(_))) => {
             #[cfg(feature = "tracing")]
