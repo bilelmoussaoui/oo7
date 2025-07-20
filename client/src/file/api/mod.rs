@@ -48,10 +48,9 @@ pub use attribute_value::AttributeValue;
 pub(super) use encrypted_item::EncryptedItem;
 pub(super) use legacy_keyring::{Keyring as LegacyKeyring, MAJOR_VERSION as LEGACY_MAJOR_VERSION};
 
-use super::{Item, Secret};
 use crate::{
     AsAttributes, Key, crypto,
-    file::{Error, WeakKeyError},
+    file::{Error, Secret, UnlockedItem, WeakKeyError},
 };
 
 pub(crate) fn data_dir() -> Option<PathBuf> {
@@ -184,7 +183,7 @@ impl Keyring {
         &self,
         attributes: &impl AsAttributes,
         key: &Key,
-    ) -> Result<Vec<Item>, Error> {
+    ) -> Result<Vec<UnlockedItem>, Error> {
         let hashed_search = attributes.hash(key);
 
         self.items
@@ -202,7 +201,7 @@ impl Keyring {
         &self,
         attributes: &impl AsAttributes,
         key: &Key,
-    ) -> Result<Option<Item>, Error> {
+    ) -> Result<Option<UnlockedItem>, Error> {
         let hashed_search = attributes.hash(key);
 
         self.items
@@ -352,7 +351,7 @@ mod tests {
 
         keyring
             .items
-            .push(Item::new("Label", &needle, Secret::blob("MyPassword")).encrypt(&key)?);
+            .push(UnlockedItem::new("Label", &needle, Secret::blob("MyPassword")).encrypt(&key)?);
 
         assert_eq!(keyring.search_items(&needle, &key)?.len(), 1);
 
@@ -371,7 +370,7 @@ mod tests {
         let key = new_keyring.derive_key(&SECRET.to_vec().into())?;
 
         new_keyring.items.push(
-            Item::new(
+            UnlockedItem::new(
                 "My Label",
                 &HashMap::from([("my-tag", "my tag value")]),
                 "A Password",

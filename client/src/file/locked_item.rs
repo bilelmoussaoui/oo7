@@ -1,6 +1,6 @@
 use crate::{
     Key,
-    file::{self, Item, api},
+    file::{self, UnlockedItem, api},
 };
 
 #[derive(Clone, Debug)]
@@ -10,7 +10,7 @@ pub struct LockedItem {
 
 impl LockedItem {
     // TODO should return the original item if we fail to decrypt it.
-    pub fn unlock(self, key: &Key) -> Result<Item, file::Error> {
+    pub fn unlock(self, key: &Key) -> Result<UnlockedItem, file::Error> {
         self.inner.decrypt(key)
     }
 }

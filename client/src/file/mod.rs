@@ -58,14 +58,14 @@ mod api;
 pub(crate) use api::AttributeValue;
 
 mod error;
-mod item;
 mod locked_item;
 mod locked_keyring;
+mod unlocked_item;
 
 pub use error::{Error, InvalidItemError, WeakKeyError};
-pub use item::Item;
 pub use locked_item::LockedItem;
 pub use locked_keyring::LockedKeyring;
+pub use unlocked_item::UnlockedItem;
 
 type ItemDefinition = (String, HashMap<String, String>, Secret, bool);
 
@@ -248,7 +248,7 @@ impl UnlockedKeyring {
     ///
     /// If items cannot be decrypted, [`InvalidItemError`]s are returned for
     /// them instead of [`Item`]s.
-    pub async fn items(&self) -> Result<Vec<Result<Item, InvalidItemError>>, Error> {
+    pub async fn items(&self) -> Result<Vec<Result<UnlockedItem, InvalidItemError>>, Error> {
         let key = self.derive_key().await?;
         let keyring = self.keyring.read().await;
         Ok(keyring
@@ -266,14 +266,20 @@ impl UnlockedKeyring {
     }
 
     /// Search items matching the attributes.
-    pub async fn search_items(&self, attributes: &impl AsAttributes) -> Result<Vec<Item>, Error> {
+    pub async fn search_items(
+        &self,
+        attributes: &impl AsAttributes,
+    ) -> Result<Vec<UnlockedItem>, Error> {
         let key = self.derive_key().await?;
         let keyring = self.keyring.read().await;
         keyring.search_items(attributes, &key)
     }
 
     /// Find the first item matching the attributes.
-    pub async fn lookup_item(&self, attributes: &impl AsAttributes) -> Result<Option<Item>, Error> {
+    pub async fn lookup_item(
+        &self,
+        attributes: &impl AsAttributes,
+    ) -> Result<Option<UnlockedItem>, Error> {
         let key = self.derive_key().await?;
         let keyring = self.keyring.read().await;
         keyring.lookup_item(attributes, &key)
@@ -316,14 +322,14 @@ impl UnlockedKeyring {
         attributes: &impl AsAttributes,
         secret: impl Into<Secret>,
         replace: bool,
-    ) -> Result<Item, Error> {
+    ) -> Result<UnlockedItem, Error> {
         let item = {
             let key = self.derive_key().await?;
             let mut keyring = self.keyring.write().await;
             if replace {
                 keyring.remove_items(attributes, &key)?;
             }
-            let item = Item::new(label, attributes, secret);
+            let item = UnlockedItem::new(label, attributes, secret);
             let encrypted_item = item.encrypt(&key)?;
             keyring.items.push(encrypted_item);
             item
@@ -339,7 +345,7 @@ impl UnlockedKeyring {
     /// The `index` refers to the index of the [`Vec`] returned by
     /// [`items()`](Self::items). If the index does not exist, the functions
     /// returns an error.
-    pub async fn replace_item_index(&self, index: usize, item: &Item) -> Result<(), Error> {
+    pub async fn replace_item_index(&self, index: usize, item: &UnlockedItem) -> Result<(), Error> {
         {
             let key = self.derive_key().await?;
             let mut keyring = self.keyring.write().await;
@@ -379,7 +385,7 @@ impl UnlockedKeyring {
             if replace {
                 keyring.remove_items(&attributes, &key)?;
             }
-            let item = Item::new(label, &attributes, secret);
+            let item = UnlockedItem::new(label, &attributes, secret);
             let encrypted_item = item.encrypt(&key)?;
             keyring.items.push(encrypted_item);
         }

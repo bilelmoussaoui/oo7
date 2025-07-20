@@ -13,7 +13,7 @@ use crate::{AsAttributes, CONTENT_TYPE_ATTRIBUTE, Key, Secret, crypto, secret::C
 #[derive(
     Deserialize, Serialize, zvariant::Type, Clone, Debug, Zeroize, ZeroizeOnDrop, PartialEq,
 )]
-pub struct Item {
+pub struct UnlockedItem {
     #[zeroize(skip)]
     attributes: HashMap<String, AttributeValue>,
     #[zeroize(skip)]
@@ -25,7 +25,7 @@ pub struct Item {
     secret: Vec<u8>,
 }
 
-impl Item {
+impl UnlockedItem {
     pub(crate) fn new(
         label: impl ToString,
         attributes: &impl AsAttributes,
@@ -171,11 +171,11 @@ impl Item {
     }
 }
 
-impl TryFrom<&[u8]> for Item {
+impl TryFrom<&[u8]> for UnlockedItem {
     type Error = Error;
 
     fn try_from(value: &[u8]) -> Result<Self, Error> {
-        let mut item: Item = zvariant::serialized::Data::new(value, *GVARIANT_ENCODING)
+        let mut item: UnlockedItem = zvariant::serialized::Data::new(value, *GVARIANT_ENCODING)
             .deserialize()?
             .0;
 
@@ -209,7 +209,7 @@ mod tests {
         let attribute_value = AttributeValue::from("5");
         let attribute_value_mac = attribute_value.mac(&key).unwrap();
 
-        let mut item = Item {
+        let mut item = UnlockedItem {
             attributes: HashMap::from([("fooness".to_string(), attribute_value)]),
             label: "foo".to_string(),
             created: 50,

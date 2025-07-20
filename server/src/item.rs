@@ -17,7 +17,7 @@ use crate::{Service, collection::Collection, error::custom_service_error};
 #[derive(Debug, Clone)]
 enum InnerItem {
     Locked(file::LockedItem),
-    Unlocked(file::Item),
+    Unlocked(file::UnlockedItem),
 }
 
 #[derive(Debug, Clone)]
@@ -222,7 +222,7 @@ impl Item {
 
 impl Item {
     pub fn new(
-        item: file::Item,
+        item: file::UnlockedItem,
         locked: bool,
         service: Service,
         collection_path: OwnedObjectPath,
