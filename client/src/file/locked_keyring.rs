@@ -15,7 +15,7 @@ use tokio::{
 
 use crate::{
     Secret,
-    file::{Keyring, api, error::Error},
+    file::{UnlockedKeyring, api, error::Error},
 };
 
 #[derive(Debug)]
@@ -27,16 +27,23 @@ pub struct LockedKeyring {
 
 impl LockedKeyring {
     /// Unlocks a keyring and validates it
-    pub async fn unlock(self, secret: Secret) -> Result<Keyring, Error> {
+    pub async fn unlock(self, secret: Secret) -> Result<UnlockedKeyring, Error> {
         self.unlock_inner(secret, true).await
     }
 
     /// Unlocks a keyring without validating it
-    pub(super) async unsafe fn unlock_unchecked(self, secret: Secret) -> Result<Keyring, Error> {
+    pub(super) async unsafe fn unlock_unchecked(
+        self,
+        secret: Secret,
+    ) -> Result<UnlockedKeyring, Error> {
         self.unlock_inner(secret, false).await
     }
 
-    async fn unlock_inner(self, secret: Secret, validate_items: bool) -> Result<Keyring, Error> {
+    async fn unlock_inner(
+        self,
+        secret: Secret,
+        validate_items: bool,
+    ) -> Result<UnlockedKeyring, Error> {
         let key = if validate_items {
             let inner_keyring = self.keyring.read().await;
 
@@ -76,7 +83,7 @@ impl LockedKeyring {
             None
         };
 
-        Ok(Keyring {
+        Ok(UnlockedKeyring {
             keyring: self.keyring,
             path: self.path,
             mtime: self.mtime,

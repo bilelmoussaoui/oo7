@@ -34,7 +34,7 @@ pub struct Collection {
     // Other attributes
     alias: Arc<Mutex<String>>,
     #[allow(unused)]
-    keyring: Arc<file::Keyring>,
+    keyring: Arc<file::UnlockedKeyring>,
     service: Service,
     item_index: Arc<RwLock<u32>>,
     path: OwnedObjectPath,
@@ -193,7 +193,7 @@ impl Collection {
         alias: &str,
         locked: bool,
         service: Service,
-        keyring: Arc<file::Keyring>,
+        keyring: Arc<file::UnlockedKeyring>,
     ) -> Self {
         let created = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
