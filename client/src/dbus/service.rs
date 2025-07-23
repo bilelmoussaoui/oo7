@@ -87,7 +87,7 @@ impl<'a> Service<'a> {
                 tracing::debug!("Starting an encrypted Secret Service session");
                 let private_key = Key::generate_private_key()?;
                 let public_key = Key::generate_public_key(&private_key)?;
-                let (service_key, session) = service.open_session(Some(&public_key)).await?;
+                let (service_key, session) = service.open_session(Some(public_key)).await?;
                 let aes_key = service_key
                     .map(|service_key| Key::generate_aes_key(&private_key, &service_key))
                     .transpose()?

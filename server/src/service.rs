@@ -97,7 +97,7 @@ impl Service {
         object_server.at(&path, session).await?;
 
         let service_key = public_key
-            .map(|k| OwnedValue::from(&k))
+            .map(OwnedValue::from)
             .unwrap_or_else(|| Value::new::<Vec<u8>>(vec![]).try_to_owned().unwrap());
 
         Ok((service_key, path))
