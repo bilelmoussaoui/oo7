@@ -467,7 +467,7 @@ impl Service {
         n_sessions
     }
 
-    async fn session_from_sender<'a>(&self, sender: UniqueName<'a>) -> Option<Session> {
+    async fn session_from_sender(&self, sender: UniqueName<'_>) -> Option<Session> {
         let sessions = self.sessions.lock().await;
 
         for session in sessions.values() {
