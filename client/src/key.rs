@@ -1,5 +1,4 @@
 use zeroize::{Zeroize, ZeroizeOnDrop};
-use zvariant::Type;
 
 use crate::{crypto, file};
 
@@ -57,20 +56,16 @@ impl Key {
     }
 }
 
-impl From<&Key> for zvariant::Value<'_> {
-    fn from(key: &Key) -> Self {
-        let mut array = zvariant::Array::new(u8::SIGNATURE);
-        for byte in key.as_ref() {
-            array
-                .append(zvariant::Value::U8(*byte))
-                .expect("Element of valid type");
-        }
-        array.into()
+impl From<Key> for zvariant::Value<'static> {
+    fn from(key: Key) -> Self {
+        let mut key = key;
+        let inner: Vec<u8> = std::mem::take(&mut key.key);
+        zvariant::Array::from(inner).into()
     }
 }
 
-impl From<&Key> for zvariant::OwnedValue {
-    fn from(key: &Key) -> Self {
+impl From<Key> for zvariant::OwnedValue {
+    fn from(key: Key) -> Self {
         zvariant::Value::from(key).try_to_owned().unwrap()
     }
 }

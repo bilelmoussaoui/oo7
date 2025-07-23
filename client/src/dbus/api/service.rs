@@ -88,7 +88,7 @@ impl<'a> Service<'a> {
     #[doc(alias = "OpenSession")]
     pub async fn open_session(
         &self,
-        client_public_key: Option<&Key>,
+        client_public_key: Option<Key>,
     ) -> Result<(Option<Key>, Session<'a>), Error> {
         let (algorithm, key): (_, Value<'_>) = match client_public_key {
             None => (Algorithm::Plain, zvariant::Str::default().into()),
