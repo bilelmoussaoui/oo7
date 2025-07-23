@@ -370,7 +370,7 @@ impl Service {
                 continue;
             };
             assert_eq!(new_owner, ""); // We enforce that in the matching rule
-            if let Some(session) = self.session_from_sender(old_owner.as_ref()).await {
+            if let Some(session) = self.session_from_sender(&old_owner).await {
                 match session.close().await {
                     Ok(_) => tracing::info!(
                         "Client {} disconnected. Session: {} closed.",
@@ -463,16 +463,10 @@ impl Service {
         n_sessions
     }
 
-    async fn session_from_sender(&self, sender: UniqueName<'_>) -> Option<Session> {
+    async fn session_from_sender(&self, sender: &UniqueName<'_>) -> Option<Session> {
         let sessions = self.sessions.lock().await;
 
-        for session in sessions.values() {
-            if session.sender() == &sender {
-                return Some(session.clone());
-            }
-        }
-
-        None
+        sessions.values().find(|s| s.sender() == sender).cloned()
     }
 
     pub async fn session(&self, path: &ObjectPath<'_>) -> Option<Session> {
