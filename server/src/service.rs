@@ -59,7 +59,11 @@ impl Service {
         let (public_key, aes_key) = match algorithm {
             Algorithm::Plain => (None, None),
             Algorithm::Encrypted => {
-                let client_public_key = Key::from(input);
+                let client_public_key = Key::try_from(input).map_err(|err| {
+                    custom_service_error(&format!(
+                        "Input Value could not be converted into a Key {err}."
+                    ))
+                })?;
                 let private_key = Key::generate_private_key().map_err(|err| {
                     custom_service_error(&format!("Failed to generate private key {err}."))
                 })?;
