@@ -75,19 +75,19 @@ impl From<&Key> for zvariant::OwnedValue {
     }
 }
 
-impl From<zvariant::Value<'_>> for Key {
-    fn from(value: zvariant::Value<'_>) -> Self {
-        let mut key = Vec::new();
-        for value in value.downcast_ref::<zvariant::Array>().unwrap().inner() {
-            key.push(value.downcast_ref::<u8>().unwrap());
-        }
-        Self::new(key)
+impl TryFrom<zvariant::Value<'_>> for Key {
+    type Error = zvariant::Error;
+
+    fn try_from(value: zvariant::Value<'_>) -> Result<Self, Self::Error> {
+        Ok(Key::new(value.try_into()?))
     }
 }
 
-impl From<zvariant::OwnedValue> for Key {
-    fn from(value: zvariant::OwnedValue) -> Self {
-        Self::from(zvariant::Value::from(value))
+impl TryFrom<zvariant::OwnedValue> for Key {
+    type Error = zvariant::Error;
+
+    fn try_from(value: zvariant::OwnedValue) -> Result<Self, Self::Error> {
+        Self::try_from(zvariant::Value::from(value))
     }
 }
 

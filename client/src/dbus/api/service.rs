@@ -105,7 +105,7 @@ impl<'a> Service<'a> {
 
         let key = match algorithm {
             Algorithm::Plain => None,
-            Algorithm::Encrypted => Some(Key::from(service_key)),
+            Algorithm::Encrypted => Some(Key::try_from(service_key)?),
         };
 
         Ok((key, session))
