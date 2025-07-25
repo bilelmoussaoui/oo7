@@ -63,10 +63,7 @@ pub trait AsAttributes {
     fn hash<'a>(
         &'a self,
         key: &Key,
-    ) -> Vec<(
-        &'a str,
-        std::result::Result<zeroize::Zeroizing<Vec<u8>>, crate::crypto::Error>,
-    )> {
+    ) -> Vec<(&'a str, std::result::Result<Vec<u8>, crate::crypto::Error>)> {
         self.as_attributes()
             .into_iter()
             .map(|(k, v)| (k, crate::file::AttributeValue::from(v).mac(key)))

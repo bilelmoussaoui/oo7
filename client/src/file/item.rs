@@ -154,7 +154,7 @@ impl Item {
         let hashed_attributes = self
             .attributes
             .iter()
-            .filter_map(|(k, v)| Some((k.to_owned(), v.mac(key).ok()?.as_slice().into())))
+            .filter_map(|(k, v)| Some((k.to_owned(), v.mac(key).ok()?)))
             .collect();
 
         Ok(EncryptedItem {
