@@ -17,18 +17,23 @@ impl EncryptedItem {
         self.hashed_attributes.get(key).map(|b| b.as_slice()) == Some(blob)
     }
 
-    pub fn decrypt(mut self, key: &Key) -> Result<Item, Error> {
-        let mac_tag = self.blob.split_off(self.blob.len() - crypto::mac_len());
+    pub fn decrypt(self, key: &Key) -> Result<Item, Error> {
+        let n = self.blob.len();
+        let n_mac = crypto::mac_len();
+        let n_iv = crypto::iv_len();
+
+        // The encrypted data, the iv, and the mac are concatenated into blob.
+        let (encrypted_data_with_iv, mac_tag) = &self.blob.split_at(n - n_mac);
 
         // verify item
-        if !crypto::verify_mac(&self.blob, key, mac_tag)? {
+        if !crypto::verify_mac(encrypted_data_with_iv, key, mac_tag)? {
             return Err(Error::MacError);
         }
 
-        let iv = self.blob.split_off(self.blob.len() - crypto::iv_len());
+        let (encrypted_data, iv) = encrypted_data_with_iv.split_at(n - n_mac - n_iv);
 
         // decrypt item
-        let decrypted = crypto::decrypt(self.blob, key, iv)?;
+        let decrypted = crypto::decrypt(encrypted_data, key, iv)?;
 
         let item = Item::try_from(decrypted.as_slice())?;
 
