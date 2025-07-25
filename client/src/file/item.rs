@@ -144,12 +144,13 @@ impl Item {
 
         let decrypted = Zeroizing::new(zvariant::to_bytes(*GVARIANT_ENCODING, &self)?.to_vec());
 
-        let iv = crypto::generate_iv()?;
+        let mut iv = crypto::generate_iv()?;
 
         let mut blob = crypto::encrypt(&*decrypted, key, &iv)?;
 
-        blob.append(&mut iv.as_slice().into());
-        blob.append(&mut crypto::compute_mac(&blob, key)?.as_slice().into());
+        blob.append(&mut iv);
+        let mut mac = crypto::compute_mac(&blob, key)?;
+        blob.append(&mut mac);
 
         let hashed_attributes = self
             .attributes
