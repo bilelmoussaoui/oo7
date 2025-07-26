@@ -142,13 +142,17 @@ impl Item {
     pub(crate) fn encrypt(&self, key: &Key) -> Result<EncryptedItem, Error> {
         key.check_strength()?;
 
+        let iv = crypto::generate_iv()?;
+
+        self.encrypt_inner(key, &iv)
+    }
+
+    fn encrypt_inner(&self, key: &Key, iv: &[u8]) -> Result<EncryptedItem, Error> {
         let decrypted = Zeroizing::new(zvariant::to_bytes(*GVARIANT_ENCODING, &self)?.to_vec());
 
-        let mut iv = crypto::generate_iv()?;
+        let mut blob = crypto::encrypt(&*decrypted, key, iv)?;
 
-        let mut blob = crypto::encrypt(&*decrypted, key, &iv)?;
-
-        blob.append(&mut iv);
+        blob.extend_from_slice(iv);
         let mut mac = crypto::compute_mac(&blob, key)?;
         blob.append(&mut mac);
 
