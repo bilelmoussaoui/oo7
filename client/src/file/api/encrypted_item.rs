@@ -13,8 +13,8 @@ pub(crate) struct EncryptedItem {
 }
 
 impl EncryptedItem {
-    pub fn has_attribute(&self, key: &str, blob: &[u8]) -> bool {
-        self.hashed_attributes.get(key).map(|b| b.as_slice()) == Some(blob)
+    pub fn has_attribute(&self, key: &str, value_mac: &[u8]) -> bool {
+        self.hashed_attributes.get(key).map(|b| b.as_slice()) == Some(value_mac)
     }
 
     pub fn decrypt(self, key: &Key) -> Result<Item, Error> {
