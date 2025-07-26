@@ -190,3 +190,63 @@ impl TryFrom<&[u8]> for Item {
         Ok(item)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_file_item_serialization() {
+        let key = Key::new(vec![
+            204, 53, 139, 40, 55, 167, 183, 240, 191, 252, 186, 174, 28, 36, 229, 26,
+        ]);
+        let n_mac = crypto::mac_len();
+        let n_iv = crypto::iv_len();
+
+        let iv = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 0, 0, 0, 0, 0];
+        assert_eq!(iv.len(), n_iv);
+
+        let attribute_value = AttributeValue::from("5");
+        let attribute_value_mac = attribute_value.mac(&key).unwrap();
+
+        let mut item = Item {
+            attributes: HashMap::from([("fooness".to_string(), attribute_value)]),
+            label: "foo".to_string(),
+            created: 50,
+            modified: 50,
+            secret: b"bar".to_vec(),
+        };
+
+        let encrypted = item.encrypt_inner(&key, &iv).unwrap();
+        assert!(encrypted.has_attribute("fooness", &attribute_value_mac));
+
+        let blob = &encrypted.blob;
+        let n = blob.len();
+
+        // encrypted.blob should be the concatenation of the encrypted data, the
+        // iv, and the mac.
+        let encrypted_item_blob = &encrypted.blob[..n - n_mac - n_iv];
+        let item_mac = crypto::compute_mac(&encrypted.blob[..n - n_mac], &key).unwrap();
+
+        assert_eq!(&blob[n - n_mac..], &item_mac);
+        assert_eq!(&blob[n - n_mac - n_iv..n - n_mac], &iv);
+        assert_eq!(
+            encrypted_item_blob,
+            vec![
+                196, 246, 127, 53, 194, 30, 176, 37, 128, 145, 195, 96, 211, 161, 60, 150, 160,
+                126, 85, 125, 85, 238, 5, 93, 153, 128, 176, 205, 31, 87, 48, 82, 121, 230, 143,
+                152, 153, 193, 182, 114, 59, 157, 85, 41, 50, 1, 142, 112
+            ]
+        );
+
+        let decrypted = encrypted.decrypt(&key).unwrap();
+
+        // The decrypted item matches the original one but with the content-type
+        // attribute set.
+        item.attributes.insert(
+            crate::CONTENT_TYPE_ATTRIBUTE.to_string(),
+            AttributeValue::from(crate::secret::ContentType::Blob.as_str()),
+        );
+        assert_eq!(decrypted, item);
+    }
+}
