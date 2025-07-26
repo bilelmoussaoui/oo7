@@ -3,10 +3,10 @@
 //! ```no_run
 //! use std::collections::HashMap;
 //!
-//! use oo7::file::Keyring;
+//! use oo7::file::UnlockedKeyring;
 //!
 //! # async fn run() -> oo7::Result<()> {
-//! let keyring = Keyring::load_default().await?;
+//! let keyring = UnlockedKeyring::load_default().await?;
 //! keyring
 //!     .create_item(
 //!         "My Label",
@@ -28,8 +28,6 @@
 //! # }
 //! ```
 
-#[cfg(feature = "async-std")]
-use std::io;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -44,7 +42,7 @@ use async_lock::{Mutex, RwLock};
 use futures_lite::AsyncReadExt;
 #[cfg(feature = "tokio")]
 use tokio::{
-    fs, io,
+    fs,
     io::AsyncReadExt,
     sync::{Mutex, RwLock},
 };
@@ -61,15 +59,17 @@ pub(crate) use api::AttributeValue;
 
 mod error;
 mod item;
+mod locked_keyring;
 
 pub use error::{Error, InvalidItemError, WeakKeyError};
 pub use item::Item;
+pub use locked_keyring::LockedKeyring;
 
 type ItemDefinition = (String, HashMap<String, String>, Secret, bool);
 
 /// File backed keyring.
 #[derive(Debug)]
-pub struct Keyring {
+pub struct UnlockedKeyring {
     keyring: Arc<RwLock<api::Keyring>>,
     path: Option<PathBuf>,
     /// Times are stored before reading the file to detect
@@ -79,7 +79,16 @@ pub struct Keyring {
     secret: Mutex<Arc<Secret>>,
 }
 
-impl Keyring {
+impl UnlockedKeyring {
+    /// Locks the keyring
+    pub fn lock(self) -> LockedKeyring {
+        LockedKeyring {
+            mtime: self.mtime,
+            keyring: self.keyring,
+            path: self.path,
+        }
+    }
+
     /// Load from default keyring file
     pub async fn load_default() -> Result<Self, Error> {
         #[cfg(feature = "tracing")]
@@ -107,7 +116,9 @@ impl Keyring {
     /// * `path` - The path to the file backend.
     /// * `secret` - The service key, usually retrieved from the Secrets portal.
     pub async fn load(path: impl AsRef<Path>, secret: Secret) -> Result<Self, Error> {
-        Self::load_inner(path, secret, true).await
+        let locked = LockedKeyring::load(path.as_ref().to_owned()).await?;
+        let unlocked = locked.unlock(secret).await?;
+        Ok(unlocked)
     }
 
     /// Load from a keyring file.
@@ -129,79 +140,9 @@ impl Keyring {
         path: impl AsRef<Path>,
         secret: Secret,
     ) -> Result<Self, Error> {
-        Self::load_inner(path, secret, false).await
-    }
-
-    async fn load_inner(
-        path: impl AsRef<Path>,
-        secret: Secret,
-        validate_items: bool,
-    ) -> Result<Self, Error> {
-        #[cfg(feature = "tracing")]
-        tracing::debug!("Trying to load keyring file at {:?}", path.as_ref());
-        let (mtime, keyring) = match fs::File::open(path.as_ref()).await {
-            Err(err) if err.kind() == io::ErrorKind::NotFound => {
-                #[cfg(feature = "tracing")]
-                tracing::debug!("Keyring file not found, creating a new one");
-                (None, api::Keyring::new())
-            }
-            Err(err) => return Err(err.into()),
-            Ok(mut file) => {
-                #[cfg(feature = "tracing")]
-                tracing::debug!("Keyring file found, loading its content");
-                let mtime = file.metadata().await?.modified().ok();
-
-                let mut content = Vec::new();
-                file.read_to_end(&mut content).await?;
-
-                let keyring = api::Keyring::try_from(content.as_slice())?;
-
-                (mtime, keyring)
-            }
-        };
-
-        let key = if validate_items {
-            let key = keyring.derive_key(&secret)?;
-
-            let mut n_broken_items = 0;
-            let mut n_valid_items = 0;
-            for encrypted_item in &keyring.items {
-                if encrypted_item.clone().decrypt(&key).is_err() {
-                    n_broken_items += 1;
-                } else {
-                    n_valid_items += 1;
-                }
-            }
-            if n_valid_items == 0 && n_broken_items != 0 {
-                #[cfg(feature = "tracing")]
-                tracing::error!("Keyring cannot be decrypted. Invalid secret.");
-                return Err(Error::IncorrectSecret);
-            } else if n_broken_items > n_valid_items {
-                #[cfg(feature = "tracing")]
-                {
-                    tracing::warn!(
-                        "The file contains {n_broken_items} broken items and {n_valid_items} valid ones."
-                    );
-                    tracing::info!(
-                        "Please switch to `Keyring::load_unchecked` to load the keyring without the secret validation.
-                        `Keyring::delete_broken_items` can be used to remove them or alternatively with `oo7-cli --repair`."
-                    );
-                }
-                return Err(Error::IncorrectSecret);
-            }
-
-            Some(Arc::new(key))
-        } else {
-            None
-        };
-
-        Ok(Self {
-            keyring: Arc::new(RwLock::new(keyring)),
-            path: Some(path.as_ref().to_path_buf()),
-            mtime: Mutex::new(mtime),
-            key: Mutex::new(key),
-            secret: Mutex::new(Arc::new(secret)),
-        })
+        let locked = LockedKeyring::load(path.as_ref().to_owned()).await?;
+        let unlocked = unsafe { locked.unlock_unchecked(secret).await? };
+        Ok(unlocked)
     }
 
     /// Creates a temporary backend, that is never stored on disk.
@@ -271,7 +212,7 @@ impl Keyring {
     pub async fn open(name: &str, secret: Secret) -> Result<Self, Error> {
         let v1_path = api::Keyring::path(name, api::MAJOR_VERSION)?;
         if v1_path.exists() {
-            return Keyring::load(v1_path, secret).await;
+            return UnlockedKeyring::load(v1_path, secret).await;
         }
 
         let v0_path = api::Keyring::path(name, api::LEGACY_MAJOR_VERSION)?;
@@ -583,7 +524,7 @@ mod tests {
         let path = PathBuf::from("../../tests/test.keyring");
 
         let secret = Secret::from(vec![1, 2]);
-        let keyring = Keyring::load(&path, secret).await?;
+        let keyring = UnlockedKeyring::load(&path, secret).await?;
 
         keyring.write().await?;
         keyring.write().await?;
@@ -595,7 +536,7 @@ mod tests {
     async fn delete() -> Result<(), Error> {
         let path = PathBuf::from("../../tests/test-delete.keyring");
 
-        let keyring = Keyring::load(&path, strong_key()).await?;
+        let keyring = UnlockedKeyring::load(&path, strong_key()).await?;
         let attributes: HashMap<&str, &str> = HashMap::default();
         keyring
             .create_item("Label", &attributes, "secret", false)
@@ -615,7 +556,7 @@ mod tests {
         let path = PathBuf::from("../../tests/write_with_weak_key.keyring");
 
         let secret = Secret::from(vec![1, 2]);
-        let keyring = Keyring::load(&path, secret).await?;
+        let keyring = UnlockedKeyring::load(&path, secret).await?;
         let attributes: HashMap<&str, &str> = HashMap::default();
 
         let result = keyring
@@ -634,7 +575,7 @@ mod tests {
     async fn write_with_strong_key() -> Result<(), Error> {
         let path = PathBuf::from("../../tests/write_with_strong_key.keyring");
 
-        let keyring = Keyring::load(&path, strong_key()).await?;
+        let keyring = UnlockedKeyring::load(&path, strong_key()).await?;
         let attributes: HashMap<&str, &str> = HashMap::default();
 
         keyring
@@ -652,7 +593,7 @@ mod tests {
     async fn concurrent_writes() -> Result<(), Error> {
         let path = PathBuf::from("../../tests/concurrent_writes.keyring");
 
-        let keyring = Arc::new(Keyring::load(&path, strong_key()).await?);
+        let keyring = Arc::new(UnlockedKeyring::load(&path, strong_key()).await?);
 
         let keyring_clone = keyring.clone();
         let handle_1 = tokio::task::spawn(async move { keyring_clone.write().await });
@@ -665,7 +606,7 @@ mod tests {
         Ok(())
     }
 
-    async fn check_items(keyring: &Keyring) -> Result<(), Error> {
+    async fn check_items(keyring: &UnlockedKeyring) -> Result<(), Error> {
         assert_eq!(keyring.n_items().await, 1);
         let items: Result<Vec<_>, _> = keyring.items().await?.into_iter().collect();
         let items = items.expect("unable to retrieve items");
@@ -703,7 +644,7 @@ mod tests {
         assert!(!v1_dir.join("default.keyring").exists());
 
         let secret = Secret::blob("test");
-        let keyring = Keyring::open("default", secret).await?;
+        let keyring = UnlockedKeyring::open("default", secret).await?;
 
         check_items(&keyring).await?;
 
@@ -730,7 +671,7 @@ mod tests {
         }
 
         let secret = Secret::blob("test");
-        let keyring = Keyring::open("default", secret).await?;
+        let keyring = UnlockedKeyring::open("default", secret).await?;
 
         assert!(!v1_dir.join("default.keyring").exists());
 
@@ -759,13 +700,13 @@ mod tests {
         }
 
         let secret = Secret::blob("wrong");
-        let keyring = Keyring::open("default", secret).await;
+        let keyring = UnlockedKeyring::open("default", secret).await;
 
         assert!(keyring.is_err());
         assert!(matches!(keyring.unwrap_err(), Error::IncorrectSecret));
 
         let secret = Secret::blob("test");
-        let keyring = Keyring::open("default", secret).await;
+        let keyring = UnlockedKeyring::open("default", secret).await;
 
         assert!(keyring.is_ok());
 
@@ -789,7 +730,7 @@ mod tests {
         }
 
         let secret = Secret::blob("test");
-        let keyring = Keyring::open("default", secret).await?;
+        let keyring = UnlockedKeyring::open("default", secret).await?;
 
         assert!(v1_dir.join("default.keyring").exists());
 
@@ -813,7 +754,7 @@ mod tests {
         }
 
         let secret = Secret::blob("test");
-        let keyring = Keyring::open("default", secret).await?;
+        let keyring = UnlockedKeyring::open("default", secret).await?;
 
         assert!(!v1_dir.join("default.keyring").exists());
 
@@ -845,7 +786,7 @@ mod tests {
         let keyring_path = v1_dir.join("default.keyring");
         fs::copy(&fixture_path, &keyring_path).await?;
 
-        let keyring = Keyring::load(&keyring_path, Secret::blob("test")).await?;
+        let keyring = UnlockedKeyring::load(&keyring_path, Secret::blob("test")).await?;
         keyring
             .create_item(
                 "test 3",
@@ -857,7 +798,7 @@ mod tests {
         drop(keyring);
 
         let keyring = unsafe {
-            Keyring::load_unchecked(&keyring_path, Secret::blob("wrong_password")).await?
+            UnlockedKeyring::load_unchecked(&keyring_path, Secret::blob("wrong_password")).await?
         };
         keyring
             .create_item(
@@ -870,12 +811,12 @@ mod tests {
         drop(keyring);
 
         assert!(
-            Keyring::load(&keyring_path, Secret::blob("wrong_password"))
+            UnlockedKeyring::load(&keyring_path, Secret::blob("wrong_password"))
                 .await
                 .is_err()
         );
 
-        let keyring = Keyring::load(&keyring_path, Secret::blob("test")).await?;
+        let keyring = UnlockedKeyring::load(&keyring_path, Secret::blob("test")).await?;
         keyring
             .create_item(
                 "test 2",
@@ -906,7 +847,7 @@ mod tests {
         let keyring_path = v1_dir.join("default.keyring");
         fs::copy(&fixture_path, &keyring_path).await?;
 
-        let keyring = Keyring::load(&keyring_path, Secret::blob("test")).await?;
+        let keyring = UnlockedKeyring::load(&keyring_path, Secret::blob("test")).await?;
         let attributes = HashMap::from([("attr", "value")]);
         let item_before = keyring
             .create_item("test", &attributes, "password", false)
@@ -916,7 +857,7 @@ mod tests {
         keyring.change_secret(secret).await?;
 
         let secret = Secret::blob("new_secret");
-        let keyring = Keyring::load(&keyring_path, secret).await?;
+        let keyring = UnlockedKeyring::load(&keyring_path, secret).await?;
         let item_now = keyring.lookup_item(&attributes).await?.unwrap();
 
         assert_eq!(item_before.label(), item_now.label());
@@ -935,7 +876,7 @@ mod tests {
     async fn content_type() -> Result<(), Error> {
         use crate::secret::ContentType;
 
-        let keyring = Keyring::temporary(Secret::blob("test_password")).await?;
+        let keyring = UnlockedKeyring::temporary(Secret::blob("test_password")).await?;
 
         // Add items with different MIME types
         keyring
