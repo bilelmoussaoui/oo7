@@ -53,7 +53,7 @@ impl Termination for Error {
 }
 
 enum Keyring {
-    File(oo7::file::Keyring),
+    File(oo7::file::UnlockedKeyring),
     Collection(oo7::dbus::Collection<'static>),
 }
 
@@ -194,7 +194,7 @@ impl Commands {
 
         let keyring = match (path, secret) {
             (Some(path), Some(secret)) => {
-                Keyring::File(oo7::file::Keyring::load(path, secret).await?)
+                Keyring::File(oo7::file::UnlockedKeyring::load(path, secret).await?)
             }
             (Some(_), None) => {
                 return Err(Error::new("A keyring requires a secret."));
@@ -496,7 +496,7 @@ fn print_item_common(
 }
 
 fn print_item_keyring(
-    item: &oo7::file::Item,
+    item: &oo7::file::UnlockedItem,
     secret_only: bool,
     as_hex: bool,
 ) -> Result<(), Error> {

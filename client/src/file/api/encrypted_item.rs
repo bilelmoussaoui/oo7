@@ -3,8 +3,10 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use zbus::zvariant::Type;
 
-use super::{Error, Item};
-use crate::{Key, crypto};
+use crate::{
+    Key, crypto,
+    file::{Error, UnlockedItem},
+};
 
 #[derive(Deserialize, Serialize, Type, Debug, Clone)]
 pub(crate) struct EncryptedItem {
@@ -17,7 +19,7 @@ impl EncryptedItem {
         self.hashed_attributes.get(key).map(|b| b.as_slice()) == Some(value_mac)
     }
 
-    pub fn decrypt(self, key: &Key) -> Result<Item, Error> {
+    pub fn decrypt(self, key: &Key) -> Result<UnlockedItem, Error> {
         let n = self.blob.len();
         let n_mac = crypto::mac_len();
         let n_iv = crypto::iv_len();
@@ -35,7 +37,7 @@ impl EncryptedItem {
         // decrypt item
         let decrypted = crypto::decrypt(encrypted_data, key, iv)?;
 
-        let item = Item::try_from(decrypted.as_slice())?;
+        let item = UnlockedItem::try_from(decrypted.as_slice())?;
 
         Self::validate(&self.hashed_attributes, &item, key)?;
 
@@ -44,7 +46,7 @@ impl EncryptedItem {
 
     fn validate(
         hashed_attributes: &HashMap<String, Vec<u8>>,
-        item: &Item,
+        item: &UnlockedItem,
         key: &Key,
     ) -> Result<(), Error> {
         for (attribute_key, hashed_attribute) in hashed_attributes.iter() {
