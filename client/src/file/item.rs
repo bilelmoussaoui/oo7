@@ -10,7 +10,9 @@ use super::{
 use crate::{AsAttributes, CONTENT_TYPE_ATTRIBUTE, Key, Secret, crypto, secret::ContentType};
 
 /// An item stored in the file backend.
-#[derive(Deserialize, Serialize, zvariant::Type, Clone, Debug, Zeroize, ZeroizeOnDrop)]
+#[derive(
+    Deserialize, Serialize, zvariant::Type, Clone, Debug, Zeroize, ZeroizeOnDrop, PartialEq,
+)]
 pub struct Item {
     #[zeroize(skip)]
     attributes: HashMap<String, AttributeValue>,
