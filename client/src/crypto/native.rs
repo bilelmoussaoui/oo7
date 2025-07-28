@@ -123,10 +123,10 @@ pub(crate) fn mac_len() -> usize {
     MacAlg::output_size()
 }
 
-pub(crate) fn compute_mac(data: impl AsRef<[u8]>, key: &Key) -> Result<Vec<u8>, super::Error> {
+pub(crate) fn compute_mac(data: impl AsRef<[u8]>, key: &Key) -> Result<crate::Mac, super::Error> {
     let mut mac = MacAlg::new_from_slice(key.as_ref()).unwrap();
     mac.update(data.as_ref());
-    Ok(mac.finalize().into_bytes().to_vec())
+    Ok(crate::Mac::new(mac.finalize().into_bytes().to_vec()))
 }
 
 pub(crate) fn verify_mac(

@@ -4,17 +4,17 @@ use serde::{Deserialize, Serialize};
 use zbus::zvariant::Type;
 
 use super::{Error, Item};
-use crate::{Key, crypto};
+use crate::{Key, Mac, crypto};
 
 #[derive(Deserialize, Serialize, Type, Debug, Clone)]
 pub(crate) struct EncryptedItem {
-    pub(crate) hashed_attributes: HashMap<String, Vec<u8>>,
+    pub(crate) hashed_attributes: HashMap<String, Mac>,
     pub(crate) blob: Vec<u8>,
 }
 
 impl EncryptedItem {
-    pub fn has_attribute(&self, key: &str, value_mac: &[u8]) -> bool {
-        self.hashed_attributes.get(key).map(|b| b.as_slice()) == Some(value_mac)
+    pub fn has_attribute(&self, key: &str, value_mac: &Mac) -> bool {
+        self.hashed_attributes.get(key) == Some(value_mac)
     }
 
     pub fn decrypt(self, key: &Key) -> Result<Item, Error> {
@@ -43,7 +43,7 @@ impl EncryptedItem {
     }
 
     fn validate(
-        hashed_attributes: &HashMap<String, Vec<u8>>,
+        hashed_attributes: &HashMap<String, Mac>,
         item: &Item,
         key: &Key,
     ) -> Result<(), Error> {

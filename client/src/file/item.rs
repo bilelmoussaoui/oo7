@@ -155,8 +155,8 @@ impl Item {
         let mut blob = crypto::encrypt(&*decrypted, key, iv)?;
 
         blob.extend_from_slice(iv);
-        let mut mac = crypto::compute_mac(&blob, key)?;
-        blob.append(&mut mac);
+        let mac = crypto::compute_mac(&blob, key)?;
+        blob.extend_from_slice(&mac);
 
         let hashed_attributes = self
             .attributes
