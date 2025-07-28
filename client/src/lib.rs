@@ -18,6 +18,7 @@ use std::collections::HashMap;
 
 mod error;
 mod key;
+mod mac;
 mod migration;
 
 #[cfg(feature = "unstable")]
@@ -25,6 +26,7 @@ mod migration;
 pub use key::Key;
 #[cfg(not(feature = "unstable"))]
 pub(crate) use key::Key;
+pub use mac::Mac;
 
 #[cfg(not(feature = "unstable"))]
 mod crypto;
@@ -63,7 +65,7 @@ pub trait AsAttributes {
     fn hash<'a>(
         &'a self,
         key: &Key,
-    ) -> Vec<(&'a str, std::result::Result<Vec<u8>, crate::crypto::Error>)> {
+    ) -> Vec<(&'a str, std::result::Result<Mac, crate::crypto::Error>)> {
         self.as_attributes()
             .into_iter()
             .map(|(k, v)| (k, crate::file::AttributeValue::from(v).mac(key)))

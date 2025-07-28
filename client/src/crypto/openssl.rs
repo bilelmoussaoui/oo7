@@ -14,7 +14,7 @@ use openssl::{
 };
 use zeroize::Zeroizing;
 
-use crate::{Key, file};
+use crate::{Key, Mac, file};
 
 const ENC_ALG: Nid = Nid::AES_128_CBC;
 const MAC_ALG: Nid = Nid::SHA256;
@@ -142,12 +142,12 @@ pub(crate) fn mac_len() -> usize {
     md.size()
 }
 
-pub(crate) fn compute_mac(data: impl AsRef<[u8]>, key: &Key) -> Result<Vec<u8>, super::Error> {
+pub(crate) fn compute_mac(data: impl AsRef<[u8]>, key: &Key) -> Result<Mac, super::Error> {
     let md = MessageDigest::from_nid(MAC_ALG).unwrap();
     let mac_key = PKey::hmac(key.as_ref())?;
     let mut signer = Signer::new(md, &mac_key)?;
     signer.update(data.as_ref())?;
-    signer.sign_to_vec().map_err(From::from)
+    signer.sign_to_vec().map_err(From::from).map(Mac::new)
 }
 
 pub(crate) fn verify_mac(
@@ -155,10 +155,7 @@ pub(crate) fn verify_mac(
     key: &Key,
     expected: impl AsRef<[u8]>,
 ) -> Result<bool, super::Error> {
-    Ok(memcmp::eq(
-        compute_mac(&data, key)?.as_slice(),
-        expected.as_ref(),
-    ))
+    Ok(memcmp::eq(compute_mac(&data, key)?.as_slice(), expected.as_ref()))
 }
 
 pub(crate) fn verify_checksum_md5(digest: impl AsRef<[u8]>, content: impl AsRef<[u8]>) -> bool {

@@ -155,8 +155,8 @@ impl Item {
         let mut blob = crypto::encrypt(&*decrypted, key, iv)?;
 
         blob.extend_from_slice(iv);
-        let mut mac = crypto::compute_mac(&blob, key)?;
-        blob.append(&mut mac);
+        let mac = crypto::compute_mac(&blob, key)?;
+        blob.extend_from_slice(mac.as_slice());
 
         let hashed_attributes = self
             .attributes
@@ -228,7 +228,7 @@ mod tests {
         let encrypted_item_blob = &encrypted.blob[..n - n_mac - n_iv];
         let item_mac = crypto::compute_mac(&encrypted.blob[..n - n_mac], &key).unwrap();
 
-        assert_eq!(&blob[n - n_mac..], &item_mac);
+        assert_eq!(&blob[n - n_mac..], item_mac.as_slice());
         assert_eq!(&blob[n - n_mac - n_iv..n - n_mac], &iv);
         assert_eq!(
             encrypted_item_blob,

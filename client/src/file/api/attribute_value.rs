@@ -2,14 +2,14 @@ use serde::{Deserialize, Serialize};
 use zbus::zvariant::Type;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-use crate::{Key, crypto};
+use crate::{Key, Mac, crypto};
 
 /// An attribute value.
 #[derive(Deserialize, Serialize, Type, Clone, Debug, Eq, PartialEq, Zeroize, ZeroizeOnDrop)]
 pub struct AttributeValue(String);
 
 impl AttributeValue {
-    pub(crate) fn mac(&self, key: &Key) -> Result<Vec<u8>, crate::crypto::Error> {
+    pub(crate) fn mac(&self, key: &Key) -> Result<Mac, crate::crypto::Error> {
         crypto::compute_mac(self.0.as_bytes(), key)
     }
 }
