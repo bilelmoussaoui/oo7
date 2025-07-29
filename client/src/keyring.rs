@@ -19,7 +19,7 @@ use crate::{AsAttributes, Result, Secret, dbus, file};
 #[derive(Debug)]
 pub enum Keyring {
     #[doc(hidden)]
-    File(Arc<file::Keyring>),
+    File(Arc<file::UnlockedKeyring>),
     #[doc(hidden)]
     DBus(dbus::Collection<'static>),
 }
@@ -46,7 +46,7 @@ impl Keyring {
             #[cfg(feature = "tracing")]
             tracing::debug!("Application is sandboxed, using the file backend");
 
-            match file::Keyring::load_default().await {
+            match file::UnlockedKeyring::load_default().await {
                 Ok(file) => return Ok(Self::File(Arc::new(file))),
                 // Do nothing in this case, we are supposed to fallback to the host keyring
                 Err(super::file::Error::Portal(ashpd::Error::PortalNotFound(_))) => {
@@ -57,7 +57,8 @@ impl Keyring {
                 }
                 Err(e) => {
                     if matches!(e, file::Error::IncorrectSecret) && auto_delete_broken_items {
-                        let keyring = unsafe { file::Keyring::load_default_unchecked().await? };
+                        let keyring =
+                            unsafe { file::UnlockedKeyring::load_default_unchecked().await? };
                         let deleted_items = keyring.delete_broken_items().await?;
                         debug_assert!(deleted_items > 0);
                         return Ok(Self::File(Arc::new(keyring)));
@@ -176,7 +177,7 @@ impl Keyring {
     }
 
     /// Get the inner file backend if the keyring is backed by one.
-    pub fn as_file(&self) -> Arc<file::Keyring> {
+    pub fn as_file(&self) -> Arc<file::UnlockedKeyring> {
         match self {
             Self::File(keyring) => keyring.clone(),
             _ => unreachable!(),
@@ -196,13 +197,13 @@ impl Keyring {
 #[derive(Debug)]
 pub enum Item {
     #[doc(hidden)]
-    File(RwLock<file::Item>, Arc<file::Keyring>),
+    File(RwLock<file::Item>, Arc<file::UnlockedKeyring>),
     #[doc(hidden)]
     DBus(dbus::Item<'static>),
 }
 
 impl Item {
-    fn for_file(item: file::Item, backend: Arc<file::Keyring>) -> Self {
+    fn for_file(item: file::Item, backend: Arc<file::UnlockedKeyring>) -> Self {
         Self::File(RwLock::new(item), backend)
     }
 
@@ -390,7 +391,7 @@ mod tests {
         let path = dir.join("default.keyring");
 
         let secret = crate::Secret::text("test");
-        let keyring = Keyring::File(file::Keyring::load(&path, secret).await?.into());
+        let keyring = Keyring::File(file::UnlockedKeyring::load(&path, secret).await?.into());
 
         let items = keyring.items().await?;
         assert_eq!(items.len(), 0);
