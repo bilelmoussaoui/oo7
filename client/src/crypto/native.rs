@@ -132,11 +132,11 @@ pub(crate) fn compute_mac(data: impl AsRef<[u8]>, key: &Key) -> Result<crate::Ma
 pub(crate) fn verify_mac(
     data: impl AsRef<[u8]>,
     key: &Key,
-    expected: impl AsRef<[u8]>,
+    expected_mac: impl AsRef<[u8]>,
 ) -> Result<bool, super::Error> {
     let mut mac = MacAlg::new_from_slice(key.as_ref()).unwrap();
     mac.update(data.as_ref());
-    Ok(mac.verify_slice(expected.as_ref()).is_ok())
+    Ok(mac.verify_slice(expected_mac.as_ref()).is_ok())
 }
 
 pub(crate) fn verify_checksum_md5(digest: impl AsRef<[u8]>, content: impl AsRef<[u8]>) -> bool {
