@@ -153,9 +153,12 @@ pub(crate) fn compute_mac(data: impl AsRef<[u8]>, key: &Key) -> Result<Mac, supe
 pub(crate) fn verify_mac(
     data: impl AsRef<[u8]>,
     key: &Key,
-    expected: impl AsRef<[u8]>,
+    expected_mac: impl AsRef<[u8]>,
 ) -> Result<bool, super::Error> {
-    Ok(memcmp::eq(compute_mac(&data, key)?.as_slice(), expected.as_ref()))
+    Ok(memcmp::eq(
+        compute_mac(&data, key)?.as_slice(),
+        expected_mac.as_ref(),
+    ))
 }
 
 pub(crate) fn verify_checksum_md5(digest: impl AsRef<[u8]>, content: impl AsRef<[u8]>) -> bool {
