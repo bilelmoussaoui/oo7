@@ -301,7 +301,7 @@ impl PrompterCallback {
 
                 // TODO: this should check if the service has a keyring, check the secret
                 // without opening it again.
-                match oo7::file::Keyring::open(&label, secret).await {
+                match oo7::file::UnlockedKeyring::open(&label, secret).await {
                     Ok(_) => tracing::debug!("Keyring secret matches for {label}."),
                     Err(oo7::file::Error::IncorrectSecret) => {
                         tracing::error!("Keyring {label} failed to unlock, incorrect secret.");
