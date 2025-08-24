@@ -66,7 +66,7 @@ impl From<Key> for zvariant::Value<'static> {
 
 impl From<Key> for zvariant::OwnedValue {
     fn from(key: Key) -> Self {
-        zvariant::Value::from(key).try_to_owned().unwrap()
+        zvariant::Value::from(key).try_into_owned().unwrap()
     }
 }
 

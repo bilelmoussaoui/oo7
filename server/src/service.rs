@@ -98,7 +98,7 @@ impl Service {
 
         let service_key = public_key
             .map(OwnedValue::from)
-            .unwrap_or_else(|| Value::new::<Vec<u8>>(vec![]).try_to_owned().unwrap());
+            .unwrap_or_else(|| Value::new::<Vec<u8>>(vec![]).try_into_owned().unwrap());
 
         Ok((service_key, path))
     }
