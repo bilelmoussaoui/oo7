@@ -346,7 +346,7 @@ impl PrompterCallback {
 
         let signal_emitter = self.service.signal_emitter(prompt_path)?;
         let result = zvariant::Value::new(prompt.objects())
-            .try_to_owned()
+            .try_into_owned()
             .unwrap();
 
         tokio::spawn(async move {
@@ -387,7 +387,7 @@ impl PrompterCallback {
         tokio::spawn(async move { prompter.stop_prompting(&path).await });
         let signal_emitter = self.service.signal_emitter(prompt_path)?;
         let result = zvariant::Value::new::<Vec<OwnedObjectPath>>(vec![])
-            .try_to_owned()
+            .try_into_owned()
             .unwrap();
 
         tokio::spawn(async move { Prompt::completed(&signal_emitter, true, result).await });
