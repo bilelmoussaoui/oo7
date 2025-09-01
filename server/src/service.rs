@@ -11,7 +11,7 @@ use oo7::{
         Algorithm, ServiceError,
         api::{DBusSecretInner, Properties},
     },
-    file::Keyring,
+    file::UnlockedKeyring,
 };
 use tokio::sync::{Mutex, RwLock};
 use tokio_stream::StreamExt;
@@ -327,7 +327,7 @@ impl Service {
                 oo7::dbus::Service::DEFAULT_COLLECTION,
                 false,
                 service.clone(),
-                Arc::new(Keyring::open("login", secret).await?),
+                Arc::new(UnlockedKeyring::open("login", secret).await?),
             );
             collections.push(collection.clone());
             collection.dispatch_items().await?;
@@ -344,7 +344,7 @@ impl Service {
             oo7::dbus::Service::SESSION_COLLECTION,
             false,
             service.clone(),
-            Arc::new(Keyring::temporary(Secret::random().unwrap()).await?),
+            Arc::new(UnlockedKeyring::temporary(Secret::random().unwrap()).await?),
         );
         object_server
             .at(collection.path(), collection.clone())
