@@ -193,9 +193,9 @@ impl Commands {
         };
 
         let keyring = match (path, secret) {
-            (Some(path), Some(secret)) => {
-                Keyring::File(oo7::file::Keyring::load(path, secret).await?)
-            }
+            (Some(path), Some(secret)) => unsafe {
+                Keyring::File(oo7::file::Keyring::load_unchecked(path, secret).await?)
+            },
             (Some(_), None) => {
                 return Err(Error::new("A keyring requires a secret."));
             }
