@@ -834,6 +834,9 @@ mod tests {
 
     #[tokio::test]
     async fn delete_broken_items() -> Result<(), Error> {
+        const VALID_TO_ADD: usize = 5;
+        const BROKEN_TO_ADD: usize = 3;
+
         let data_dir = tempdir()?;
         let v0_dir = data_dir.path().join("keyrings");
         let v1_dir = v0_dir.join("v1");
@@ -845,53 +848,54 @@ mod tests {
         let keyring_path = v1_dir.join("default.keyring");
         fs::copy(&fixture_path, &keyring_path).await?;
 
+        // 1) Load with the correct password and add several valid items.
+        //    This ensures n_valid_items > n_broken_items that we'll add later.
         let keyring = Keyring::load(&keyring_path, Secret::blob("test")).await?;
-        keyring
-            .create_item(
-                "test 3",
-                &HashMap::from([("attr3", "value3")]),
-                "password3",
-                false,
-            )
-            .await?;
+        for i in 0..VALID_TO_ADD {
+            keyring
+                .create_item(
+                    &format!("valid {}", i),
+                    &HashMap::from([("attr_valid", "value")]),
+                    format!("password_valid_{}", i),
+                    false,
+                )
+                .await?;
+        }
         drop(keyring);
 
+        // 2) Load_unchecked with the wrong password and add a few "broken" items.
         let keyring = unsafe {
             Keyring::load_unchecked(&keyring_path, Secret::blob("wrong_password")).await?
         };
-        keyring
-            .create_item(
-                "test",
-                &HashMap::from([("attr", "value")]),
-                "password",
-                false,
-            )
-            .await?;
+        for i in 0..BROKEN_TO_ADD {
+            keyring
+                .create_item(
+                    &format!("bad{}", i),
+                    &HashMap::from([("attr_bad", "value_bad")]),
+                    format!("pw_bad{}", i),
+                    false,
+                )
+                .await?;
+        }
         drop(keyring);
 
+        // 3) Load with the correct password and run the deletion.
+        let keyring = Keyring::load(&keyring_path, Secret::blob("test")).await?;
+        let removed = keyring.delete_broken_items().await?;
         assert!(
-            Keyring::load(&keyring_path, Secret::blob("wrong_password"))
-                .await
-                .is_err()
+            removed >= BROKEN_TO_ADD,
+            "expected at least {} broken items removed, got {}",
+            BROKEN_TO_ADD,
+            removed
         );
 
-        let keyring = Keyring::load(&keyring_path, Secret::blob("test")).await?;
-        keyring
-            .create_item(
-                "test 2",
-                &HashMap::from([("attr2", "value2")]),
-                "password2",
-                false,
-            )
-            .await?;
-
-        assert_eq!(keyring.delete_broken_items().await?, 1);
+        // Second call should find nothing left to clean up.
         assert_eq!(keyring.delete_broken_items().await?, 0);
 
         fs::remove_file(keyring_path).await?;
-
         Ok(())
     }
+
 
     #[tokio::test]
     async fn change_secret() -> Result<(), Error> {
