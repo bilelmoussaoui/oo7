@@ -298,27 +298,28 @@ impl Service {
     pub async fn run(secret: Option<Secret>, request_replacement: bool) -> Result<(), Error> {
         let service = Self {
             collections: Default::default(),
-            connection: OnceLock::new(),
+            connection: Default::default(),
             sessions: Default::default(),
             session_index: Default::default(),
             prompts: Default::default(),
             prompt_index: Default::default(),
         };
 
-        let connection = zbus::connection::Builder::session()?
+        let connection_builder = zbus::connection::Builder::session()?
             .allow_name_replacements(true)
             .replace_existing_names(request_replacement)
             .name(oo7::dbus::api::Service::DESTINATION.as_deref().unwrap())?
             .serve_at(
                 oo7::dbus::api::Service::PATH.as_deref().unwrap(),
                 service.clone(),
-            )?
-            .build()
-            .await?;
+            )?;
 
-        service.connection.set(connection.clone()).unwrap();
-        let object_server = connection.object_server();
+        service
+            .connection
+            .set(connection_builder.build().await?)
+            .unwrap();
 
+        let object_server = service.object_server();
         let mut collections = service.collections.lock().await;
 
         if let Some(secret) = secret {
