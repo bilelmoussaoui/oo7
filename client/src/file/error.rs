@@ -35,8 +35,13 @@ pub enum Error {
     Utf8(std::str::Utf8Error),
     /// Mismatch of algorithms used in legacy keyring file.
     AlgorithmMismatch(u8),
-    /// Incorrect secret
+    /// Incorrect secret - no items could be decrypted
     IncorrectSecret,
+    /// Keyring partially corrupted - more broken items than valid ones
+    PartiallyCorruptedKeyring {
+        valid_items: usize,
+        broken_items: usize,
+    },
     /// Crypto related error.
     Crypto(crate::crypto::Error),
 }
@@ -110,6 +115,14 @@ impl std::fmt::Display for Error {
             Self::Utf8(e) => write!(f, "UTF-8 encoding error {e}"),
             Self::AlgorithmMismatch(e) => write!(f, "Unknown algorithm {e}"),
             Self::IncorrectSecret => write!(f, "Incorrect secret"),
+            Self::PartiallyCorruptedKeyring {
+                valid_items,
+                broken_items,
+            } => write!(
+                f,
+                "Keyring partially corrupted: {} valid items, {} broken items",
+                valid_items, broken_items
+            ),
             Self::Crypto(e) => write!(f, "Failed to do a cryptography operation, {e}"),
         }
     }

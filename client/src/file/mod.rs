@@ -163,31 +163,34 @@ impl Keyring {
         let key = if validate_items {
             let key = keyring.derive_key(&secret)?;
 
-            let mut n_broken_items = 0;
-            let mut n_valid_items = 0;
+            let mut broken_items = 0;
+            let mut valid_items = 0;
             for encrypted_item in &keyring.items {
                 if encrypted_item.clone().decrypt(&key).is_err() {
-                    n_broken_items += 1;
+                    broken_items += 1;
                 } else {
-                    n_valid_items += 1;
+                    valid_items += 1;
                 }
             }
-            if n_valid_items == 0 && n_broken_items != 0 {
+            if valid_items == 0 && broken_items != 0 {
                 #[cfg(feature = "tracing")]
                 tracing::error!("Keyring cannot be decrypted. Invalid secret.");
                 return Err(Error::IncorrectSecret);
-            } else if n_broken_items > n_valid_items {
+            } else if broken_items > valid_items {
                 #[cfg(feature = "tracing")]
                 {
                     tracing::warn!(
-                        "The file contains {n_broken_items} broken items and {n_valid_items} valid ones."
+                        "The file contains {broken_items} broken items and {valid_items} valid ones."
                     );
                     tracing::info!(
                         "Please switch to `Keyring::load_unchecked` to load the keyring without the secret validation.
                         `Keyring::delete_broken_items` can be used to remove them or alternatively with `oo7-cli --repair`."
                     );
                 }
-                return Err(Error::IncorrectSecret);
+                return Err(Error::PartiallyCorruptedKeyring {
+                    valid_items,
+                    broken_items,
+                });
             }
 
             Some(Arc::new(key))
@@ -483,8 +486,8 @@ impl Keyring {
         let mut key_lock = self.key.lock().await;
         if key_lock.is_none() {
             #[cfg(feature = "async-std")]
-            let key = blocking::unblock(move || keyring.blocking_read().derive_key(&secret))
-                .await?;
+            let key =
+                blocking::unblock(move || keyring.blocking_read().derive_key(&secret)).await?;
             #[cfg(feature = "tokio")]
             let key =
                 tokio::task::spawn_blocking(move || keyring.blocking_read().derive_key(&secret))
@@ -847,7 +850,7 @@ mod tests {
         fs::copy(&fixture_path, &keyring_path).await?;
 
         // 1) Load with the correct password and add several valid items. This ensures
-        //    n_valid_items > n_broken_items that we'll add later.
+        //    valid_items > broken_items that we'll add later.
         let keyring = Keyring::load(&keyring_path, Secret::blob("test")).await?;
         for i in 0..VALID_TO_ADD {
             keyring
