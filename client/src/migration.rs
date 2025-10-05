@@ -36,8 +36,22 @@ pub async fn migrate(attributes: Vec<impl AsAttributes>, replace: bool) -> Resul
 
     file_backend.create_items(new_items).await?;
 
+    // Delete items from source after successful creation in destination
+    let mut deletion_errors = Vec::new();
     for item in all_items.iter() {
-        item.delete(None).await?;
+        if let Err(e) = item.delete(None).await {
+            deletion_errors.push(e);
+        }
+    }
+
+    // Report deletion failures - partial migration is still an error condition
+    if !deletion_errors.is_empty() {
+        #[cfg(feature = "tracing")]
+        tracing::error!(
+            "Migration partially failed: {} items could not be deleted from source",
+            deletion_errors.len()
+        );
+        return Err(deletion_errors.into_iter().next().unwrap().into());
     }
 
     Ok(())
