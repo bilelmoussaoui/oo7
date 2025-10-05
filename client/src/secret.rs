@@ -52,12 +52,21 @@ impl ContentType {
 }
 
 /// A wrapper around a combination of (secret, content-type).
-#[derive(Debug, Clone, PartialEq, Eq, Zeroize, ZeroizeOnDrop)]
+#[derive(Clone, PartialEq, Eq, Zeroize, ZeroizeOnDrop)]
 pub enum Secret {
     /// Corresponds to [`ContentType::Text`]
     Text(String),
     /// Corresponds to [`ContentType::Blob`]
     Blob(Vec<u8>),
+}
+
+impl std::fmt::Debug for Secret {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Text(_) => write!(f, "Secret::Text([REDACTED])"),
+            Self::Blob(_) => write!(f, "Secret::Blob([REDACTED])"),
+        }
+    }
 }
 
 impl Secret {
@@ -167,5 +176,19 @@ impl std::ops::Deref for Secret {
 impl AsRef<[u8]> for Secret {
     fn as_ref(&self) -> &[u8] {
         self.as_bytes()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn secret_debug_is_redacted() {
+        let text_secret = Secret::text("password");
+        let blob_secret = Secret::blob([1, 2, 3]);
+
+        assert_eq!(format!("{:?}", text_secret), "Secret::Text([REDACTED])");
+        assert_eq!(format!("{:?}", blob_secret), "Secret::Blob([REDACTED])");
     }
 }

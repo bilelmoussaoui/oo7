@@ -3,11 +3,21 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 use crate::{crypto, file};
 
 /// A key.
-#[derive(Debug, Zeroize, ZeroizeOnDrop)]
+#[derive(Zeroize, ZeroizeOnDrop)]
 pub struct Key {
     key: Vec<u8>,
     #[zeroize(skip)]
     strength: Result<(), file::WeakKeyError>,
+}
+
+impl std::fmt::Debug for Key {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Key {{ key: [REDACTED], strength: {:?} }}",
+            self.strength
+        )
+    }
 }
 
 impl AsRef<[u8]> for Key {
@@ -129,5 +139,14 @@ mod tests {
 
         assert_eq!(public_key.unwrap().as_ref(), expected_public_key);
         assert_eq!(aes_key.unwrap().as_ref(), expected_aes_key);
+    }
+
+    #[test]
+    fn key_debug_is_redacted() {
+        let key = Key::new(vec![1, 2, 3, 4]);
+        let debug_output = format!("{:?}", key);
+
+        assert!(debug_output.contains("key: [REDACTED]"));
+        assert!(debug_output.contains("strength:"));
     }
 }

@@ -6,8 +6,14 @@ use zbus::zvariant::Type;
 // There is no constructor to avoid performing sanity checks, e.g. length.
 /// A message authentication code. It provides constant-time comparison when
 /// compared against another mac or against a slice of bytes.
-#[derive(Deserialize, Serialize, Type, Debug, Clone)]
+#[derive(Deserialize, Serialize, Type, Clone)]
 pub struct Mac(Vec<u8>);
+
+impl std::fmt::Debug for Mac {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Mac([REDACTED])")
+    }
+}
 
 impl Mac {
     pub(crate) fn new(inner: Vec<u8>) -> Self {
@@ -35,5 +41,16 @@ impl Mac {
 impl PartialEq for Mac {
     fn eq(&self, other: &Self) -> bool {
         self.verify_slice(&other.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mac_debug_is_redacted() {
+        let mac = Mac::new(vec![1, 2, 3, 4]);
+        assert_eq!(format!("{:?}", mac), "Mac([REDACTED])");
     }
 }
