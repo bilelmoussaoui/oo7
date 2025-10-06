@@ -95,9 +95,8 @@ async fn inner_main(args: Args) -> Result<(), Error> {
         let res = Service::run(Some(secret), args.replace).await;
         match res {
             Ok(()) => (),
-            // TODO Create a unit test that verifies that this is the correct
-            // error type.
-            Err(Error::File(oo7::file::Error::ChecksumMismatch))
+            // Wrong password provided via system credentials
+            Err(Error::File(oo7::file::Error::IncorrectSecret))
                 if matches!(should_error_out, ShouldErrorOut::No) =>
             {
                 tracing::warn!(

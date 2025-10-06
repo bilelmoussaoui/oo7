@@ -1069,4 +1069,31 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn wrong_password_error_type() -> Result<(), Error> {
+        let temp_dir = tempdir().unwrap();
+        let keyring_path = temp_dir.path().join("wrong_password_test.keyring");
+        let correct_secret = Secret::from("correct-password-that-is-long-enough".as_bytes());
+        let wrong_secret = Secret::from("wrong-password-that-is-long-enough".as_bytes());
+
+        // Create a keyring with the correct password
+        let keyring = Keyring::load(&keyring_path, correct_secret).await?;
+        keyring
+            .create_item(
+                "Test Item",
+                &HashMap::from([("app", "test")]),
+                "my-secret",
+                false,
+            )
+            .await?;
+
+        // Try to load with wrong password
+        let result = Keyring::load(&keyring_path, wrong_secret).await;
+
+        // Verify this returns IncorrectSecret, not ChecksumMismatch
+        assert!(matches!(result, Err(Error::IncorrectSecret)));
+
+        Ok(())
+    }
 }
