@@ -4,7 +4,7 @@
 #[cfg(all(all(feature = "tokio", feature = "async-std"), not(doc)))]
 compile_error!("You can't enable both async-std & tokio features at once");
 #[cfg(all(not(feature = "tokio"), not(feature = "async-std"), not(doc)))]
-compile_error!("You you have to enable either openssl_crypto or native_crypto feature");
+compile_error!("You have to enable either tokio or async-std feature");
 #[cfg(all(all(feature = "native_crypto", feature = "openssl_crypto"), not(doc)))]
 compile_error!("You can't enable both openssl_crypto & native_crypto features at once");
 #[cfg(all(
@@ -12,7 +12,7 @@ compile_error!("You can't enable both openssl_crypto & native_crypto features at
     not(feature = "openssl_crypto"),
     not(doc)
 ))]
-compile_error!("You you have to enable either openssl_crypto or native_crypto feature");
+compile_error!("You have to enable either openssl_crypto or native_crypto feature");
 
 use std::collections::HashMap;
 
