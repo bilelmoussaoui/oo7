@@ -54,6 +54,7 @@ zeroize.workspace = true
 [dev-dependencies]
 tempfile.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 
 [features]
 default = ["local_tests", "tokio", "native_crypto"]
@@ -106,3 +107,8 @@ required-features = ["tokio"]
 name = "dbus_service"
 path = "examples/dbus_service.rs"
 required-features = ["tokio"]
+
+[[example]]
+name = "file_tracing"
+path = "examples/file_tracing.rs"
+required-features = ["tokio", "tracing"]
