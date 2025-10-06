@@ -165,7 +165,7 @@ impl Service {
         Ok((unlocked, OwnedObjectPath::default()))
     }
 
-    #[zbus(out_args("locked", "prompt"))]
+    #[zbus(out_args("locked", "Prompt"))]
     pub async fn lock(
         &self,
         objects: Vec<OwnedObjectPath>,

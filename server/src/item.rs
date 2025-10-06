@@ -27,7 +27,7 @@ pub struct Item {
 
 #[zbus::interface(name = "org.freedesktop.Secret.Item")]
 impl Item {
-    #[zbus(out_args("prompt"))]
+    #[zbus(out_args("Prompt"))]
     pub async fn delete(
         &self,
         #[zbus(object_server)] object_server: &zbus::ObjectServer,
