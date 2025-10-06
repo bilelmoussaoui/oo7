@@ -559,8 +559,10 @@ impl Keyring {
         let mut key_lock = self.key.lock().await;
         if key_lock.is_none() {
             #[cfg(feature = "async-std")]
-            let key =
-                { blocking::unblock(move || keyring.blocking_read().derive_key(&secret)).await? };
+            let key = blocking::unblock(move || {
+                async_io::block_on(async { keyring.read().await.derive_key(&secret) })
+            })
+            .await?;
             #[cfg(feature = "tokio")]
             let key = {
                 tokio::task::spawn_blocking(move || keyring.blocking_read().derive_key(&secret))
