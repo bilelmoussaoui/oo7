@@ -399,6 +399,7 @@ impl Keyring {
     /// Delete an item.
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, attributes)))]
     pub async fn delete(&self, attributes: &impl AsAttributes) -> Result<(), Error> {
+        #[cfg(feature = "tracing")]
         let items_before = { self.keyring.read().await.items.len() };
 
         {
