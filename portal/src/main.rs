@@ -42,9 +42,7 @@ impl ashpd::backend::secret::SecretImpl for Secret {
         tracing::debug!("Request from app: {app_id}");
 
         let active_requests = self.active_requests.clone();
-        let task = tokio::spawn(async move {
-            send_secret_to_app(&app_id, fd).await
-        });
+        let task = tokio::spawn(async move { send_secret_to_app(&app_id, fd).await });
 
         // Store the abort handle for this request
         {
