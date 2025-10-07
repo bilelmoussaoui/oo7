@@ -1,4 +1,4 @@
-use std::{collections::HashMap, future::pending, os::unix::net::UnixStream};
+use std::{collections::HashMap, future::pending, os::unix::net::UnixStream, sync::Arc};
 mod error;
 
 use ashpd::{
@@ -9,29 +9,61 @@ use ashpd::{
 use clap::Parser;
 pub use error::Result;
 use oo7::dbus::Service;
-use tokio::io::AsyncWriteExt;
+use tokio::{io::AsyncWriteExt, sync::Mutex, task::AbortHandle};
 
 const PORTAL_NAME: &str = "org.freedesktop.impl.portal.desktop.oo7";
 
-struct Secret;
+#[derive(Default)]
+struct Secret {
+    active_requests: Arc<Mutex<HashMap<HandleToken, AbortHandle>>>,
+}
 
 #[async_trait::async_trait]
 impl ashpd::backend::request::RequestImpl for Secret {
-    async fn close(&self, _token: HandleToken) {}
+    async fn close(&self, token: HandleToken) {
+        tracing::debug!("Closing request with token: {:?}", token);
+
+        let mut requests = self.active_requests.lock().await;
+        if let Some(abort_handle) = requests.remove(&token) {
+            tracing::debug!("Aborting active request for token: {:?}", token);
+            abort_handle.abort();
+        }
+    }
 }
 
 #[async_trait::async_trait]
 impl ashpd::backend::secret::SecretImpl for Secret {
     async fn retrieve(
         &self,
-        _token: HandleToken,
+        token: HandleToken,
         app_id: ashpd::AppID,
         fd: std::os::fd::OwnedFd,
     ) -> ashpd::backend::Result<HashMap<String, OwnedValue>> {
         tracing::debug!("Request from app: {app_id}");
-        send_secret_to_app(&app_id, fd)
-            .await
+
+        let active_requests = self.active_requests.clone();
+        let task = tokio::spawn(async move {
+            send_secret_to_app(&app_id, fd).await
+        });
+
+        // Store the abort handle for this request
+        {
+            let mut requests = active_requests.lock().await;
+            requests.insert(token.clone(), task.abort_handle());
+        }
+
+        let result = task.await;
+
+        // Remove the request from active requests once completed
+        {
+            let mut requests = active_requests.lock().await;
+            requests.remove(&token);
+        }
+
+        result
+            .map_err(|e| ashpd::PortalError::Failed(format!("Task failed: {e}")))?
             .map_err(|e| ashpd::PortalError::Failed(format!("Could not retrieve secret {e}")))?;
+
         Ok(Default::default())
     }
 }
@@ -114,7 +146,7 @@ async fn main() -> Result<()> {
     }
 
     ashpd::backend::Builder::new(PORTAL_NAME)?
-        .secret(Secret)
+        .secret(Secret::default())
         .with_flags(flags)
         .build()
         .await
