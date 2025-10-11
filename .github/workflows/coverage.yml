@@ -70,7 +70,7 @@ jobs:
           cargo tarpaulin \
             --package oo7 \
             --lib \
-            --features "tracing,async-std,openssl,local_tests" \
+            --features "tracing,async-std,openssl_crypto,local_tests" \
             --ignore-panics \
             --out Lcov \
             --output-dir coverage-raw
