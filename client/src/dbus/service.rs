@@ -231,6 +231,7 @@ mod tests {
     use super::Service;
 
     #[tokio::test]
+    #[ignore = "gnome-keyring doesn't support creating custom collections in CI"]
     async fn create_collection() {
         let service = Service::new().await.unwrap();
         let collection = service
