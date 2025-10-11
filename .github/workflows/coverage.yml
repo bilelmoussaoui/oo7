@@ -59,7 +59,8 @@ jobs:
           cargo tarpaulin \
             --package oo7 \
             --lib \
-            --features "tracing,tokio,local_tests" \
+            --no-default-features \
+            --features "tracing,tokio,native_crypto,local_tests" \
             --ignore-panics \
             --out Lcov \
             --output-dir coverage-raw
@@ -70,6 +71,7 @@ jobs:
           cargo tarpaulin \
             --package oo7 \
             --lib \
+            --no-default-features \
             --features "tracing,async-std,openssl_crypto,local_tests" \
             --ignore-panics \
             --out Lcov \
