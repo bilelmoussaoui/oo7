@@ -132,19 +132,15 @@ jobs:
       - name: Store coverage percentage for main branch
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: |
-          # Extract and store coverage percentage for future PR comparisons
-          CURRENT_COVERAGE=$(python3 -c "
-          import json
-          try:
-              with open('coverage-raw/tarpaulin-report.json', 'r') as f:
-                  data = json.load(f)
-                  covered = data.get('covered', 0)
-                  coverable = data.get('coverable', 1)
-                  coverage = (covered / coverable * 100) if coverable > 0 else 0
-                  print(f'{coverage:.2f}')
-          except Exception as e:
-              print('0.00')
-          " 2>/dev/null || echo "0.00")
+          # Run tarpaulin with stdout output to get coverage percentage
+          CURRENT_COVERAGE=$(cargo tarpaulin \
+            --package oo7 \
+            --lib \
+            --no-default-features \
+            --features "tracing,tokio,native_crypto" \
+            --ignore-panics \
+            --skip-clean \
+            --print-summary | grep -o '[0-9]\+\.[0-9]\+%' | head -1 | sed 's/%//' || echo "0.00")
 
           echo "Main branch coverage: $CURRENT_COVERAGE%"
 
