@@ -82,10 +82,9 @@ fn encode(map: &HashMap<&str, &[u8]>) -> String {
 // Converts a payload String into a HashMap
 fn decode(exchange: &str) -> Option<HashMap<&str, Vec<u8>>> {
     let (_, exchange) = exchange.split_once(PROTOCOL)?; // Remove PROTOCOL prefix
-    let pairs = exchange.split("\n").collect::<Vec<_>>();
     let mut map: HashMap<&str, Vec<u8>> = HashMap::new();
 
-    for pair in pairs {
+    for pair in exchange.split('\n') {
         if pair.is_empty() {
             // To avoid splitting an empty line (last new line)
             break;
