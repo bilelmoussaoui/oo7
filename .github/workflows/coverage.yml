@@ -43,15 +43,15 @@ jobs:
 
       - name: Run coverage for native-tokio
         run: |
+          mkdir -p coverage-raw
           cargo tarpaulin \
             --package oo7 \
             --lib \
             --features "tracing,tokio" \
             --ignore-panics \
             --out Lcov \
-            --output-dir coverage-raw \
-            --lcov-output-path coverage-raw/native-tokio.lcov \
-            -- --skip dbus
+            --output-dir coverage-raw
+          mv coverage-raw/lcov.info coverage-raw/native-tokio.lcov
 
       - name: Run coverage for openssl-async-std
         run: |
@@ -61,9 +61,8 @@ jobs:
             --features "tracing,async-std,openssl" \
             --ignore-panics \
             --out Lcov \
-            --output-dir coverage-raw \
-            --lcov-output-path coverage-raw/openssl-async-std.lcov \
-            -- --skip dbus
+            --output-dir coverage-raw
+          mv coverage-raw/lcov.info coverage-raw/openssl-async-std.lcov
 
       - name: Install grcov for merging coverage
         uses: taiki-e/install-action@v2
