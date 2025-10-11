@@ -14,35 +14,41 @@ use time::{OffsetDateTime, UtcOffset};
 const BINARY_NAME: &str = env!("CARGO_BIN_NAME");
 const H_STYLE: anstyle::Style = anstyle::Style::new().bold().underline();
 
-struct Error(String);
+enum Error {
+    Owned(String),
+    Borrowed(&'static str),
+}
 
 impl fmt::Debug for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+        match self {
+            Self::Owned(s) => f.write_str(s),
+            Self::Borrowed(s) => f.write_str(s),
+        }
     }
 }
 
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Error {
-        Error(err.to_string())
+        Self::Owned(err.to_string())
     }
 }
 
 impl From<oo7::file::Error> for Error {
     fn from(err: oo7::file::Error) -> Error {
-        Error(err.to_string())
+        Self::Owned(err.to_string())
     }
 }
 
 impl From<oo7::dbus::Error> for Error {
     fn from(err: oo7::dbus::Error) -> Error {
-        Error(err.to_string())
+        Self::Owned(err.to_string())
     }
 }
 
 impl Error {
-    fn new(s: &str) -> Self {
-        Self(String::from(s))
+    fn new(s: &'static str) -> Self {
+        Self::Borrowed(s)
     }
 }
 
@@ -207,7 +213,7 @@ impl Commands {
                     service
                         .with_alias(alias)
                         .await?
-                        .ok_or_else(|| Error(format!("Collection '{alias}' not found")))?
+                        .ok_or_else(|| Error::Owned(format!("Collection '{alias}' not found")))?
                 } else {
                     service.default_collection().await?
                 };
