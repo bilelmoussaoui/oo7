@@ -36,10 +36,22 @@ jobs:
         with:
           tool: cargo-tarpaulin
 
-      - name: Install system dependencies
+      - name: Install system dependencies and setup D-Bus
         run: |
           sudo apt-get update
-          sudo apt-get install -y libssl-dev pkg-config
+          sudo apt-get install -y libssl-dev pkg-config gnome-keyring dbus-x11
+
+          # Start D-Bus session
+          mkdir -p ~/.local/share/keyrings
+          eval $(dbus-launch --sh-syntax)
+          export DBUS_SESSION_BUS_ADDRESS
+          echo "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS" >> $GITHUB_ENV
+
+          # Initialize and unlock the default keyring
+          printf '\n' | gnome-keyring-daemon --unlock --daemonize --login
+
+          # Give the service time to start
+          sleep 3
 
       - name: Run coverage for native-tokio
         run: |
@@ -47,7 +59,7 @@ jobs:
           cargo tarpaulin \
             --package oo7 \
             --lib \
-            --features "tracing,tokio" \
+            --features "tracing,tokio,local_tests" \
             --ignore-panics \
             --out Lcov \
             --output-dir coverage-raw
@@ -58,7 +70,7 @@ jobs:
           cargo tarpaulin \
             --package oo7 \
             --lib \
-            --features "tracing,async-std,openssl" \
+            --features "tracing,async-std,openssl,local_tests" \
             --ignore-panics \
             --out Lcov \
             --output-dir coverage-raw
