@@ -41,12 +41,11 @@ impl ashpd::backend::secret::SecretImpl for Secret {
     ) -> ashpd::backend::Result<HashMap<String, OwnedValue>> {
         tracing::debug!("Request from app: {app_id}");
 
-        let active_requests = self.active_requests.clone();
         let task = tokio::spawn(async move { send_secret_to_app(&app_id, fd).await });
 
         // Store the abort handle for this request
         {
-            let mut requests = active_requests.lock().await;
+            let mut requests = self.active_requests.lock().await;
             requests.insert(token.clone(), task.abort_handle());
         }
 
@@ -54,7 +53,7 @@ impl ashpd::backend::secret::SecretImpl for Secret {
 
         // Remove the request from active requests once completed
         {
-            let mut requests = active_requests.lock().await;
+            let mut requests = self.active_requests.lock().await;
             requests.remove(&token);
         }
 
