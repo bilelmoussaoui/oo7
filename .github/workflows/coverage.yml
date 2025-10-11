@@ -1,0 +1,122 @@
+name: Code Coverage
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: coverage-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  coverage:
+    name: Generate Coverage Report
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-tarpaulin
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-tarpaulin
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev pkg-config
+
+      - name: Run coverage for native-tokio
+        run: |
+          cargo tarpaulin \
+            --package oo7 \
+            --lib \
+            --features "tracing,tokio" \
+            --ignore-panics \
+            --out Lcov \
+            --output-dir coverage-raw \
+            --lcov-output-path coverage-raw/native-tokio.lcov \
+            -- --skip dbus
+
+      - name: Run coverage for openssl-async-std
+        run: |
+          cargo tarpaulin \
+            --package oo7 \
+            --lib \
+            --features "tracing,async-std,openssl" \
+            --ignore-panics \
+            --out Lcov \
+            --output-dir coverage-raw \
+            --lcov-output-path coverage-raw/openssl-async-std.lcov \
+            -- --skip dbus
+
+      - name: Install grcov for merging coverage
+        uses: taiki-e/install-action@v2
+        with:
+          tool: grcov
+
+      - name: Merge coverage and generate HTML report
+        run: |
+          mkdir -p site/coverage
+
+          # Merge LCOV files
+          cat coverage-raw/*.lcov > coverage-raw/combined.lcov
+
+          # Generate HTML report with grcov
+          grcov coverage-raw/combined.lcov \
+            --binary-path target/debug/ \
+            --source-dir . \
+            --output-type html \
+            --output-path site/coverage \
+            --branch \
+            --ignore-not-existing \
+            --ignore "**/tests/*" \
+            --ignore "**/examples/*" \
+            --ignore "**/target/*"
+
+      - name: Setup Pages
+        if: github.ref == 'refs/heads/main'
+        uses: actions/configure-pages@v4
+
+      - name: Upload to GitHub Pages
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: site/coverage/
+          retention-days: 30
+
+  deploy:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: coverage
+    if: github.ref == 'refs/heads/main'
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}coverage/
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
