@@ -16,7 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@nightly-2025-01-15
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: nightly-2025-09-01
       - env:
           RUSTFLAGS: --cfg docsrs
           RUSTDOCFLAGS: --cfg docsrs
