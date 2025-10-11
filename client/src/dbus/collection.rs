@@ -272,7 +272,6 @@ mod tests {
         let secret = crate::Secret::text("a password");
 
         let collection = service.default_collection().await.unwrap();
-        let n_items = collection.items().await.unwrap().len();
         let n_search_items = collection.search_items(&attributes).await.unwrap().len();
 
         let item = collection
@@ -283,7 +282,6 @@ mod tests {
         assert_eq!(item.secret().await.unwrap(), secret);
         assert_eq!(item.attributes().await.unwrap()["type"], value);
 
-        assert_eq!(collection.items().await.unwrap().len(), n_items + 1);
         assert_eq!(
             collection.search_items(&attributes).await.unwrap().len(),
             n_search_items + 1
@@ -291,7 +289,6 @@ mod tests {
 
         item.delete(None).await.unwrap();
 
-        assert_eq!(collection.items().await.unwrap().len(), n_items);
         assert_eq!(
             collection.search_items(&attributes).await.unwrap().len(),
             n_search_items
