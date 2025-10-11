@@ -91,6 +91,7 @@ jobs:
           path: ./site/
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ steps.find-runs.outputs.docs-run-id }}
+        continue-on-error: true
 
       - name: Download coverage artifact
         if: steps.find-runs.outputs.has-coverage == 'true'
@@ -100,6 +101,7 @@ jobs:
           path: ./site/coverage/
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ steps.find-runs.outputs.coverage-run-id }}
+        continue-on-error: true
 
       - name: Upload combined site
         uses: actions/upload-pages-artifact@v4
