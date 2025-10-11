@@ -255,7 +255,7 @@ impl<'a> Collection<'a> {
 }
 
 #[cfg(test)]
-#[cfg(all(feature = "tokio", feature = "local_tests"))]
+#[cfg(feature = "tokio")]
 mod tests {
     use std::collections::HashMap;
 

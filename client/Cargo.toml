@@ -57,10 +57,7 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 
 [features]
-default = ["local_tests", "tokio", "native_crypto"]
-# Some tests requires a prompt to be displayed, which can't be easily
-# handled in CI unless we write a mock service. The feature allows to disabling those tests in CI
-local_tests = []
+default = ["tokio", "native_crypto"]
 # Enables unstable low-level API
 unstable = []
 async-std = [

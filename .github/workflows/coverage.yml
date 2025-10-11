@@ -60,7 +60,7 @@ jobs:
             --package oo7 \
             --lib \
             --no-default-features \
-            --features "tracing,tokio,native_crypto,local_tests" \
+            --features "tracing,tokio,native_crypto" \
             --ignore-panics \
             --out Lcov \
             --output-dir coverage-raw
@@ -72,7 +72,7 @@ jobs:
             --package oo7 \
             --lib \
             --no-default-features \
-            --features "tracing,async-std,openssl_crypto,local_tests" \
+            --features "tracing,async-std,openssl_crypto" \
             --ignore-panics \
             --out Lcov \
             --output-dir coverage-raw
