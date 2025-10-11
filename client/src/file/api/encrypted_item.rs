@@ -17,7 +17,7 @@ impl EncryptedItem {
         self.hashed_attributes.get(key) == Some(value_mac)
     }
 
-    pub fn decrypt(self, key: &Key) -> Result<Item, Error> {
+    fn try_decrypt_inner(&self, key: &Key) -> Result<Item, Error> {
         let n = self.blob.len();
         let n_mac = crypto::mac_len();
         let n_iv = crypto::iv_len();
@@ -40,6 +40,14 @@ impl EncryptedItem {
         Self::validate(&self.hashed_attributes, &item, key)?;
 
         Ok(item)
+    }
+
+    pub fn is_valid(&self, key: &Key) -> bool {
+        self.try_decrypt_inner(key).is_ok()
+    }
+
+    pub fn decrypt(self, key: &Key) -> Result<Item, Error> {
+        self.try_decrypt_inner(key)
     }
 
     fn validate(

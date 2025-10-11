@@ -175,7 +175,7 @@ impl Keyring {
             let mut broken_items = 0;
             let mut valid_items = 0;
             for encrypted_item in &keyring.items {
-                if encrypted_item.clone().decrypt(&key).is_err() {
+                if !encrypted_item.is_valid(&key) {
                     broken_items += 1;
                 } else {
                     valid_items += 1;
@@ -646,7 +646,7 @@ impl Keyring {
         let _span = tracing::debug_span!("identify_broken", total_items = keyring.items.len());
 
         for (index, encrypted_item) in keyring.items.iter().enumerate() {
-            if let Err(_err) = encrypted_item.clone().decrypt(&key) {
+            if !encrypted_item.is_valid(&key) {
                 broken_items.push(index);
             }
         }
