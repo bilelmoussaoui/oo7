@@ -27,19 +27,9 @@ jobs:
           chmod -c -R +rX "target/doc/" | while read line; do
             echo "::warning title=Invalid file permissions automatically fixed::$line"
           done
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v4
+      - name: Upload docs artifact
+        uses: actions/upload-artifact@v4
         with:
+          name: docs-reports
           path: ./target/doc/
-
-  deploy:
-    needs: build
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          retention-days: 30

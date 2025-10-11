@@ -1,0 +1,111 @@
+name: Deploy to GitHub Pages
+
+on:
+  workflow_run:
+    workflows: ["docs", "Code Coverage"]
+    types:
+      - completed
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy Combined Site
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Find latest successful workflow runs
+        id: find-runs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Find latest successful docs run
+            const { data: runs } = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'docs.yml',
+              status: 'completed',
+              conclusion: 'success',
+              branch: 'main',
+              per_page: 1
+            });
+            const docsRun = runs.workflow_runs[0];
+
+            // Find latest successful coverage run
+            const { data: coverageRuns } = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'coverage.yml',
+              status: 'completed',
+              conclusion: 'success',
+              branch: 'main',
+              per_page: 1
+            });
+            const coverageRun = coverageRuns.workflow_runs[0];
+
+            if (!docsRun && !coverageRun) {
+              core.setFailed('No successful runs found for either workflow');
+              return;
+            }
+
+            if (docsRun) {
+              core.setOutput('docs-run-id', docsRun.id);
+              core.setOutput('has-docs', 'true');
+              console.log(`Found docs run: ${docsRun.id}`);
+            } else {
+              core.setOutput('has-docs', 'false');
+              console.log('No successful docs run found, skipping docs');
+            }
+
+            if (coverageRun) {
+              core.setOutput('coverage-run-id', coverageRun.id);
+              core.setOutput('has-coverage', 'true');
+              console.log(`Found coverage run: ${coverageRun.id}`);
+            } else {
+              core.setOutput('has-coverage', 'false');
+              console.log('No successful coverage run found, skipping coverage');
+            }
+
+      - name: Download docs artifact
+        if: steps.find-runs.outputs.has-docs == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: docs-reports
+          path: ./site/
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ steps.find-runs.outputs.docs-run-id }}
+
+      - name: Download coverage artifact
+        if: steps.find-runs.outputs.has-coverage == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-reports
+          path: ./site/coverage/
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ steps.find-runs.outputs.coverage-run-id }}
+
+      - name: Upload combined site
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./site/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
