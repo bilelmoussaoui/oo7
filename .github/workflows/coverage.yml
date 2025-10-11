@@ -64,7 +64,7 @@ jobs:
             --ignore-panics \
             --out Lcov \
             --output-dir coverage-raw
-          mv coverage-raw/lcov.info coverage-raw/native-tokio.lcov
+          mv coverage-raw/lcov.info coverage-raw/native-tokio.info
 
       - name: Run coverage for openssl-async-std
         run: |
@@ -76,7 +76,7 @@ jobs:
             --ignore-panics \
             --out Lcov \
             --output-dir coverage-raw
-          mv coverage-raw/lcov.info coverage-raw/openssl-async-std.lcov
+          mv coverage-raw/lcov.info coverage-raw/openssl-async-std.info
 
       - name: Install grcov for merging coverage
         uses: taiki-e/install-action@v2
@@ -88,10 +88,10 @@ jobs:
           mkdir -p site/coverage
 
           # Merge LCOV files
-          cat coverage-raw/*.lcov > coverage-raw/combined.lcov
+          cat coverage-raw/*.info > coverage-raw/combined.info
 
           # Generate HTML report with grcov
-          grcov coverage-raw/combined.lcov \
+          grcov coverage-raw/combined.info \
             --binary-path target/debug/ \
             --source-dir . \
             --output-type html \
