@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use serde::{Deserialize, Serialize};
 use zbus::zvariant::Type;
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -26,9 +28,21 @@ impl AsRef<str> for AttributeValue {
     }
 }
 
-impl std::ops::Deref for AttributeValue {
+impl Deref for AttributeValue {
     type Target = str;
     fn deref(&self) -> &Self::Target {
         self.0.as_str()
+    }
+}
+
+impl PartialEq<str> for AttributeValue {
+    fn eq(&self, other: &str) -> bool {
+        self.deref() == other
+    }
+}
+
+impl PartialEq<&str> for AttributeValue {
+    fn eq(&self, other: &&str) -> bool {
+        self.deref() == *other
     }
 }
