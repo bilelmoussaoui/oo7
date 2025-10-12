@@ -37,7 +37,7 @@ pub struct Service {
     // Properties
     collections: Arc<Mutex<Vec<Collection>>>,
     // Other attributes
-    connection: OnceLock<zbus::Connection>,
+    connection: Arc<OnceLock<zbus::Connection>>,
     // sessions mapped to their corresponding object path on the bus
     sessions: Arc<Mutex<HashMap<OwnedObjectPath, Session>>>,
     session_index: Arc<RwLock<u32>>,
@@ -305,21 +305,19 @@ impl Service {
             prompt_index: Default::default(),
         };
 
-        let connection_builder = zbus::connection::Builder::session()?
+        let connection = zbus::connection::Builder::session()?
             .allow_name_replacements(true)
             .replace_existing_names(request_replacement)
             .name(oo7::dbus::api::Service::DESTINATION.as_deref().unwrap())?
             .serve_at(
                 oo7::dbus::api::Service::PATH.as_deref().unwrap(),
                 service.clone(),
-            )?;
+            )?
+            .build()
+            .await?;
+        service.connection.set(connection.clone()).unwrap();
 
-        service
-            .connection
-            .set(connection_builder.build().await?)
-            .unwrap();
-
-        let object_server = service.object_server();
+        let object_server = connection.object_server();
         let mut collections = service.collections.lock().await;
 
         if let Some(secret) = secret {
