@@ -784,6 +784,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn migrate_from_legacy() -> Result<(), Error> {
         let data_dir = tempdir()?;
         let v0_dir = data_dir.path().join("keyrings");
@@ -813,6 +814,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn migrate() -> Result<(), Error> {
         let data_dir = tempdir()?;
         let v0_dir = data_dir.path().join("keyrings");
@@ -842,6 +844,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn open_wrong_password() -> Result<(), Error> {
         let data_dir = tempdir()?;
         let v0_dir = data_dir.path().join("keyrings");
@@ -872,6 +875,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn open() -> Result<(), Error> {
         let data_dir = tempdir()?;
         let v0_dir = data_dir.path().join("keyrings");
@@ -901,6 +905,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn open_nonexistent() -> Result<(), Error> {
         let data_dir = tempdir()?;
         let v0_dir = data_dir.path().join("keyrings");
