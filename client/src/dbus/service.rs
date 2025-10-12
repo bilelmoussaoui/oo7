@@ -133,7 +133,7 @@ impl<'a> Service<'a> {
     ) -> Result<Collection<'a>, Error> {
         match self.with_alias(alias).await {
             Ok(Some(collection)) => Ok(collection),
-            Ok(None) => self.create_collection(label, alias, window_id).await,
+            Ok(None) => self.create_collection(label, Some(alias), window_id).await,
             Err(err) => Err(err),
         }
     }
@@ -164,7 +164,7 @@ impl<'a> Service<'a> {
     pub async fn create_collection(
         &self,
         label: &str,
-        alias: &str,
+        alias: Option<&str>,
         window_id: Option<WindowIdentifier>,
     ) -> Result<Collection<'a>, Error> {
         self.inner
@@ -231,11 +231,11 @@ mod tests {
     use super::Service;
 
     #[tokio::test]
-    #[ignore = "gnome-keyring doesn't support creating custom collections in CI"]
+    #[ignore = "Requires prompting"]
     async fn create_collection() {
         let service = Service::new().await.unwrap();
         let collection = service
-            .create_collection("somelabel", "Some Label", None)
+            .create_collection("somelabel", None, None)
             .await
             .unwrap();
 
