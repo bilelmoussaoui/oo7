@@ -200,7 +200,7 @@ mod tests {
     use crate::dbus::Service;
 
     #[tokio::test]
-    async fn test_item_label_mutation() {
+    async fn label_mutation() {
         let service = Service::plain().await.unwrap();
         let collection = service.default_collection().await.unwrap();
 
@@ -224,7 +224,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_item_secret_mutation() {
+    async fn secret_mutation() {
         let service = Service::plain().await.unwrap();
         let collection = service.default_collection().await.unwrap();
 
@@ -253,7 +253,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_item_attributes_mutation() {
+    async fn attributes_mutation() {
         let service = Service::plain().await.unwrap();
         let collection = service.default_collection().await.unwrap();
 
@@ -289,7 +289,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_text_secret_type() {
+    async fn text_secret_type() {
         let service = Service::plain().await.unwrap();
         let collection = service.default_collection().await.unwrap();
 
@@ -311,7 +311,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_blob_secret_type() {
+    async fn blob_secret_type() {
         let service = Service::plain().await.unwrap();
         let collection = service.default_collection().await.unwrap();
 
@@ -337,7 +337,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_item_timestamps() {
+    async fn timestamps() {
         let service = Service::plain().await.unwrap();
         let collection = service.default_collection().await.unwrap();
 

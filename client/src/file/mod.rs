@@ -1101,7 +1101,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_comprehensive_search_patterns() -> Result<(), Error> {
+    async fn comprehensive_search_patterns() -> Result<(), Error> {
         let temp_dir = tempdir().unwrap();
         let keyring_path = temp_dir.path().join("search_test.keyring");
         let keyring = Keyring::load(&keyring_path, strong_key()).await?;
@@ -1187,7 +1187,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_item_replacement_behavior() -> Result<(), Error> {
+    async fn item_replacement_behavior() -> Result<(), Error> {
         let temp_dir = tempdir().unwrap();
         let keyring_path = temp_dir.path().join("replace_test.keyring");
         let keyring = Keyring::load(&keyring_path, strong_key()).await?;
@@ -1255,7 +1255,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_empty_keyring_operations() -> Result<(), Error> {
+    async fn empty_keyring_operations() -> Result<(), Error> {
         let temp_dir = tempdir().unwrap();
         let keyring_path = temp_dir.path().join("empty_test.keyring");
         let keyring = Keyring::load(&keyring_path, strong_key()).await?;
@@ -1287,7 +1287,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_secret_types_handling() -> Result<(), Error> {
+    async fn secret_types_handling() -> Result<(), Error> {
         let temp_dir = tempdir().unwrap();
         let keyring_path = temp_dir.path().join("secret_types_test.keyring");
         let keyring = Keyring::load(&keyring_path, strong_key()).await?;
@@ -1370,7 +1370,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_item_lifecycle_operations() -> Result<(), Error> {
+    async fn item_lifecycle_operations() -> Result<(), Error> {
         let temp_dir = tempdir().unwrap();
         let keyring_path = temp_dir.path().join("lifecycle_test.keyring");
         let keyring = Keyring::load(&keyring_path, strong_key()).await?;
@@ -1424,7 +1424,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_item_attribute_operations() -> Result<(), Error> {
+    async fn item_attribute_operations() -> Result<(), Error> {
         let temp_dir = tempdir().unwrap();
         let keyring_path = temp_dir.path().join("attr_test.keyring");
         let keyring = Keyring::load(&keyring_path, strong_key()).await?;
