@@ -19,27 +19,71 @@ use crate::{
 // This would fail to serialize till <https://gitlab.gnome.org/GNOME/gcr/-/merge_requests/169>
 // is resolved.
 struct Properties {
-    #[serde(with = "as_value::optional", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        with = "as_value::optional",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     title: Option<String>,
-    #[serde(with = "as_value::optional", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        with = "as_value::optional",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     message: Option<String>,
-    #[serde(with = "as_value::optional", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        with = "as_value::optional",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     description: Option<String>,
-    #[serde(with = "as_value::optional", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        with = "as_value::optional",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     warning: Option<String>,
-    #[serde(with = "as_value::optional", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        with = "as_value::optional",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     password_new: Option<bool>,
-    #[serde(with = "as_value::optional", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        with = "as_value::optional",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     password_strength: Option<u32>,
-    #[serde(with = "as_value::optional", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        with = "as_value::optional",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     choice_label: Option<String>,
-    #[serde(with = "as_value::optional", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        with = "as_value::optional",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     choice_chosen: Option<bool>,
-    #[serde(with = "as_value::optional", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        with = "as_value::optional",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     caller_window: Option<WindowIdentifierType>,
-    #[serde(with = "as_value::optional", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        with = "as_value::optional",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     continue_label: Option<String>,
-    #[serde(with = "as_value::optional", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        with = "as_value::optional",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     cancel_label: Option<String>,
 }
 
