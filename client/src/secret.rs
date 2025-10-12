@@ -181,6 +181,8 @@ impl AsRef<[u8]> for Secret {
 
 #[cfg(test)]
 mod tests {
+    use zvariant::{serialized::Context, to_bytes, Endian};
+
     use super::*;
 
     #[test]
@@ -190,5 +192,93 @@ mod tests {
 
         assert_eq!(format!("{:?}", text_secret), "Secret::Text([REDACTED])");
         assert_eq!(format!("{:?}", blob_secret), "Secret::Blob([REDACTED])");
+    }
+
+    #[test]
+    fn content_type_serialization() {
+        let ctxt = Context::new_dbus(Endian::Little, 0);
+
+        // Test Text serialization
+        let encoded = to_bytes(ctxt, &ContentType::Text).unwrap();
+        let value: String = encoded.deserialize().unwrap().0;
+        assert_eq!(value, "text/plain");
+
+        // Test Blob serialization
+        let encoded = to_bytes(ctxt, &ContentType::Blob).unwrap();
+        let value: String = encoded.deserialize().unwrap().0;
+        assert_eq!(value, "application/octet-stream");
+
+        // Test Text deserialization
+        let encoded = to_bytes(ctxt, &"text/plain").unwrap();
+        let content_type: ContentType = encoded.deserialize().unwrap().0;
+        assert_eq!(content_type, ContentType::Text);
+
+        // Test Blob deserialization
+        let encoded = to_bytes(ctxt, &"application/octet-stream").unwrap();
+        let content_type: ContentType = encoded.deserialize().unwrap().0;
+        assert_eq!(content_type, ContentType::Blob);
+
+        // Test invalid content type deserialization
+        let encoded = to_bytes(ctxt, &"invalid/type").unwrap();
+        let result: Result<(ContentType, _), _> = encoded.deserialize();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid content type"));
+    }
+
+    #[test]
+    fn content_type_from_str() {
+        assert_eq!(ContentType::from_str("text/plain").unwrap(), ContentType::Text);
+        assert_eq!(
+            ContentType::from_str("application/octet-stream").unwrap(),
+            ContentType::Blob
+        );
+
+        // Test error case
+        let result = ContentType::from_str("invalid");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid content type"));
+    }
+
+    #[test]
+    fn invalid_utf8() {
+        // Test with invalid UTF-8 bytes
+        let invalid_utf8 = vec![0xFF, 0xFE, 0xFD];
+
+        // Should fall back to blob when UTF-8 decoding fails
+        let secret = Secret::with_content_type(ContentType::Text, &invalid_utf8);
+        assert_eq!(secret.content_type(), ContentType::Blob);
+        assert_eq!(&*secret, &[0xFF, 0xFE, 0xFD]);
+
+        // Test with valid UTF-8
+        let valid_utf8 = "Hello, World!";
+        let secret = Secret::with_content_type(ContentType::Text, valid_utf8.as_bytes());
+        assert_eq!(secret.content_type(), ContentType::Text);
+        assert_eq!(&*secret, valid_utf8.as_bytes());
+
+        // Test with blob content type
+        let data = vec![1, 2, 3, 4];
+        let secret = Secret::with_content_type(ContentType::Blob, &data);
+        assert_eq!(secret.content_type(), ContentType::Blob);
+        assert_eq!(&*secret, &[1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn random() {
+        let secret1 = Secret::random().unwrap();
+        let secret2 = Secret::random().unwrap();
+
+        // Random secrets should be blobs
+        assert_eq!(secret1.content_type(), ContentType::Blob);
+        assert_eq!(secret2.content_type(), ContentType::Blob);
+
+        // Should be 64 bytes
+        assert_eq!(secret1.as_bytes().len(), 64);
+        assert_eq!(secret2.as_bytes().len(), 64);
+
+        // Should be different
+        assert_ne!(secret1.as_bytes(), secret2.as_bytes());
     }
 }
