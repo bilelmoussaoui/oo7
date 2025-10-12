@@ -136,6 +136,19 @@ jobs:
           mkdir -p coverage-baseline
           echo "$CURRENT_COVERAGE" > coverage-baseline/main-coverage.txt
 
+          # Generate coverage badge
+          COVERAGE_INT=$(echo "$CURRENT_COVERAGE" | cut -d. -f1)
+          if [ "$COVERAGE_INT" -ge 80 ]; then
+            COLOR="brightgreen"
+          elif [ "$COVERAGE_INT" -ge 60 ]; then
+            COLOR="yellow"
+          else
+            COLOR="red"
+          fi
+
+          # Create badge SVG using shields.io format
+          curl -s "https://img.shields.io/badge/coverage-${CURRENT_COVERAGE}%25-${COLOR}" > site/coverage/badge.svg
+
       - name: Upload baseline coverage
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: actions/upload-artifact@v4
