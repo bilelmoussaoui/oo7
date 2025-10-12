@@ -229,6 +229,7 @@ jobs:
             }
 
       - name: Upload coverage artifacts
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
           name: coverage-reports
