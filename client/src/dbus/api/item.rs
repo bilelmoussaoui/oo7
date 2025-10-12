@@ -37,6 +37,7 @@ impl<'a> Item<'a> {
     {
         zbus::proxy::Builder::new(connection)
             .path(object_path)?
+            .uncached_properties(&["Label", "Attributes", "Modified"])
             .build()
             .await
             .map_err(From::from)
