@@ -110,6 +110,9 @@ mod tests {
     fn serialize_label() {
         let properties = Properties::for_collection("some_label");
 
+        assert!(properties.attributes().is_none());
+        assert_eq!(properties.label(), "some_label");
+
         let ctxt = Context::new_dbus(Endian::Little, 0);
         let encoded = to_bytes(ctxt, &properties).unwrap();
         let decoded: HashMap<&str, Value<'_>> = encoded.deserialize().unwrap().0;
@@ -128,6 +131,9 @@ mod tests {
         attributes.insert("some", "attribute");
         let properties = Properties::for_item("some_label", &attributes);
 
+        assert!(properties.attributes().is_some());
+        assert_eq!(properties.label(), "some_label");
+
         let ctxt = Context::new_dbus(Endian::Little, 0);
         let encoded = to_bytes(ctxt, &properties).unwrap();
         let decoded: HashMap<&str, Value<'_>> = encoded.deserialize().unwrap().0;
@@ -144,5 +150,47 @@ mod tests {
     #[test]
     fn signature() {
         assert_eq!(Properties::SIGNATURE, "a{sv}");
+    }
+
+    #[test]
+    fn deserialize_collection_properties() {
+        // Create serialized data that represents collection properties
+        let mut map = HashMap::new();
+        map.insert(COLLECTION_PROPERTY_LABEL, Value::from("test_collection"));
+
+        let ctxt = Context::new_dbus(Endian::Little, 0);
+        let encoded = to_bytes(ctxt, &map).unwrap();
+
+        // Deserialize through the Properties Deserialize trait
+        let properties: Properties = encoded.deserialize().unwrap().0;
+
+        assert_eq!(properties.label(), "test_collection");
+        assert!(properties.attributes().is_none());
+    }
+
+    #[test]
+    fn deserialize_item_properties() {
+        use zvariant::Dict;
+
+        // Create serialized data that represents item properties
+        let mut attrs_dict = Dict::new(String::SIGNATURE, String::SIGNATURE);
+        attrs_dict.add("key1", "value1").unwrap();
+        attrs_dict.add("key2", "value2").unwrap();
+
+        let mut map = HashMap::new();
+        map.insert(ITEM_PROPERTY_LABEL, Value::from("test_item"));
+        map.insert(ITEM_PROPERTY_ATTRIBUTES, Value::from(attrs_dict));
+
+        let ctxt = Context::new_dbus(Endian::Little, 0);
+        let encoded = to_bytes(ctxt, &map).unwrap();
+
+        // Deserialize through the Properties Deserialize trait
+        let properties: Properties = encoded.deserialize().unwrap().0;
+
+        assert_eq!(properties.label(), "test_item");
+        let attributes = properties.attributes().unwrap();
+        assert_eq!(attributes.get("key1"), Some(&"value1".to_string()));
+        assert_eq!(attributes.get("key2"), Some(&"value2".to_string()));
+        assert_eq!(attributes.len(), 2);
     }
 }
