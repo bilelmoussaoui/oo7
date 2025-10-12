@@ -1099,4 +1099,392 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_comprehensive_search_patterns() -> Result<(), Error> {
+        let temp_dir = tempdir().unwrap();
+        let keyring_path = temp_dir.path().join("search_test.keyring");
+        let keyring = Keyring::load(&keyring_path, strong_key()).await?;
+
+        // Create diverse test data
+        let test_items = vec![
+            (
+                "Email Password",
+                vec![
+                    ("app", "email"),
+                    ("user", "alice@example.com"),
+                    ("type", "password"),
+                ],
+            ),
+            (
+                "Email Token",
+                vec![
+                    ("app", "email"),
+                    ("user", "alice@example.com"),
+                    ("type", "token"),
+                ],
+            ),
+            (
+                "SSH Key",
+                vec![("app", "ssh"), ("user", "alice"), ("type", "key")],
+            ),
+            (
+                "Database Password",
+                vec![
+                    ("app", "database"),
+                    ("env", "production"),
+                    ("type", "password"),
+                ],
+            ),
+            (
+                "API Key",
+                vec![("app", "api"), ("service", "github"), ("type", "key")],
+            ),
+        ];
+
+        for (i, (label, attrs)) in test_items.iter().enumerate() {
+            let attrs_map: HashMap<&str, &str> = attrs.iter().cloned().collect();
+            keyring
+                .create_item(label, &attrs_map, format!("secret{}", i), false)
+                .await?;
+        }
+
+        // Test exact match
+        let exact = keyring
+            .search_items(&HashMap::from([
+                ("app", "email"),
+                ("user", "alice@example.com"),
+                ("type", "password"),
+            ]))
+            .await?;
+        assert_eq!(exact.len(), 1);
+        assert_eq!(exact[0].label(), "Email Password");
+
+        // Test partial match - by app
+        let email_items = keyring
+            .search_items(&HashMap::from([("app", "email")]))
+            .await?;
+        assert_eq!(email_items.len(), 2);
+
+        // Test partial match - by type
+        let passwords = keyring
+            .search_items(&HashMap::from([("type", "password")]))
+            .await?;
+        assert_eq!(passwords.len(), 2);
+
+        let keys = keyring
+            .search_items(&HashMap::from([("type", "key")]))
+            .await?;
+        assert_eq!(keys.len(), 2);
+
+        // Test no match
+        let nonexistent = keyring
+            .search_items(&HashMap::from([("app", "nonexistent")]))
+            .await?;
+        assert_eq!(nonexistent.len(), 0);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_item_replacement_behavior() -> Result<(), Error> {
+        let temp_dir = tempdir().unwrap();
+        let keyring_path = temp_dir.path().join("replace_test.keyring");
+        let keyring = Keyring::load(&keyring_path, strong_key()).await?;
+
+        let attrs = HashMap::from([("app", "test"), ("user", "alice")]);
+
+        // Create initial item
+        keyring
+            .create_item("Original", &attrs, "secret1", false)
+            .await?;
+
+        // Verify initial state
+        let items = keyring.search_items(&attrs).await?;
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].label(), "Original");
+        assert_eq!(items[0].secret(), Secret::text("secret1"));
+
+        // With replace=false, allows duplicates (discovered behavior)
+        keyring
+            .create_item("Duplicate", &attrs, "secret2", false)
+            .await?;
+
+        // Verify we now have 2 items with same attributes
+        let items = keyring.search_items(&attrs).await?;
+        assert_eq!(items.len(), 2);
+
+        // Verify both items exist with different content
+        let labels: Vec<_> = items.iter().map(|i| i.label()).collect();
+        assert!(labels.contains(&"Original"));
+        assert!(labels.contains(&"Duplicate"));
+
+        // Now test replace=true behavior - should remove existing items with same
+        // attributes
+        keyring
+            .create_item("Replacement", &attrs, "secret3", true)
+            .await?;
+
+        // After replace=true, should only have the new item
+        let items = keyring.search_items(&attrs).await?;
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].label(), "Replacement");
+        assert_eq!(items[0].secret(), Secret::text("secret3"));
+
+        // Test replace=true on empty attributes (should just add)
+        let unique_attrs = HashMap::from([("app", "unique"), ("user", "bob")]);
+        keyring
+            .create_item("Unique Item", &unique_attrs, "unique_secret", true)
+            .await?;
+
+        let unique_items = keyring.search_items(&unique_attrs).await?;
+        assert_eq!(unique_items.len(), 1);
+        assert_eq!(unique_items[0].label(), "Unique Item");
+
+        // Test replace=true again on the unique item - should replace it
+        keyring
+            .create_item("Updated Unique", &unique_attrs, "updated_secret", true)
+            .await?;
+
+        let unique_items = keyring.search_items(&unique_attrs).await?;
+        assert_eq!(unique_items.len(), 1);
+        assert_eq!(unique_items[0].label(), "Updated Unique");
+        assert_eq!(unique_items[0].secret(), Secret::text("updated_secret"));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_empty_keyring_operations() -> Result<(), Error> {
+        let temp_dir = tempdir().unwrap();
+        let keyring_path = temp_dir.path().join("empty_test.keyring");
+        let keyring = Keyring::load(&keyring_path, strong_key()).await?;
+
+        // Test operations on empty keyring
+        let items = keyring.items().await?;
+        assert_eq!(items.len(), 0);
+
+        let search_results = keyring
+            .search_items(&HashMap::from([("any", "thing")]))
+            .await?;
+        assert_eq!(search_results.len(), 0);
+
+        // Delete on empty keyring should succeed
+        keyring
+            .delete(&HashMap::from([("nonexistent", "key")]))
+            .await?;
+
+        // Verify still empty after delete
+        assert_eq!(keyring.n_items().await, 0);
+
+        // Test lookup on empty keyring
+        let lookup_result = keyring
+            .lookup_item(&HashMap::from([("test", "value")]))
+            .await?;
+        assert!(lookup_result.is_none());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_secret_types_handling() -> Result<(), Error> {
+        let temp_dir = tempdir().unwrap();
+        let keyring_path = temp_dir.path().join("secret_types_test.keyring");
+        let keyring = Keyring::load(&keyring_path, strong_key()).await?;
+
+        // Test text secret
+        keyring
+            .create_item(
+                "Text Secret",
+                &HashMap::from([("type", "text")]),
+                Secret::text("Hello, World!"),
+                false,
+            )
+            .await?;
+
+        // Test binary secret
+        keyring
+            .create_item(
+                "Binary Secret",
+                &HashMap::from([("type", "binary")]),
+                Secret::blob(&[0x00, 0x01, 0x02, 0xFF]),
+                false,
+            )
+            .await?;
+
+        // Test large secret
+        let large_data = vec![42u8; 10000];
+        keyring
+            .create_item(
+                "Large Secret",
+                &HashMap::from([("type", "large")]),
+                Secret::blob(&large_data),
+                false,
+            )
+            .await?;
+
+        // Test empty secret
+        keyring
+            .create_item(
+                "Empty Secret",
+                &HashMap::from([("type", "empty")]),
+                Secret::text(""),
+                false,
+            )
+            .await?;
+
+        // Verify all secrets can be retrieved correctly
+        let text_items = keyring
+            .search_items(&HashMap::from([("type", "text")]))
+            .await?;
+        assert_eq!(text_items.len(), 1);
+        assert_eq!(text_items[0].secret(), Secret::text("Hello, World!"));
+        assert_eq!(
+            text_items[0].secret().content_type(),
+            crate::secret::ContentType::Text
+        );
+
+        let binary_items = keyring
+            .search_items(&HashMap::from([("type", "binary")]))
+            .await?;
+        assert_eq!(binary_items.len(), 1);
+        assert_eq!(&*binary_items[0].secret(), &[0x00, 0x01, 0x02, 0xFF]);
+        assert_eq!(
+            binary_items[0].secret().content_type(),
+            crate::secret::ContentType::Blob
+        );
+
+        let large_items = keyring
+            .search_items(&HashMap::from([("type", "large")]))
+            .await?;
+        assert_eq!(large_items.len(), 1);
+        assert_eq!(&*large_items[0].secret(), &large_data);
+
+        let empty_items = keyring
+            .search_items(&HashMap::from([("type", "empty")]))
+            .await?;
+        assert_eq!(empty_items.len(), 1);
+        assert_eq!(empty_items[0].secret(), Secret::text(""));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_item_lifecycle_operations() -> Result<(), Error> {
+        let temp_dir = tempdir().unwrap();
+        let keyring_path = temp_dir.path().join("lifecycle_test.keyring");
+        let keyring = Keyring::load(&keyring_path, strong_key()).await?;
+
+        // Test creating multiple items
+        keyring
+            .create_item(
+                "Test Item 1",
+                &HashMap::from([("app", "myapp"), ("user", "alice")]),
+                "secret1",
+                false,
+            )
+            .await?;
+
+        keyring
+            .create_item(
+                "Test Item 2",
+                &HashMap::from([("app", "myapp"), ("user", "bob")]),
+                "secret2",
+                false,
+            )
+            .await?;
+
+        // Test retrieving all items
+        let items = keyring.items().await?;
+        let valid_items: Vec<_> = items.into_iter().map(|r| r.unwrap()).collect();
+        assert_eq!(valid_items.len(), 2);
+
+        // Test searching by user
+        let alice_items = keyring
+            .search_items(&HashMap::from([("user", "alice")]))
+            .await?;
+        assert_eq!(alice_items.len(), 1);
+        assert_eq!(alice_items[0].label(), "Test Item 1");
+        assert_eq!(alice_items[0].secret(), Secret::text("secret1"));
+
+        // Test searching by app (should find both)
+        let app_items = keyring
+            .search_items(&HashMap::from([("app", "myapp")]))
+            .await?;
+        assert_eq!(app_items.len(), 2);
+
+        // Test deleting items
+        keyring.delete(&HashMap::from([("user", "alice")])).await?;
+        let remaining_items = keyring.items().await?;
+        let valid_remaining: Vec<_> = remaining_items.into_iter().map(|r| r.unwrap()).collect();
+        assert_eq!(valid_remaining.len(), 1);
+        assert_eq!(valid_remaining[0].label(), "Test Item 2");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_item_attribute_operations() -> Result<(), Error> {
+        let temp_dir = tempdir().unwrap();
+        let keyring_path = temp_dir.path().join("attr_test.keyring");
+        let keyring = Keyring::load(&keyring_path, strong_key()).await?;
+
+        // Create item with initial attributes
+        keyring
+            .create_item(
+                "Attribute Test",
+                &HashMap::from([("app", "testapp"), ("version", "1.0"), ("env", "test")]),
+                "test-secret",
+                false,
+            )
+            .await?;
+
+        let items = keyring
+            .search_items(&HashMap::from([("app", "testapp")]))
+            .await?;
+        assert_eq!(items.len(), 1);
+        let item = &items[0];
+
+        // Test reading attributes
+        let attrs = item.attributes();
+        assert_eq!(attrs.len(), 4); // 3 + xdg:schema
+        assert_eq!(attrs.get("app").unwrap().to_string(), "testapp");
+        assert_eq!(attrs.get("version").unwrap().to_string(), "1.0");
+        assert_eq!(attrs.get("env").unwrap().to_string(), "test");
+
+        // Test updating attributes - need to get item from keyring after update
+        let index = keyring
+            .lookup_item_index(&HashMap::from([("app", "testapp")]))
+            .await?
+            .unwrap();
+        keyring
+            .replace_item_index(
+                index,
+                &crate::file::Item::new(
+                    "Attribute Test",
+                    &HashMap::from([
+                        ("app", "testapp"),
+                        ("version", "2.0"),        // updated
+                        ("env", "production"),     // updated
+                        ("new_attr", "new_value"), // added
+                    ]),
+                    item.secret(),
+                ),
+            )
+            .await?;
+
+        let updated_items = keyring
+            .search_items(&HashMap::from([("app", "testapp")]))
+            .await?;
+        assert_eq!(updated_items.len(), 1);
+        let updated_attrs = updated_items[0].attributes();
+        assert_eq!(updated_attrs.get("version").unwrap().to_string(), "2.0");
+        assert_eq!(updated_attrs.get("env").unwrap().to_string(), "production");
+        assert_eq!(
+            updated_attrs.get("new_attr").unwrap().to_string(),
+            "new_value"
+        );
+
+        Ok(())
+    }
 }
