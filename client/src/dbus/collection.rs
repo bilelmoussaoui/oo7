@@ -306,4 +306,50 @@ mod tests {
         let service = Service::encrypted().await.unwrap();
         create_item(service, true).await;
     }
+
+    #[tokio::test]
+    async fn test_attribute_search_patterns() {
+        let service = Service::plain().await.unwrap();
+        let collection = service.default_collection().await.unwrap();
+
+        let secret = crate::Secret::text("search test");
+
+        // Create items with different attributes
+        let attrs1 = HashMap::from([("service", "email"), ("username", "user1")]);
+        let item1 = collection
+            .create_item("Email 1", &attrs1, secret.clone(), true, None)
+            .await
+            .unwrap();
+
+        let attrs2 = HashMap::from([("service", "email"), ("username", "user2")]);
+        let item2 = collection
+            .create_item("Email 2", &attrs2, secret.clone(), true, None)
+            .await
+            .unwrap();
+
+        let attrs3 = HashMap::from([("service", "web"), ("username", "user1")]);
+        let item3 = collection
+            .create_item("Web", &attrs3, secret.clone(), true, None)
+            .await
+            .unwrap();
+
+        // Search by service
+        let search_email = HashMap::from([("service", "email")]);
+        let email_items = collection.search_items(&search_email).await.unwrap();
+        assert!(email_items.len() >= 2);
+
+        // Search by username
+        let search_user1 = HashMap::from([("username", "user1")]);
+        let user1_items = collection.search_items(&search_user1).await.unwrap();
+        assert!(user1_items.len() >= 2);
+
+        // Search by both attributes
+        let search_specific = HashMap::from([("service", "email"), ("username", "user1")]);
+        let specific_items = collection.search_items(&search_specific).await.unwrap();
+        assert!(specific_items.len() >= 1);
+
+        item1.delete(None).await.unwrap();
+        item2.delete(None).await.unwrap();
+        item3.delete(None).await.unwrap();
+    }
 }
