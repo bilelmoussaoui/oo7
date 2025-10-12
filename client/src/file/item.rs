@@ -196,7 +196,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_item_set_label() {
+    async fn set_label() {
         let attributes = std::collections::HashMap::from([("service", "test-service")]);
         let mut item = Item::new("Original Label", &attributes, Secret::text("secret"));
 
@@ -212,7 +212,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_item_set_secret_text() {
+    async fn set_secret_text() {
         let attributes = std::collections::HashMap::from([("service", "test-service")]);
         let mut item = Item::new("Test Item", &attributes, Secret::text("original"));
 
@@ -228,7 +228,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_item_set_secret_blob() {
+    async fn set_secret_blob() {
         let attributes = std::collections::HashMap::from([("type", "binary")]);
         let mut item = Item::new("Binary Item", &attributes, Secret::blob(b"binary data"));
 
@@ -243,7 +243,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_item_created_timestamp() {
+    async fn created_timestamp() {
         let attributes = std::collections::HashMap::from([("test", "timestamp")]);
         let item = Item::new("Timestamp Test", &attributes, Secret::text("data"));
 
@@ -255,7 +255,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_item_modified_timestamp_updates() {
+    async fn modified_timestamp_updates() {
         let attributes = std::collections::HashMap::from([("test", "modification")]);
         let mut item = Item::new("Modification Test", &attributes, Secret::text("data"));
 
@@ -279,7 +279,7 @@ mod tests {
     }
 
     #[test]
-    fn test_file_item_serialization() {
+    fn serialization() {
         let key = Key::new(vec![
             204, 53, 139, 40, 55, 167, 183, 240, 191, 252, 186, 174, 28, 36, 229, 26,
         ]);

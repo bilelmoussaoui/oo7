@@ -308,7 +308,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_attribute_search_patterns() {
+    async fn attribute_search_patterns() {
         let service = Service::plain().await.unwrap();
         let collection = service.default_collection().await.unwrap();
 
@@ -363,7 +363,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_collection_items() {
+    async fn items() {
         let service = Service::plain().await.unwrap();
         let collection = service.default_collection().await.unwrap();
 
