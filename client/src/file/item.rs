@@ -195,6 +195,89 @@ impl TryFrom<&[u8]> for Item {
 mod tests {
     use super::*;
 
+    #[tokio::test]
+    async fn test_item_set_label() {
+        let attributes = std::collections::HashMap::from([("service", "test-service")]);
+        let mut item = Item::new("Original Label", &attributes, Secret::text("secret"));
+
+        let original_modified = item.modified();
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        item.set_label("New Label");
+
+        assert_eq!(item.label(), "New Label");
+        assert!(item.modified() > original_modified);
+        assert_eq!(item.secret().as_bytes(), b"secret");
+        assert_eq!(item.attributes().get("service").unwrap(), "test-service");
+    }
+
+    #[tokio::test]
+    async fn test_item_set_secret_text() {
+        let attributes = std::collections::HashMap::from([("service", "test-service")]);
+        let mut item = Item::new("Test Item", &attributes, Secret::text("original"));
+
+        let original_modified = item.modified();
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        item.set_secret(Secret::text("new secret"));
+
+        assert_eq!(item.secret().as_bytes(), b"new secret");
+        assert!(item.modified() > original_modified);
+        assert_eq!(item.label(), "Test Item");
+        assert_eq!(item.attributes().get("service").unwrap(), "test-service");
+    }
+
+    #[tokio::test]
+    async fn test_item_set_secret_blob() {
+        let attributes = std::collections::HashMap::from([("type", "binary")]);
+        let mut item = Item::new("Binary Item", &attributes, Secret::blob(b"binary data"));
+
+        let original_modified = item.modified();
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        item.set_secret(Secret::blob(b"new binary data"));
+
+        assert_eq!(item.secret().as_bytes(), b"new binary data");
+        assert!(item.modified() > original_modified);
+        assert_eq!(item.label(), "Binary Item");
+    }
+
+    #[tokio::test]
+    async fn test_item_created_timestamp() {
+        let attributes = std::collections::HashMap::from([("test", "timestamp")]);
+        let item = Item::new("Timestamp Test", &attributes, Secret::text("data"));
+
+        let created_time = item.created();
+        assert!(created_time.as_secs() > 0);
+
+        let modified_time = item.modified();
+        assert_eq!(created_time, modified_time);
+    }
+
+    #[tokio::test]
+    async fn test_item_modified_timestamp_updates() {
+        let attributes = std::collections::HashMap::from([("test", "modification")]);
+        let mut item = Item::new("Modification Test", &attributes, Secret::text("data"));
+
+        let original_created = item.created();
+        let original_modified = item.modified();
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        item.set_label("Updated Label");
+
+        assert_eq!(item.created(), original_created);
+        assert!(item.modified() > original_modified);
+
+        let mid_modified = item.modified();
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        item.set_secret(Secret::text("updated secret"));
+
+        assert_eq!(item.created(), original_created);
+        assert!(item.modified() > mid_modified);
+    }
+
     #[test]
     fn test_file_item_serialization() {
         let key = Key::new(vec![
