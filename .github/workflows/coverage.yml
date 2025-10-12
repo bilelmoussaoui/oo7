@@ -132,15 +132,14 @@ jobs:
       - name: Store coverage percentage for main branch
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: |
-          # Run tarpaulin with stdout output to get coverage percentage
+          # Run tarpaulin and extract coverage percentage from the summary line
           CURRENT_COVERAGE=$(cargo tarpaulin \
             --package oo7 \
             --lib \
             --no-default-features \
             --features "tracing,tokio,native_crypto" \
             --ignore-panics \
-            --skip-clean \
-            --print-summary | grep -o '[0-9]\+\.[0-9]\+%' | head -1 | sed 's/%//' || echo "0.00")
+            --skip-clean 2>&1 | grep "% coverage" | grep -o '[0-9]\+\.[0-9]\+' | head -1 || echo "0.00")
 
           echo "Main branch coverage: $CURRENT_COVERAGE%"
 
