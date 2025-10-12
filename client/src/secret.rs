@@ -181,7 +181,7 @@ impl AsRef<[u8]> for Secret {
 
 #[cfg(test)]
 mod tests {
-    use zvariant::{serialized::Context, to_bytes, Endian};
+    use zvariant::{Endian, serialized::Context, to_bytes};
 
     use super::*;
 
@@ -222,15 +222,20 @@ mod tests {
         let encoded = to_bytes(ctxt, &"invalid/type").unwrap();
         let result: Result<(ContentType, _), _> = encoded.deserialize();
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Invalid content type"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Invalid content type")
+        );
     }
 
     #[test]
     fn content_type_from_str() {
-        assert_eq!(ContentType::from_str("text/plain").unwrap(), ContentType::Text);
+        assert_eq!(
+            ContentType::from_str("text/plain").unwrap(),
+            ContentType::Text
+        );
         assert_eq!(
             ContentType::from_str("application/octet-stream").unwrap(),
             ContentType::Blob

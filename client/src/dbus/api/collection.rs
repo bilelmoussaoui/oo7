@@ -41,7 +41,7 @@ impl<'a> Collection<'a> {
     {
         zbus::proxy::Builder::new(connection)
             .path(object_path)?
-            .uncached_properties(&["Label", "Modified", "Items"])
+            .uncached_properties(&["Label", "Modified", "Items", "Locked"])
             .build()
             .await
             .map_err(From::from)
