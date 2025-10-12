@@ -82,28 +82,17 @@ jobs:
       - name: Generate coverage summary for PR comparison
         if: github.event_name == 'pull_request'
         run: |
-          # Merge LCOV files for summary
-          cat coverage-raw/*.info > coverage-raw/pr-combined.info
-
-          # Generate JSON summary for comparison
-          cargo tarpaulin \
+          # Extract PR coverage percentage using the same method as main branch
+          PR_COVERAGE=$(cargo tarpaulin \
             --package oo7 \
             --lib \
             --no-default-features \
             --features "tracing,tokio,native_crypto" \
             --ignore-panics \
-            --out Json \
-            --output-dir coverage-raw \
-            --skip-clean
+            --skip-clean 2>&1 | grep "% coverage" | grep -o '[0-9]\+\.[0-9]\+' | head -1 || echo "0.00")
 
-          # Extract coverage percentage
-          python3 -c "
-          import json
-          with open('coverage-raw/tarpaulin-report.json', 'r') as f:
-              data = json.load(f)
-              coverage = data['files']['']  # This might need adjustment based on actual structure
-              print(f'PR_COVERAGE={coverage:.2f}')
-          " >> $GITHUB_ENV || echo "PR_COVERAGE=0.00" >> $GITHUB_ENV
+          echo "PR_COVERAGE=$PR_COVERAGE" >> $GITHUB_ENV
+          echo "PR coverage: $PR_COVERAGE%"
 
       - name: Install grcov for merging coverage
         uses: taiki-e/install-action@v2
@@ -157,10 +146,50 @@ jobs:
 
       - name: Get main branch coverage for comparison
         if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Find the latest successful coverage run on main that has the baseline artifact
+            const { data: runs } = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'coverage.yml',
+              status: 'completed',
+              conclusion: 'success',
+              branch: 'main',
+              per_page: 10
+            });
+
+            for (const run of runs.workflow_runs) {
+              try {
+                const { data: artifacts } = await github.rest.actions.listWorkflowRunArtifacts({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  run_id: run.id
+                });
+
+                const baselineArtifact = artifacts.artifacts.find(a => a.name === 'coverage-baseline');
+                if (baselineArtifact) {
+                  core.exportVariable('BASELINE_RUN_ID', run.id.toString());
+                  console.log(`Found baseline artifact in run ${run.id}`);
+                  return;
+                }
+              } catch (error) {
+                console.log(`Error checking run ${run.id}: ${error.message}`);
+              }
+            }
+
+            console.log('No baseline artifact found in recent main branch runs');
+            core.exportVariable('BASELINE_RUN_ID', '');
+
+      - name: Download baseline artifact
+        if: github.event_name == 'pull_request' && env.BASELINE_RUN_ID != ''
         uses: actions/download-artifact@v4
         with:
           name: coverage-baseline
           path: coverage-baseline/
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ env.BASELINE_RUN_ID }}
         continue-on-error: true
 
       - name: Set main coverage for comparison
