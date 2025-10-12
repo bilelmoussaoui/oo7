@@ -191,3 +191,144 @@ impl<'a> Item<'a> {
         self.inner.inner().path()
     }
 }
+
+#[cfg(test)]
+#[cfg(feature = "tokio")]
+mod tests {
+    use std::collections::HashMap;
+
+    use crate::dbus::Service;
+
+    #[tokio::test]
+    async fn test_item_label_mutation() {
+        let service = Service::plain().await.unwrap();
+        let collection = service.default_collection().await.unwrap();
+
+        let attributes = HashMap::from([("test", "label-mutation")]);
+        let secret = crate::Secret::text("test secret");
+
+        let item = collection
+            .create_item("Original Label", &attributes, secret, true, None)
+            .await
+            .unwrap();
+
+        let initial_label = item.label().await.unwrap();
+        assert_eq!(initial_label, "Original Label");
+
+        item.set_label("Updated Label").await.unwrap();
+
+        let updated_label = item.label().await.unwrap();
+        assert_eq!(updated_label, "Updated Label");
+
+        item.delete(None).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_item_secret_mutation() {
+        let service = Service::plain().await.unwrap();
+        let collection = service.default_collection().await.unwrap();
+
+        let attributes = HashMap::from([("test", "secret-mutation")]);
+        let original_secret = crate::Secret::text("original secret");
+
+        let item = collection
+            .create_item(
+                "Secret Test",
+                &attributes,
+                original_secret.clone(),
+                true,
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(item.secret().await.unwrap(), original_secret);
+
+        let new_secret = crate::Secret::text("updated secret");
+        item.set_secret(new_secret.clone()).await.unwrap();
+
+        assert_eq!(item.secret().await.unwrap(), new_secret);
+
+        item.delete(None).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_text_secret_type() {
+        let service = Service::plain().await.unwrap();
+        let collection = service.default_collection().await.unwrap();
+
+        let text_attributes = HashMap::from([("type", "text-secret")]);
+        let text_secret = crate::Secret::text("text password");
+        let text_item = collection
+            .create_item(
+                "Text Secret",
+                &text_attributes,
+                text_secret.clone(),
+                true,
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(text_item.secret().await.unwrap(), text_secret);
+        text_item.delete(None).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_blob_secret_type() {
+        let service = Service::plain().await.unwrap();
+        let collection = service.default_collection().await.unwrap();
+
+        let blob_attributes = HashMap::from([("type", "blob-secret")]);
+        let blob_secret = crate::Secret::blob(b"binary data");
+        let blob_item = collection
+            .create_item(
+                "Blob Secret",
+                &blob_attributes,
+                blob_secret.clone(),
+                true,
+                None,
+            )
+            .await
+            .unwrap();
+
+        let retrieved_secret = blob_item.secret().await.unwrap();
+
+        // TODO: gnome-keyring doesn't preserve content types - everything becomes
+        // text/plain But the actual secret data should be preserved
+        assert_eq!(retrieved_secret.as_bytes(), blob_secret.as_bytes());
+        blob_item.delete(None).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_item_timestamps() {
+        let service = Service::plain().await.unwrap();
+        let collection = service.default_collection().await.unwrap();
+
+        let attributes = HashMap::from([("test", "timestamps")]);
+        let secret = crate::Secret::text("timestamp test");
+
+        let item = collection
+            .create_item("Timestamp Test", &attributes, secret, true, None)
+            .await
+            .unwrap();
+
+        let created = item.created().await.unwrap();
+        let modified = item.modified().await.unwrap();
+
+        eprintln!("Created: {:?}, Modified: {:?}", created, modified);
+        assert_eq!(created, modified);
+
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        item.set_label("Updated Label").await.unwrap();
+
+        // Allow time for D-Bus changes to propagate
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        let new_modified = item.modified().await.unwrap();
+        assert!(new_modified > modified);
+        assert_eq!(item.created().await.unwrap(), created);
+
+        item.delete(None).await.unwrap();
+    }
+}
