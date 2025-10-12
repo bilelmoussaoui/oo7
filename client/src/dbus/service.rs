@@ -252,4 +252,12 @@ mod tests {
         let found_collection = service.with_label("somelabel").await.unwrap();
         assert!(found_collection.is_none());
     }
+
+    #[tokio::test]
+    async fn default_collections() {
+        let service = Service::new().await.unwrap();
+
+        assert!(service.default_collection().await.is_ok());
+        assert!(service.session_collection().await.is_ok());
+    }
 }
