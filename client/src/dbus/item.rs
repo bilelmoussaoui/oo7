@@ -253,6 +253,42 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_item_attributes_mutation() {
+        let service = Service::plain().await.unwrap();
+        let collection = service.default_collection().await.unwrap();
+
+        let original_attributes = HashMap::from([("service", "email"), ("username", "user1")]);
+        let secret = crate::Secret::text("test secret");
+
+        let item = collection
+            .create_item("Attributes Test", &original_attributes, secret, true, None)
+            .await
+            .unwrap();
+
+        let retrieved_attrs = item.attributes().await.unwrap();
+        assert_eq!(retrieved_attrs.get("service"), Some(&"email".to_string()));
+        assert_eq!(retrieved_attrs.get("username"), Some(&"user1".to_string()));
+
+        let new_attributes = HashMap::from([
+            ("service", "web"),
+            ("username", "user2"),
+            ("domain", "example.com"),
+        ]);
+        item.set_attributes(&new_attributes).await.unwrap();
+
+        let updated_attrs = item.attributes().await.unwrap();
+        assert_eq!(updated_attrs.get("service"), Some(&"web".to_string()));
+        assert_eq!(updated_attrs.get("username"), Some(&"user2".to_string()));
+        assert_eq!(
+            updated_attrs.get("domain"),
+            Some(&"example.com".to_string())
+        );
+        assert!(!updated_attrs.contains_key("email")); // old attribute should be gone
+
+        item.delete(None).await.unwrap();
+    }
+
+    #[tokio::test]
     async fn test_text_secret_type() {
         let service = Service::plain().await.unwrap();
         let collection = service.default_collection().await.unwrap();
