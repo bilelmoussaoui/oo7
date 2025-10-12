@@ -151,15 +151,19 @@ impl<'a> Item<'a> {
     /// * `secret` - The secret to store.
     #[doc(alias = "SetSecret")]
     pub async fn set_secret(&self, secret: impl Into<Secret>) -> Result<(), Error> {
-        let secret = match self.algorithm {
-            Algorithm::Plain => api::DBusSecret::new(Arc::clone(&self.session), secret),
-            Algorithm::Encrypted => {
-                let aes_key = self.aes_key.as_ref().unwrap();
-                api::DBusSecret::new_encrypted(Arc::clone(&self.session), secret, aes_key)?
-            }
-        };
-        self.inner.set_secret(&secret).await?;
-        Ok(())
+        if !self.is_available().await {
+            Err(Error::Deleted)
+        } else {
+            let secret = match self.algorithm {
+                Algorithm::Plain => api::DBusSecret::new(Arc::clone(&self.session), secret),
+                Algorithm::Encrypted => {
+                    let aes_key = self.aes_key.as_ref().unwrap();
+                    api::DBusSecret::new_encrypted(Arc::clone(&self.session), secret, aes_key)?
+                }
+            };
+            self.inner.set_secret(&secret).await?;
+            Ok(())
+        }
     }
 
     /// Unlock the item.
@@ -366,5 +370,57 @@ mod tests {
         assert_eq!(item.created().await.unwrap(), created);
 
         item.delete(None).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn deleted_error() {
+        let service = Service::plain().await.unwrap();
+        let collection = service.default_collection().await.unwrap();
+
+        let attributes = HashMap::from([("test", "deleted-error")]);
+        let secret = crate::Secret::text("delete test");
+
+        let item = collection
+            .create_item("Delete Test", &attributes, secret, true, None)
+            .await
+            .unwrap();
+
+        // Verify item works before deletion
+        assert!(item.label().await.is_ok());
+
+        // Delete the item
+        item.delete(None).await.unwrap();
+
+        // All operations should now return Error::Deleted
+        assert!(matches!(item.label().await, Err(super::Error::Deleted)));
+        assert!(matches!(
+            item.set_label("New").await,
+            Err(super::Error::Deleted)
+        ));
+        assert!(matches!(item.secret().await, Err(super::Error::Deleted)));
+        assert!(matches!(
+            item.set_secret("new secret").await,
+            Err(super::Error::Deleted)
+        ));
+        assert!(matches!(
+            item.attributes().await,
+            Err(super::Error::Deleted)
+        ));
+        assert!(matches!(
+            item.set_attributes(&attributes).await,
+            Err(super::Error::Deleted)
+        ));
+        assert!(matches!(item.created().await, Err(super::Error::Deleted)));
+        assert!(matches!(item.modified().await, Err(super::Error::Deleted)));
+        assert!(matches!(item.is_locked().await, Err(super::Error::Deleted)));
+        assert!(matches!(item.lock(None).await, Err(super::Error::Deleted)));
+        assert!(matches!(
+            item.unlock(None).await,
+            Err(super::Error::Deleted)
+        ));
+        assert!(matches!(
+            item.delete(None).await,
+            Err(super::Error::Deleted)
+        ));
     }
 }
