@@ -314,42 +314,84 @@ mod tests {
 
         let secret = crate::Secret::text("search test");
 
-        // Create items with different attributes
-        let attrs1 = HashMap::from([("service", "email"), ("username", "user1")]);
+        // Create items with unique test attributes
+        let attrs1 = HashMap::from([("test-pattern", "pattern-test-a"), ("category", "group1")]);
         let item1 = collection
-            .create_item("Email 1", &attrs1, secret.clone(), true, None)
+            .create_item("Pattern Test 1", &attrs1, secret.clone(), true, None)
             .await
             .unwrap();
 
-        let attrs2 = HashMap::from([("service", "email"), ("username", "user2")]);
+        let attrs2 = HashMap::from([("test-pattern", "pattern-test-a"), ("category", "group2")]);
         let item2 = collection
-            .create_item("Email 2", &attrs2, secret.clone(), true, None)
+            .create_item("Pattern Test 2", &attrs2, secret.clone(), true, None)
             .await
             .unwrap();
 
-        let attrs3 = HashMap::from([("service", "web"), ("username", "user1")]);
+        let attrs3 = HashMap::from([("test-pattern", "pattern-test-b"), ("category", "group1")]);
         let item3 = collection
-            .create_item("Web", &attrs3, secret.clone(), true, None)
+            .create_item("Pattern Test 3", &attrs3, secret.clone(), true, None)
             .await
             .unwrap();
 
-        // Search by service
-        let search_email = HashMap::from([("service", "email")]);
-        let email_items = collection.search_items(&search_email).await.unwrap();
-        assert!(email_items.len() >= 2);
+        // Search by test-pattern - should find items with pattern-test-a
+        let search_pattern_a = HashMap::from([("test-pattern", "pattern-test-a")]);
+        let pattern_a_items = collection.search_items(&search_pattern_a).await.unwrap();
+        let found_paths: std::collections::HashSet<_> =
+            pattern_a_items.iter().map(|item| item.path()).collect();
+        assert!(found_paths.contains(item1.path()));
+        assert!(found_paths.contains(item2.path()));
 
-        // Search by username
-        let search_user1 = HashMap::from([("username", "user1")]);
-        let user1_items = collection.search_items(&search_user1).await.unwrap();
-        assert!(user1_items.len() >= 2);
+        // Search by category - should find items in group1
+        let search_group1 = HashMap::from([("category", "group1")]);
+        let group1_items = collection.search_items(&search_group1).await.unwrap();
+        let found_group1_paths: std::collections::HashSet<_> =
+            group1_items.iter().map(|item| item.path()).collect();
+        assert!(found_group1_paths.contains(item1.path()));
+        assert!(found_group1_paths.contains(item3.path()));
 
-        // Search by both attributes
-        let search_specific = HashMap::from([("service", "email"), ("username", "user1")]);
+        // Search by both attributes - should find only item1
+        let search_specific =
+            HashMap::from([("test-pattern", "pattern-test-a"), ("category", "group1")]);
         let specific_items = collection.search_items(&search_specific).await.unwrap();
-        assert!(specific_items.len() >= 1);
+        let found_specific_paths: std::collections::HashSet<_> =
+            specific_items.iter().map(|item| item.path()).collect();
+        assert!(found_specific_paths.contains(item1.path()));
 
         item1.delete(None).await.unwrap();
         item2.delete(None).await.unwrap();
         item3.delete(None).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_collection_items() {
+        let service = Service::plain().await.unwrap();
+        let collection = service.default_collection().await.unwrap();
+
+        let secret = crate::Secret::text("items test");
+
+        // Create some test items with unique attributes
+        let attrs1 = HashMap::from([("test", "items-test-1"), ("unique", "test-1")]);
+        let item1 = collection
+            .create_item("Test Item 1", &attrs1, secret.clone(), true, None)
+            .await
+            .unwrap();
+
+        let attrs2 = HashMap::from([("test", "items-test-2"), ("unique", "test-2")]);
+        let item2 = collection
+            .create_item("Test Item 2", &attrs2, secret.clone(), true, None)
+            .await
+            .unwrap();
+
+        // Get all items and verify our items are included by path
+        let all_items = collection.items().await.unwrap();
+        let item_paths: std::collections::HashSet<_> =
+            all_items.iter().map(|item| item.path()).collect();
+
+        assert!(item_paths.contains(item1.path()));
+        assert!(item_paths.contains(item2.path()));
+
+        // Clean up
+        item1.delete(None).await.unwrap();
+        item2.delete(None).await.unwrap();
     }
 }
