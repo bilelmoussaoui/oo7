@@ -40,3 +40,58 @@ impl<'de> Deserialize<'de> for Algorithm {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use zvariant::{Endian, serialized::Context, to_bytes};
+
+    use super::*;
+
+    #[test]
+    fn serialization() {
+        let ctxt = Context::new_dbus(Endian::Little, 0);
+
+        // Test serializing Plain
+        let encoded = to_bytes(ctxt, &Algorithm::Plain).unwrap();
+        let value: String = encoded.deserialize().unwrap().0;
+        assert_eq!(value, "plain");
+
+        // Test serializing Encrypted
+        let encoded = to_bytes(ctxt, &Algorithm::Encrypted).unwrap();
+        let value: String = encoded.deserialize().unwrap().0;
+        assert_eq!(value, "dh-ietf1024-sha256-aes128-cbc-pkcs7");
+
+        // Test deserializing plain
+        let encoded = to_bytes(ctxt, &PLAIN_ALGORITHM).unwrap();
+        let algo: Algorithm = encoded.deserialize().unwrap().0;
+        assert_eq!(algo, Algorithm::Plain);
+
+        // Test deserializing encrypted
+        let encoded = to_bytes(ctxt, &ENCRYPTED_ALGORITHM).unwrap();
+        let algo: Algorithm = encoded.deserialize().unwrap().0;
+        assert_eq!(algo, Algorithm::Encrypted);
+
+        // Test deserializing invalid algorithm
+        let encoded = to_bytes(ctxt, &"invalid-algorithm").unwrap();
+        let result: Result<(Algorithm, _), _> = encoded.deserialize();
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Invalid algorithm")
+        );
+
+        // Test roundtrip for Plain
+        let original = Algorithm::Plain;
+        let encoded = to_bytes(ctxt, &original).unwrap();
+        let decoded: Algorithm = encoded.deserialize().unwrap().0;
+        assert_eq!(original, decoded);
+
+        // Test roundtrip for Encrypted
+        let original = Algorithm::Encrypted;
+        let encoded = to_bytes(ctxt, &original).unwrap();
+        let decoded: Algorithm = encoded.deserialize().unwrap().0;
+        assert_eq!(original, decoded);
+    }
+}
