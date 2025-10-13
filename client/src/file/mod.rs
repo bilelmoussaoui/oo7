@@ -506,6 +506,7 @@ impl Keyring {
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, items), fields(item_count = items.len())))]
     pub(crate) async fn create_items(&self, items: Vec<ItemDefinition>) -> Result<(), Error> {
         let key = self.derive_key().await?;
+        let mut mtime = self.mtime.lock().await;
         let mut keyring = self.keyring.write().await;
 
         #[cfg(feature = "tracing")]
@@ -523,7 +524,11 @@ impl Keyring {
         #[cfg(feature = "tracing")]
         tracing::debug!("Writing keyring back to the file");
         if let Some(ref path) = self.path {
-            keyring.dump(path, *self.mtime.lock().await).await?;
+            keyring.dump(path, *mtime).await?;
+            // Update mtime after successful write
+            if let Ok(modified) = fs::metadata(path).await?.modified() {
+                *mtime = Some(modified);
+            }
         }
         Ok(())
     }
@@ -1490,6 +1495,72 @@ mod tests {
             "new_value"
         );
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn bulk_create_items() -> Result<(), Error> {
+        let temp_dir = tempdir().unwrap();
+        let keyring_path = temp_dir.path().join("bulk_create_test.keyring");
+        let keyring = Keyring::load(&keyring_path, strong_key()).await?;
+
+        // Prepare multiple items to create at once
+        let items_to_create = vec![
+            (
+                "Bulk Item 1".to_string(),
+                HashMap::from([
+                    ("app".to_string(), "bulk-app".to_string()),
+                    ("user".to_string(), "user1".to_string()),
+                ]),
+                Secret::text("secret1"),
+                false,
+            ),
+            (
+                "Bulk Item 2".to_string(),
+                HashMap::from([
+                    ("app".to_string(), "bulk-app".to_string()),
+                    ("user".to_string(), "user2".to_string()),
+                ]),
+                Secret::text("secret2"),
+                false,
+            ),
+            (
+                "Bulk Item 3".to_string(),
+                HashMap::from([
+                    ("app".to_string(), "bulk-app".to_string()),
+                    ("user".to_string(), "user3".to_string()),
+                ]),
+                Secret::text("secret3"),
+                false,
+            ),
+        ];
+
+        // Create all items in bulk
+        keyring.create_items(items_to_create).await?;
+        // Verify all items were created
+        let all_items = keyring
+            .search_items(&HashMap::from([("app", "bulk-app")]))
+            .await?;
+        assert_eq!(all_items.len(), 3);
+
+        // Test replace=true in bulk create
+        let replace_items = vec![(
+            "Replaced Item".to_string(),
+            HashMap::from([
+                ("app".to_string(), "bulk-app".to_string()),
+                ("user".to_string(), "user1".to_string()),
+            ]),
+            Secret::text("new_secret1"),
+            true, // replace=true should remove existing item with same attributes
+        )];
+
+        keyring.create_items(replace_items).await?;
+
+        // Verify the item was replaced - should still have 3 items total
+        let all_items_after = keyring
+            .search_items(&HashMap::from([("app", "bulk-app")]))
+            .await?;
+        assert_eq!(all_items_after.len(), 3);
         Ok(())
     }
 }
