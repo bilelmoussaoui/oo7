@@ -31,7 +31,7 @@ use crate::Key;
 pub struct Service<'a> {
     inner: Arc<api::Service<'a>>,
     aes_key: Option<Arc<Key>>,
-    session: Arc<api::Session<'a>>,
+    session: Arc<api::Session<'static>>,
     algorithm: Algorithm,
 }
 
@@ -225,6 +225,27 @@ impl<'a> Service<'a> {
     }
 }
 
+impl Drop for Service<'_> {
+    fn drop(&mut self) {
+        let session = Arc::clone(&self.session);
+        #[cfg(feature = "tokio")]
+        {
+            let _ = tokio::spawn(async move {
+                let _ = session.close().await;
+            });
+        }
+        #[cfg(feature = "async-std")]
+        {
+            blocking::unblock(move || {
+                futures_lite::future::block_on(async move {
+                    let _ = session.close().await;
+                })
+            })
+            .detach();
+        }
+    }
+}
+
 #[cfg(test)]
 #[cfg(feature = "tokio")]
 mod tests {
@@ -265,15 +286,11 @@ mod tests {
     async fn encrypted_session() {
         let service = Service::encrypted().await.unwrap();
         assert!(service.default_collection().await.is_ok());
-
-        service.session.close().await.unwrap();
     }
 
     #[tokio::test]
     async fn plain_session() {
         let service = Service::plain().await.unwrap();
         assert!(service.default_collection().await.is_ok());
-
-        service.session.close().await.unwrap();
     }
 }
