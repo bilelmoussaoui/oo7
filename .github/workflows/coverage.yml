@@ -67,13 +67,13 @@ jobs:
             --output-dir coverage-raw
           mv coverage-raw/lcov.info coverage-raw/native-tokio.info
 
-      - name: Run coverage for openssl-async-std
+      - name: Run coverage for openssl-tokio
         run: |
           cargo tarpaulin \
             --package oo7 \
             --lib \
             --no-default-features \
-            --features "tracing,async-std,openssl_crypto" \
+            --features "tracing,tokio,openssl_crypto" \
             --ignore-panics \
             --out Lcov \
             --output-dir coverage-raw
