@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-echo "🧪 Generating coverage for native_crypto/tokio..."
+echo "🧪 Generating coverage for oo7::native_crypto/tokio..."
 mkdir -p coverage-raw
 cargo tarpaulin \
   --package oo7 \
@@ -14,7 +14,7 @@ cargo tarpaulin \
 mv coverage-raw/lcov.info coverage-raw/native-tokio.info
 
 echo ""
-echo "🧪 Generating coverage for openssl_crypto/tokio..."
+echo "🧪 Generating coverage for oo7::openssl_crypto/tokio..."
 cargo tarpaulin \
   --package oo7 \
   --lib \
@@ -24,6 +24,28 @@ cargo tarpaulin \
   --out Lcov \
   --output-dir coverage-raw
 mv coverage-raw/lcov.info coverage-raw/openssl-tokio.info
+
+echo ""
+echo "🧪 Generating coverage for oo7-daemon::native_crypto..."
+cargo tarpaulin \
+  --package oo7-daemon \
+  --no-default-features \
+  --features "native_crypto" \
+  --ignore-panics \
+  --out Lcov \
+  --output-dir coverage-raw
+mv coverage-raw/lcov.info coverage-raw/daemon-native_crypto.info
+
+echo ""
+echo "🧪 Generating coverage for oo7-daemon::openssl_crypto..."
+cargo tarpaulin \
+  --package oo7-daemon \
+  --no-default-features \
+  --features "openssl_crypto" \
+  --ignore-panics \
+  --out Lcov \
+  --output-dir coverage-raw
+mv coverage-raw/lcov.info coverage-raw/daemon-openssl_crypto.info
 
 echo ""
 echo "📊 Merging coverage reports..."
@@ -40,6 +62,8 @@ grcov coverage-raw/combined.info \
   --output-path coverage/coverage.json \
   --branch \
   --ignore-not-existing \
+  --ignore "**/portal/*" \
+  --ignore "**/cli/*" \
   --ignore "**/tests/*" \
   --ignore "**/examples/*" \
   --ignore "**/target/*"
@@ -52,6 +76,8 @@ grcov coverage-raw/combined.info \
   --output-path coverage \
   --branch \
   --ignore-not-existing \
+  --ignore "**/portal/*" \
+  --ignore "**/cli/*" \
   --ignore "**/tests/*" \
   --ignore "**/examples/*" \
   --ignore "**/target/*"

@@ -37,6 +37,11 @@ jobs:
         with:
           tool: cargo-tarpaulin
 
+      - name: Install grcov for merging coverage
+        uses: taiki-e/install-action@v2
+        with:
+          tool: grcov
+
       - name: Install system dependencies and setup D-Bus
         run: |
           sudo apt-get update
@@ -54,54 +59,15 @@ jobs:
           # Give the service time to start
           sleep 3
 
-      - name: Run coverage for native-tokio
+      - name: Run coverage script
         run: |
-          mkdir -p coverage-raw
-          cargo tarpaulin \
-            --package oo7 \
-            --lib \
-            --no-default-features \
-            --features "tracing,tokio,native_crypto" \
-            --ignore-panics \
-            --out Lcov \
-            --output-dir coverage-raw
-          mv coverage-raw/lcov.info coverage-raw/native-tokio.info
+          chmod +x coverage.sh
+          ./coverage.sh
 
-      - name: Run coverage for openssl-tokio
-        run: |
-          cargo tarpaulin \
-            --package oo7 \
-            --lib \
-            --no-default-features \
-            --features "tracing,tokio,openssl_crypto" \
-            --ignore-panics \
-            --out Lcov \
-            --output-dir coverage-raw
-          mv coverage-raw/lcov.info coverage-raw/openssl-tokio.info
-
-      - name: Install grcov for merging coverage
-        uses: taiki-e/install-action@v2
-        with:
-          tool: grcov
-
-      - name: Merge coverage and generate HTML report
+      - name: Prepare coverage for deployment
         run: |
           mkdir -p site/coverage
-
-          # Merge LCOV files
-          cat coverage-raw/*.info > coverage-raw/combined.info
-
-          # Generate HTML report with grcov
-          grcov coverage-raw/combined.info \
-            --binary-path target/debug/ \
-            --source-dir . \
-            --output-type html \
-            --output-path site/coverage \
-            --branch \
-            --ignore-not-existing \
-            --ignore "**/tests/*" \
-            --ignore "**/examples/*" \
-            --ignore "**/target/*"
+          cp -r coverage/* site/coverage/
 
           # Extract coverage percentage from the generated JSON file
           CURRENT_COVERAGE=$(jq -r '.message' site/coverage/html/coverage.json | sed 's/%//')
