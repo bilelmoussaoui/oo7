@@ -1,29 +1,18 @@
 //! File backend implementation that can be backed by the [Secret portal](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.Secret.html).
 //!
 //! ```no_run
-//! use std::collections::HashMap;
-//!
 //! use oo7::file::Keyring;
 //!
 //! # async fn run() -> oo7::Result<()> {
 //! let keyring = Keyring::load_default().await?;
 //! keyring
-//!     .create_item(
-//!         "My Label",
-//!         &HashMap::from([("account", "alice")]),
-//!         "My Password",
-//!         true,
-//!     )
+//!     .create_item("My Label", &[("account", "alice")], "My Password", true)
 //!     .await?;
 //!
-//! let items = keyring
-//!     .search_items(&HashMap::from([("account", "alice")]))
-//!     .await?;
+//! let items = keyring.search_items(&[("account", "alice")]).await?;
 //! assert_eq!(items[0].secret(), oo7::Secret::blob("My Password"));
 //!
-//! keyring
-//!     .delete(&HashMap::from([("account", "alice")]))
-//!     .await?;
+//! keyring.delete(&[("account", "alice")]).await?;
 //! #   Ok(())
 //! # }
 //! ```
@@ -929,7 +918,7 @@ mod tests {
         keyring
             .create_item(
                 "foo",
-                &HashMap::from([(crate::XDG_SCHEMA_ATTRIBUTE, "org.gnome.keyring.Note")]),
+                &[(crate::XDG_SCHEMA_ATTRIBUTE, "org.gnome.keyring.Note")],
                 "foo",
                 false,
             )
@@ -964,7 +953,7 @@ mod tests {
             keyring
                 .create_item(
                     &format!("valid {}", i),
-                    &HashMap::from([("attr_valid", "value")]),
+                    &[("attr_valid", "value")],
                     format!("password_valid_{}", i),
                     false,
                 )
@@ -980,7 +969,7 @@ mod tests {
             keyring
                 .create_item(
                     &format!("bad{}", i),
-                    &HashMap::from([("attr_bad", "value_bad")]),
+                    &[("attr_bad", "value_bad")],
                     format!("pw_bad{}", i),
                     false,
                 )
@@ -1019,9 +1008,9 @@ mod tests {
         fs::copy(&fixture_path, &keyring_path).await?;
 
         let keyring = Keyring::load(&keyring_path, Secret::blob("test")).await?;
-        let attributes = HashMap::from([("attr", "value")]);
+        let attributes = &[("attr", "value")];
         let item_before = keyring
-            .create_item("test", &attributes, "password", false)
+            .create_item("test", attributes, "password", false)
             .await?;
 
         let secret = Secret::blob("new_secret");
@@ -1029,7 +1018,7 @@ mod tests {
 
         let secret = Secret::blob("new_secret");
         let keyring = Keyring::load(&keyring_path, secret).await?;
-        let item_now = keyring.lookup_item(&attributes).await?.unwrap();
+        let item_now = keyring.lookup_item(attributes).await?.unwrap();
 
         assert_eq!(item_before.label(), item_now.label());
         assert_eq!(item_before.secret(), item_now.secret());
@@ -1053,7 +1042,7 @@ mod tests {
         keyring
             .create_item(
                 "Text",
-                &HashMap::from([("type", "text")]),
+                &[("type", "text")],
                 Secret::text("Hello, World!"),
                 false,
             )
@@ -1062,21 +1051,17 @@ mod tests {
         keyring
             .create_item(
                 "Password",
-                &HashMap::from([("type", "password")]),
+                &[("type", "password")],
                 Secret::blob("super_secret_password"),
                 false,
             )
             .await?;
 
-        let items = keyring
-            .search_items(&HashMap::from([("type", "text")]))
-            .await?;
+        let items = keyring.search_items(&[("type", "text")]).await?;
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].secret().content_type(), ContentType::Text);
 
-        let items = keyring
-            .search_items(&HashMap::from([("type", "password")]))
-            .await?;
+        let items = keyring.search_items(&[("type", "password")]).await?;
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].secret().content_type(), ContentType::Blob);
 
@@ -1093,12 +1078,7 @@ mod tests {
         // Create a keyring with the correct password
         let keyring = Keyring::load(&keyring_path, correct_secret).await?;
         keyring
-            .create_item(
-                "Test Item",
-                &HashMap::from([("app", "test")]),
-                "my-secret",
-                false,
-            )
+            .create_item("Test Item", &[("app", "test")], "my-secret", false)
             .await?;
 
         // Try to load with wrong password
@@ -1161,36 +1141,28 @@ mod tests {
 
         // Test exact match
         let exact = keyring
-            .search_items(&HashMap::from([
+            .search_items(&[
                 ("app", "email"),
                 ("user", "alice@example.com"),
                 ("type", "password"),
-            ]))
+            ])
             .await?;
         assert_eq!(exact.len(), 1);
         assert_eq!(exact[0].label(), "Email Password");
 
         // Test partial match - by app
-        let email_items = keyring
-            .search_items(&HashMap::from([("app", "email")]))
-            .await?;
+        let email_items = keyring.search_items(&[("app", "email")]).await?;
         assert_eq!(email_items.len(), 2);
 
         // Test partial match - by type
-        let passwords = keyring
-            .search_items(&HashMap::from([("type", "password")]))
-            .await?;
+        let passwords = keyring.search_items(&[("type", "password")]).await?;
         assert_eq!(passwords.len(), 2);
 
-        let keys = keyring
-            .search_items(&HashMap::from([("type", "key")]))
-            .await?;
+        let keys = keyring.search_items(&[("type", "key")]).await?;
         assert_eq!(keys.len(), 2);
 
         // Test no match
-        let nonexistent = keyring
-            .search_items(&HashMap::from([("app", "nonexistent")]))
-            .await?;
+        let nonexistent = keyring.search_items(&[("app", "nonexistent")]).await?;
         assert_eq!(nonexistent.len(), 0);
 
         Ok(())
@@ -1202,26 +1174,26 @@ mod tests {
         let keyring_path = temp_dir.path().join("replace_test.keyring");
         let keyring = Keyring::load(&keyring_path, strong_key()).await?;
 
-        let attrs = HashMap::from([("app", "test"), ("user", "alice")]);
+        let attrs = &[("app", "test"), ("user", "alice")];
 
         // Create initial item
         keyring
-            .create_item("Original", &attrs, "secret1", false)
+            .create_item("Original", attrs, "secret1", false)
             .await?;
 
         // Verify initial state
-        let items = keyring.search_items(&attrs).await?;
+        let items = keyring.search_items(attrs).await?;
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].label(), "Original");
         assert_eq!(items[0].secret(), Secret::text("secret1"));
 
         // With replace=false, allows duplicates (discovered behavior)
         keyring
-            .create_item("Duplicate", &attrs, "secret2", false)
+            .create_item("Duplicate", attrs, "secret2", false)
             .await?;
 
         // Verify we now have 2 items with same attributes
-        let items = keyring.search_items(&attrs).await?;
+        let items = keyring.search_items(attrs).await?;
         assert_eq!(items.len(), 2);
 
         // Verify both items exist with different content
@@ -1232,31 +1204,31 @@ mod tests {
         // Now test replace=true behavior - should remove existing items with same
         // attributes
         keyring
-            .create_item("Replacement", &attrs, "secret3", true)
+            .create_item("Replacement", attrs, "secret3", true)
             .await?;
 
         // After replace=true, should only have the new item
-        let items = keyring.search_items(&attrs).await?;
+        let items = keyring.search_items(attrs).await?;
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].label(), "Replacement");
         assert_eq!(items[0].secret(), Secret::text("secret3"));
 
         // Test replace=true on empty attributes (should just add)
-        let unique_attrs = HashMap::from([("app", "unique"), ("user", "bob")]);
+        let unique_attrs = &[("app", "unique"), ("user", "bob")];
         keyring
-            .create_item("Unique Item", &unique_attrs, "unique_secret", true)
+            .create_item("Unique Item", unique_attrs, "unique_secret", true)
             .await?;
 
-        let unique_items = keyring.search_items(&unique_attrs).await?;
+        let unique_items = keyring.search_items(unique_attrs).await?;
         assert_eq!(unique_items.len(), 1);
         assert_eq!(unique_items[0].label(), "Unique Item");
 
         // Test replace=true again on the unique item - should replace it
         keyring
-            .create_item("Updated Unique", &unique_attrs, "updated_secret", true)
+            .create_item("Updated Unique", unique_attrs, "updated_secret", true)
             .await?;
 
-        let unique_items = keyring.search_items(&unique_attrs).await?;
+        let unique_items = keyring.search_items(unique_attrs).await?;
         assert_eq!(unique_items.len(), 1);
         assert_eq!(unique_items[0].label(), "Updated Unique");
         assert_eq!(unique_items[0].secret(), Secret::text("updated_secret"));
@@ -1274,23 +1246,17 @@ mod tests {
         let items = keyring.items().await?;
         assert_eq!(items.len(), 0);
 
-        let search_results = keyring
-            .search_items(&HashMap::from([("any", "thing")]))
-            .await?;
+        let search_results = keyring.search_items(&[("any", "thing")]).await?;
         assert_eq!(search_results.len(), 0);
 
         // Delete on empty keyring should succeed
-        keyring
-            .delete(&HashMap::from([("nonexistent", "key")]))
-            .await?;
+        keyring.delete(&[("nonexistent", "key")]).await?;
 
         // Verify still empty after delete
         assert_eq!(keyring.n_items().await, 0);
 
         // Test lookup on empty keyring
-        let lookup_result = keyring
-            .lookup_item(&HashMap::from([("test", "value")]))
-            .await?;
+        let lookup_result = keyring.lookup_item(&[("test", "value")]).await?;
         assert!(lookup_result.is_none());
 
         Ok(())
@@ -1306,7 +1272,7 @@ mod tests {
         keyring
             .create_item(
                 "Text Secret",
-                &HashMap::from([("type", "text")]),
+                &[("type", "text")],
                 Secret::text("Hello, World!"),
                 false,
             )
@@ -1316,7 +1282,7 @@ mod tests {
         keyring
             .create_item(
                 "Binary Secret",
-                &HashMap::from([("type", "binary")]),
+                &[("type", "binary")],
                 Secret::blob(&[0x00, 0x01, 0x02, 0xFF]),
                 false,
             )
@@ -1327,7 +1293,7 @@ mod tests {
         keyring
             .create_item(
                 "Large Secret",
-                &HashMap::from([("type", "large")]),
+                &[("type", "large")],
                 Secret::blob(&large_data),
                 false,
             )
@@ -1337,16 +1303,14 @@ mod tests {
         keyring
             .create_item(
                 "Empty Secret",
-                &HashMap::from([("type", "empty")]),
+                &[("type", "empty")],
                 Secret::text(""),
                 false,
             )
             .await?;
 
         // Verify all secrets can be retrieved correctly
-        let text_items = keyring
-            .search_items(&HashMap::from([("type", "text")]))
-            .await?;
+        let text_items = keyring.search_items(&[("type", "text")]).await?;
         assert_eq!(text_items.len(), 1);
         assert_eq!(text_items[0].secret(), Secret::text("Hello, World!"));
         assert_eq!(
@@ -1354,9 +1318,7 @@ mod tests {
             crate::secret::ContentType::Text
         );
 
-        let binary_items = keyring
-            .search_items(&HashMap::from([("type", "binary")]))
-            .await?;
+        let binary_items = keyring.search_items(&[("type", "binary")]).await?;
         assert_eq!(binary_items.len(), 1);
         assert_eq!(&*binary_items[0].secret(), &[0x00, 0x01, 0x02, 0xFF]);
         assert_eq!(
@@ -1364,15 +1326,11 @@ mod tests {
             crate::secret::ContentType::Blob
         );
 
-        let large_items = keyring
-            .search_items(&HashMap::from([("type", "large")]))
-            .await?;
+        let large_items = keyring.search_items(&[("type", "large")]).await?;
         assert_eq!(large_items.len(), 1);
         assert_eq!(&*large_items[0].secret(), &large_data);
 
-        let empty_items = keyring
-            .search_items(&HashMap::from([("type", "empty")]))
-            .await?;
+        let empty_items = keyring.search_items(&[("type", "empty")]).await?;
         assert_eq!(empty_items.len(), 1);
         assert_eq!(empty_items[0].secret(), Secret::text(""));
 
@@ -1389,7 +1347,7 @@ mod tests {
         keyring
             .create_item(
                 "Test Item 1",
-                &HashMap::from([("app", "myapp"), ("user", "alice")]),
+                &[("app", "myapp"), ("user", "alice")],
                 "secret1",
                 false,
             )
@@ -1398,7 +1356,7 @@ mod tests {
         keyring
             .create_item(
                 "Test Item 2",
-                &HashMap::from([("app", "myapp"), ("user", "bob")]),
+                &[("app", "myapp"), ("user", "bob")],
                 "secret2",
                 false,
             )
@@ -1410,21 +1368,17 @@ mod tests {
         assert_eq!(valid_items.len(), 2);
 
         // Test searching by user
-        let alice_items = keyring
-            .search_items(&HashMap::from([("user", "alice")]))
-            .await?;
+        let alice_items = keyring.search_items(&[("user", "alice")]).await?;
         assert_eq!(alice_items.len(), 1);
         assert_eq!(alice_items[0].label(), "Test Item 1");
         assert_eq!(alice_items[0].secret(), Secret::text("secret1"));
 
         // Test searching by app (should find both)
-        let app_items = keyring
-            .search_items(&HashMap::from([("app", "myapp")]))
-            .await?;
+        let app_items = keyring.search_items(&[("app", "myapp")]).await?;
         assert_eq!(app_items.len(), 2);
 
         // Test deleting items
-        keyring.delete(&HashMap::from([("user", "alice")])).await?;
+        keyring.delete(&[("user", "alice")]).await?;
         let remaining_items = keyring.items().await?;
         let valid_remaining: Vec<_> = remaining_items.into_iter().map(|r| r.unwrap()).collect();
         assert_eq!(valid_remaining.len(), 1);
@@ -1443,15 +1397,13 @@ mod tests {
         keyring
             .create_item(
                 "Attribute Test",
-                &HashMap::from([("app", "testapp"), ("version", "1.0"), ("env", "test")]),
+                &[("app", "testapp"), ("version", "1.0"), ("env", "test")],
                 "test-secret",
                 false,
             )
             .await?;
 
-        let items = keyring
-            .search_items(&HashMap::from([("app", "testapp")]))
-            .await?;
+        let items = keyring.search_items(&[("app", "testapp")]).await?;
         assert_eq!(items.len(), 1);
         let item = &items[0];
 
@@ -1464,7 +1416,7 @@ mod tests {
 
         // Test updating attributes - need to get item from keyring after update
         let index = keyring
-            .lookup_item_index(&HashMap::from([("app", "testapp")]))
+            .lookup_item_index(&[("app", "testapp")])
             .await?
             .unwrap();
         keyring
@@ -1472,20 +1424,18 @@ mod tests {
                 index,
                 &crate::file::Item::new(
                     "Attribute Test",
-                    &HashMap::from([
+                    &[
                         ("app", "testapp"),
                         ("version", "2.0"),        // updated
                         ("env", "production"),     // updated
                         ("new_attr", "new_value"), // added
-                    ]),
+                    ],
                     item.secret(),
                 ),
             )
             .await?;
 
-        let updated_items = keyring
-            .search_items(&HashMap::from([("app", "testapp")]))
-            .await?;
+        let updated_items = keyring.search_items(&[("app", "testapp")]).await?;
         assert_eq!(updated_items.len(), 1);
         let updated_attrs = updated_items[0].attributes();
         assert_eq!(updated_attrs.get("version").unwrap().to_string(), "2.0");
@@ -1538,9 +1488,7 @@ mod tests {
         // Create all items in bulk
         keyring.create_items(items_to_create).await?;
         // Verify all items were created
-        let all_items = keyring
-            .search_items(&HashMap::from([("app", "bulk-app")]))
-            .await?;
+        let all_items = keyring.search_items(&[("app", "bulk-app")]).await?;
         assert_eq!(all_items.len(), 3);
 
         // Test replace=true in bulk create
@@ -1557,9 +1505,7 @@ mod tests {
         keyring.create_items(replace_items).await?;
 
         // Verify the item was replaced - should still have 3 items total
-        let all_items_after = keyring
-            .search_items(&HashMap::from([("app", "bulk-app")]))
-            .await?;
+        let all_items_after = keyring.search_items(&[("app", "bulk-app")]).await?;
         assert_eq!(all_items_after.len(), 3);
         Ok(())
     }
@@ -1573,20 +1519,10 @@ mod tests {
         let correct_secret = Secret::from("correct-password-long-enough".as_bytes());
         let keyring = Keyring::load(&keyring_path, correct_secret.clone()).await?;
         keyring
-            .create_item(
-                "valid1",
-                &HashMap::from([("attr", "value1")]),
-                "password1",
-                false,
-            )
+            .create_item("valid1", &[("attr", "value1")], "password1", false)
             .await?;
         keyring
-            .create_item(
-                "valid2",
-                &HashMap::from([("attr", "value2")]),
-                "password2",
-                false,
-            )
+            .create_item("valid2", &[("attr", "value2")], "password2", false)
             .await?;
         drop(keyring);
 
@@ -1594,28 +1530,13 @@ mod tests {
         let wrong_secret = Secret::from("wrong-password-long-enough".as_bytes());
         let keyring = unsafe { Keyring::load_unchecked(&keyring_path, wrong_secret).await? };
         keyring
-            .create_item(
-                "broken1",
-                &HashMap::from([("bad", "value1")]),
-                "bad_password1",
-                false,
-            )
+            .create_item("broken1", &[("bad", "value1")], "bad_password1", false)
             .await?;
         keyring
-            .create_item(
-                "broken2",
-                &HashMap::from([("bad", "value2")]),
-                "bad_password2",
-                false,
-            )
+            .create_item("broken2", &[("bad", "value2")], "bad_password2", false)
             .await?;
         keyring
-            .create_item(
-                "broken3",
-                &HashMap::from([("bad", "value3")]),
-                "bad_password3",
-                false,
-            )
+            .create_item("broken3", &[("bad", "value3")], "bad_password3", false)
             .await?;
         drop(keyring);
 
@@ -1645,20 +1566,10 @@ mod tests {
         let correct_secret = Secret::from("correct-password-long-enough".as_bytes());
         let keyring = Keyring::load(&keyring_path, correct_secret).await?;
         keyring
-            .create_item(
-                "item1",
-                &HashMap::from([("app", "test1")]),
-                "password1",
-                false,
-            )
+            .create_item("item1", &[("app", "test1")], "password1", false)
             .await?;
         keyring
-            .create_item(
-                "item2",
-                &HashMap::from([("app", "test2")]),
-                "password2",
-                false,
-            )
+            .create_item("item2", &[("app", "test2")], "password2", false)
             .await?;
         drop(keyring);
 
@@ -1689,20 +1600,11 @@ mod tests {
 
         // Create one item
         keyring
-            .create_item(
-                "Test Item",
-                &HashMap::from([("app", "test")]),
-                "secret",
-                false,
-            )
+            .create_item("Test Item", &[("app", "test")], "secret", false)
             .await?;
 
         // Try to replace at invalid index
-        let new_item = Item::new(
-            "Replacement",
-            &HashMap::from([("app", "test2")]),
-            "new_secret",
-        );
+        let new_item = Item::new("Replacement", &[("app", "test2")], "new_secret");
         let result = keyring.replace_item_index(100, &new_item).await;
 
         assert!(matches!(result, Err(Error::InvalidItemIndex(100))));

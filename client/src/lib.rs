@@ -101,3 +101,24 @@ impl_as_attributes!([(K, V)]);
 impl_as_attributes!(HashMap<K, V>);
 impl_as_attributes!(std::collections::BTreeMap<K, V>);
 impl_as_attributes!(Vec<(K, V)>);
+
+impl<K, V, const N: usize> AsAttributes for [(K, V); N]
+where
+    K: AsRef<str>,
+    V: AsRef<str>,
+{
+    fn as_attributes(&self) -> HashMap<&str, &str> {
+        self.iter().map(|(k, v)| (k.as_ref(), v.as_ref())).collect()
+    }
+}
+
+// Implementation for references to arrays
+impl<K, V, const N: usize> AsAttributes for &[(K, V); N]
+where
+    K: AsRef<str>,
+    V: AsRef<str>,
+{
+    fn as_attributes(&self) -> HashMap<&str, &str> {
+        self.iter().map(|(k, v)| (k.as_ref(), v.as_ref())).collect()
+    }
+}

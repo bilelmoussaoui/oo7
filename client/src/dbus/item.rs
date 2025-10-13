@@ -199,8 +199,6 @@ impl<'a> Item<'a> {
 #[cfg(test)]
 #[cfg(feature = "tokio")]
 mod tests {
-    use std::collections::HashMap;
-
     use crate::dbus::Service;
 
     #[tokio::test]
@@ -208,11 +206,16 @@ mod tests {
         let service = Service::plain().await.unwrap();
         let collection = service.default_collection().await.unwrap();
 
-        let attributes = HashMap::from([("test", "label-mutation")]);
         let secret = crate::Secret::text("test secret");
 
         let item = collection
-            .create_item("Original Label", &attributes, secret, true, None)
+            .create_item(
+                "Original Label",
+                &[("test", "label-mutation")],
+                secret,
+                true,
+                None,
+            )
             .await
             .unwrap();
 
@@ -232,13 +235,12 @@ mod tests {
         let service = Service::plain().await.unwrap();
         let collection = service.default_collection().await.unwrap();
 
-        let attributes = HashMap::from([("test", "secret-mutation")]);
         let original_secret = crate::Secret::text("original secret");
 
         let item = collection
             .create_item(
                 "Secret Test",
-                &attributes,
+                &[("test", "secret-mutation")],
                 original_secret.clone(),
                 true,
                 None,
@@ -261,13 +263,12 @@ mod tests {
         let service = Service::encrypted().await.unwrap();
         let collection = service.default_collection().await.unwrap();
 
-        let attributes = HashMap::from([("test", "secret-mutation-encrypted")]);
         let original_secret = crate::Secret::text("original encrypted secret");
 
         let item = collection
             .create_item(
                 "Encrypted Secret Test",
-                &attributes,
+                &[("test", "secret-mutation-encrypted")],
                 original_secret.clone(),
                 true,
                 None,
@@ -290,11 +291,16 @@ mod tests {
         let service = Service::plain().await.unwrap();
         let collection = service.default_collection().await.unwrap();
 
-        let original_attributes = HashMap::from([("service", "email"), ("username", "user1")]);
         let secret = crate::Secret::text("test secret");
 
         let item = collection
-            .create_item("Attributes Test", &original_attributes, secret, true, None)
+            .create_item(
+                "Attributes Test",
+                &[("service", "email"), ("username", "user1")],
+                secret,
+                true,
+                None,
+            )
             .await
             .unwrap();
 
@@ -302,12 +308,13 @@ mod tests {
         assert_eq!(retrieved_attrs.get("service"), Some(&"email".to_string()));
         assert_eq!(retrieved_attrs.get("username"), Some(&"user1".to_string()));
 
-        let new_attributes = HashMap::from([
+        item.set_attributes(&[
             ("service", "web"),
             ("username", "user2"),
             ("domain", "example.com"),
-        ]);
-        item.set_attributes(&new_attributes).await.unwrap();
+        ])
+        .await
+        .unwrap();
 
         let updated_attrs = item.attributes().await.unwrap();
         assert_eq!(updated_attrs.get("service"), Some(&"web".to_string()));
@@ -326,12 +333,11 @@ mod tests {
         let service = Service::plain().await.unwrap();
         let collection = service.default_collection().await.unwrap();
 
-        let text_attributes = HashMap::from([("type", "text-secret")]);
         let text_secret = crate::Secret::text("text password");
         let text_item = collection
             .create_item(
                 "Text Secret",
-                &text_attributes,
+                &[("type", "text-secret")],
                 text_secret.clone(),
                 true,
                 None,
@@ -348,12 +354,11 @@ mod tests {
         let service = Service::plain().await.unwrap();
         let collection = service.default_collection().await.unwrap();
 
-        let blob_attributes = HashMap::from([("type", "blob-secret")]);
         let blob_secret = crate::Secret::blob(b"binary data");
         let blob_item = collection
             .create_item(
                 "Blob Secret",
-                &blob_attributes,
+                &[("type", "blob-secret")],
                 blob_secret.clone(),
                 true,
                 None,
@@ -374,11 +379,16 @@ mod tests {
         let service = Service::plain().await.unwrap();
         let collection = service.default_collection().await.unwrap();
 
-        let attributes = HashMap::from([("test", "timestamps")]);
         let secret = crate::Secret::text("timestamp test");
 
         let item = collection
-            .create_item("Timestamp Test", &attributes, secret, true, None)
+            .create_item(
+                "Timestamp Test",
+                &[("test", "timestamps")],
+                secret,
+                true,
+                None,
+            )
             .await
             .unwrap();
 
@@ -406,11 +416,11 @@ mod tests {
         let service = Service::plain().await.unwrap();
         let collection = service.default_collection().await.unwrap();
 
-        let attributes = HashMap::from([("test", "deleted-error")]);
+        let attributes = &[("test", "deleted-error")];
         let secret = crate::Secret::text("delete test");
 
         let item = collection
-            .create_item("Delete Test", &attributes, secret, true, None)
+            .create_item("Delete Test", attributes, secret, true, None)
             .await
             .unwrap();
 
@@ -436,7 +446,7 @@ mod tests {
             Err(super::Error::Deleted)
         ));
         assert!(matches!(
-            item.set_attributes(&attributes).await,
+            item.set_attributes(attributes).await,
             Err(super::Error::Deleted)
         ));
         assert!(matches!(item.created().await, Err(super::Error::Deleted)));

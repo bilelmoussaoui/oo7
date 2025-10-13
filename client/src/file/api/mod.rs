@@ -331,8 +331,6 @@ impl TryFrom<&[u8]> for Keyring {
 #[cfg(test)]
 #[cfg(feature = "tokio")]
 mod tests {
-    use std::collections::HashMap;
-
     use super::*;
     use crate::secret::ContentType;
 
@@ -345,20 +343,20 @@ mod tests {
 
     #[tokio::test]
     async fn keyfile_add_remove() -> Result<(), Error> {
-        let needle = HashMap::from([("key", "value")]);
+        let needle = &[("key", "value")];
 
         let mut keyring = Keyring::new();
         let key = keyring.derive_key(&SECRET.to_vec().into())?;
 
         keyring
             .items
-            .push(Item::new("Label", &needle, Secret::blob("MyPassword")).encrypt(&key)?);
+            .push(Item::new("Label", needle, Secret::blob("MyPassword")).encrypt(&key)?);
 
-        assert_eq!(keyring.search_items(&needle, &key)?.len(), 1);
+        assert_eq!(keyring.search_items(needle, &key)?.len(), 1);
 
-        keyring.remove_items(&needle, &key)?;
+        keyring.remove_items(needle, &key)?;
 
-        assert_eq!(keyring.search_items(&needle, &key)?.len(), 0);
+        assert_eq!(keyring.search_items(needle, &key)?.len(), 0);
 
         Ok(())
     }
@@ -371,20 +369,14 @@ mod tests {
         let key = new_keyring.derive_key(&SECRET.to_vec().into())?;
 
         new_keyring.items.push(
-            Item::new(
-                "My Label",
-                &HashMap::from([("my-tag", "my tag value")]),
-                "A Password",
-            )
-            .encrypt(&key)?,
+            Item::new("My Label", &[("my-tag", "my tag value")], "A Password").encrypt(&key)?,
         );
         new_keyring.dump("/tmp/test.keyring", None).await?;
 
         let blob = tokio::fs::read("/tmp/test.keyring").await?;
 
         let loaded_keyring = Keyring::try_from(blob.as_slice())?;
-        let loaded_items =
-            loaded_keyring.search_items(&HashMap::from([("my-tag", "my tag value")]), &key)?;
+        let loaded_items = loaded_keyring.search_items(&[("my-tag", "my tag value")], &key)?;
 
         assert_eq!(loaded_items[0].secret(), Secret::text("A Password"));
         assert_eq!(loaded_items[0].secret().content_type(), ContentType::Text);

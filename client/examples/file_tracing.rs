@@ -7,7 +7,7 @@
 //! Run with: cargo run --example file_tracing --features "tokio tracing"
 //! --release
 
-use std::{collections::HashMap, time::Instant};
+use std::time::Instant;
 
 use oo7::file::Keyring;
 use tempfile::tempdir;
@@ -68,7 +68,7 @@ async fn test_keyring_lifecycle() -> oo7::Result<()> {
     keyring
         .create_item(
             "Test Item",
-            &HashMap::from([("app", "test"), ("user", "alice")]),
+            &[("app", "test"), ("user", "alice")],
             "my-secret-password",
             false,
         )
@@ -85,9 +85,7 @@ async fn test_keyring_lifecycle() -> oo7::Result<()> {
 
     // Measure search
     let start = Instant::now();
-    let items = keyring
-        .search_items(&HashMap::from([("app", "test")]))
-        .await?;
+    let items = keyring.search_items(&[("app", "test")]).await?;
     let search_time = start.elapsed();
     info!(
         "Single item search: {:?} (found {} items)",
@@ -118,11 +116,11 @@ async fn test_bulk_operations() -> oo7::Result<()> {
             keyring
                 .create_item(
                     &format!("Item {}", i),
-                    &HashMap::from([
+                    &[
                         ("app", "bulk_test"),
                         ("index", &i.to_string()),
                         ("batch", "individual"),
-                    ]),
+                    ],
                     format!("secret-{}", i),
                     false,
                 )
@@ -138,9 +136,7 @@ async fn test_bulk_operations() -> oo7::Result<()> {
 
         // Test search performance with more items
         let start = Instant::now();
-        let items = keyring
-            .search_items(&HashMap::from([("app", "bulk_test")]))
-            .await?;
+        let items = keyring.search_items(&[("app", "bulk_test")]).await?;
         let search_time = start.elapsed();
 
         info!(
@@ -179,7 +175,7 @@ async fn test_scaling_behavior() -> oo7::Result<()> {
                 keyring
                     .create_item(
                         &format!("Scale Item {}", i),
-                        &HashMap::from([("app", "scaling_test"), ("index", &i.to_string())]),
+                        &[("app", "scaling_test"), ("index", &i.to_string())],
                         format!("scaling-secret-{}", i),
                         false,
                     )
@@ -201,7 +197,7 @@ async fn test_scaling_behavior() -> oo7::Result<()> {
         keyring
             .create_item(
                 "New Item",
-                &HashMap::from([("app", "scaling_test"), ("type", "new")]),
+                &[("app", "scaling_test"), ("type", "new")],
                 "new-secret",
                 false,
             )
@@ -211,9 +207,7 @@ async fn test_scaling_behavior() -> oo7::Result<()> {
 
         // Test search performance
         let start = Instant::now();
-        let items = keyring
-            .search_items(&HashMap::from([("app", "scaling_test")]))
-            .await?;
+        let items = keyring.search_items(&[("app", "scaling_test")]).await?;
         let search_time = start.elapsed();
         info!(
             "Search keyring with {} items: {:?} (found {})",
@@ -246,11 +240,11 @@ async fn test_search_performance() -> oo7::Result<()> {
             keyring
                 .create_item(
                     &format!("{} - {}", app, user),
-                    &HashMap::from([
+                    &[
                         ("app", *app),
                         ("user", *user),
                         ("index", &(i * users.len() + j).to_string()),
-                    ]),
+                    ],
                     format!("{}-{}-secret", app, user),
                     false,
                 )
@@ -267,7 +261,7 @@ async fn test_search_performance() -> oo7::Result<()> {
     // 1. Exact match (should find 1 item)
     let start = Instant::now();
     let items = keyring
-        .search_items(&HashMap::from([("app", "browser"), ("user", "alice")]))
+        .search_items(&[("app", "browser"), ("user", "alice")])
         .await?;
     let exact_time = start.elapsed();
     info!(
@@ -278,9 +272,7 @@ async fn test_search_performance() -> oo7::Result<()> {
 
     // 2. Single attribute match (should find multiple items)
     let start = Instant::now();
-    let items = keyring
-        .search_items(&HashMap::from([("app", "browser")]))
-        .await?;
+    let items = keyring.search_items(&[("app", "browser")]).await?;
     let single_attr_time = start.elapsed();
     info!(
         "Single attribute search: {:?} (found {} items)",
@@ -290,9 +282,7 @@ async fn test_search_performance() -> oo7::Result<()> {
 
     // 3. No match
     let start = Instant::now();
-    let items = keyring
-        .search_items(&HashMap::from([("app", "nonexistent")]))
-        .await?;
+    let items = keyring.search_items(&[("app", "nonexistent")]).await?;
     let no_match_time = start.elapsed();
     info!(
         "No match search: {:?} (found {} items)",

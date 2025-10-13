@@ -69,7 +69,7 @@ impl ashpd::backend::secret::SecretImpl for Secret {
 async fn send_secret_to_app(app_id: &AppID, fd: std::os::fd::OwnedFd) -> Result<()> {
     let service = Service::new().await?;
     let collection = service.default_collection().await?;
-    let attributes = HashMap::from([("app_id", app_id)]);
+    let attributes = &[("app_id", app_id)];
 
     // Write the secret to the FD.
     let std_stream = UnixStream::from(fd);
@@ -80,7 +80,7 @@ async fn send_secret_to_app(app_id: &AppID, fd: std::os::fd::OwnedFd) -> Result<
         collection.unlock(None).await?;
     }
 
-    if let Some(item) = collection.search_items(&attributes).await?.first() {
+    if let Some(item) = collection.search_items(attributes).await?.first() {
         stream.write_all(&item.secret().await?).await?;
     } else {
         tracing::debug!("Could not find secret for {app_id}, creating one");
@@ -89,7 +89,7 @@ async fn send_secret_to_app(app_id: &AppID, fd: std::os::fd::OwnedFd) -> Result<
         collection
             .create_item(
                 &format!("Secret Portal token for {app_id}"),
-                &attributes,
+                attributes,
                 secret.clone(),
                 true,
                 None,

@@ -24,21 +24,19 @@ The library provides types that automatically pick a backend based on whether th
 ### Basic usage
 
 ```rust,no_run
-use std::collections::HashMap;
-
 async fn run() -> oo7::Result<()> {
     let keyring = oo7::Keyring::new().await?;
-    let attributes = HashMap::from([("attribute", "attribute_value")]);
+    let attributes = &[("attribute", "attribute_value")];
 
     // Store a secret
     keyring
-        .create_item("Item Label", &attributes, b"secret", true).await?;
+        .create_item("Item Label", attributes, b"secret", true).await?;
 
     // Find a stored secret
-    let items = keyring.search_items(&attributes).await?;
+    let items = keyring.search_items(attributes).await?;
 
     // Delete a stored secret
-    keyring.delete(&attributes).await?;
+    keyring.delete(attributes).await?;
 
     // Unlock the collection if the Secret Service is used
     keyring.unlock().await?;
@@ -53,7 +51,6 @@ If your application makes heavy usage of the keyring like a password manager. Yo
 
 ```rust,ignore
 use std::sync::OnceLock;
-use std::collections::HashMap;
 
 static KEYRING: OnceLock<oo7::Keyring> = OnceLock::new();
 

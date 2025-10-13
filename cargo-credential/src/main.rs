@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use cargo_credential::{Action, CredentialResponse, Error, RegistryInfo, Secret};
 
 pub struct SecretServiceCredential;
@@ -17,9 +15,9 @@ impl SecretServiceCredential {
             .default_collection()
             .await
             .map_err(|err| Error::Other(Box::new(err)))?;
-        let attributes = HashMap::from([("url", registry.index_url)]);
+        let attributes = &[("url", registry.index_url)];
         let items = collection
-            .search_items(&attributes)
+            .search_items(attributes)
             .await
             .map_err(|err| Error::Other(Box::new(err)))?;
 
@@ -57,7 +55,7 @@ impl SecretServiceCredential {
                     collection
                         .create_item(
                             &format!("cargo-registry:{}", registry.index_url),
-                            &attributes,
+                            attributes,
                             token,
                             true,
                             None,

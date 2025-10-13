@@ -1,16 +1,12 @@
-use std::collections::HashMap;
-
-use oo7::Keyring;
-
 #[tokio::main]
 async fn main() -> oo7::Result<()> {
-    let keyring = Keyring::new().await?;
-    let attributes = HashMap::from([("attr", "value")]);
+    let keyring = oo7::Keyring::new().await?;
+    let attributes = &[("attr", "value")];
     keyring
-        .create_item("Some Label", &attributes, "secret", true)
+        .create_item("Some Label", attributes, "secret", true)
         .await?;
 
-    let items = keyring.search_items(&attributes).await?;
+    let items = keyring.search_items(attributes).await?;
 
     for item in items {
         println!("{}", item.label().await?);

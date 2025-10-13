@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::OnceLock};
+use std::sync::OnceLock;
 
 use oo7::Keyring;
 
@@ -9,7 +9,7 @@ async fn main() -> oo7::Result<()> {
     let keyring = Keyring::new().await?;
     KEYRING.set(keyring).unwrap();
 
-    let attributes = HashMap::from([("attr", "value")]);
+    let attributes = [("attr", "value")];
 
     KEYRING
         .get()

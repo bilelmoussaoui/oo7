@@ -197,8 +197,11 @@ mod tests {
 
     #[tokio::test]
     async fn set_label() {
-        let attributes = std::collections::HashMap::from([("service", "test-service")]);
-        let mut item = Item::new("Original Label", &attributes, Secret::text("secret"));
+        let mut item = Item::new(
+            "Original Label",
+            &[("service", "test-service")],
+            Secret::text("secret"),
+        );
 
         let original_modified = item.modified();
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -213,8 +216,11 @@ mod tests {
 
     #[tokio::test]
     async fn set_secret_text() {
-        let attributes = std::collections::HashMap::from([("service", "test-service")]);
-        let mut item = Item::new("Test Item", &attributes, Secret::text("original"));
+        let mut item = Item::new(
+            "Test Item",
+            &[("service", "test-service")],
+            Secret::text("original"),
+        );
 
         let original_modified = item.modified();
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -229,8 +235,11 @@ mod tests {
 
     #[tokio::test]
     async fn set_secret_blob() {
-        let attributes = std::collections::HashMap::from([("type", "binary")]);
-        let mut item = Item::new("Binary Item", &attributes, Secret::blob(b"binary data"));
+        let mut item = Item::new(
+            "Binary Item",
+            &[("type", "binary")],
+            Secret::blob(b"binary data"),
+        );
 
         let original_modified = item.modified();
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -244,8 +253,11 @@ mod tests {
 
     #[tokio::test]
     async fn created_timestamp() {
-        let attributes = std::collections::HashMap::from([("test", "timestamp")]);
-        let item = Item::new("Timestamp Test", &attributes, Secret::text("data"));
+        let item = Item::new(
+            "Timestamp Test",
+            &[("test", "timestamp")],
+            Secret::text("data"),
+        );
 
         let created_time = item.created();
         assert!(created_time.as_secs() > 0);
@@ -256,8 +268,11 @@ mod tests {
 
     #[tokio::test]
     async fn modified_timestamp_updates() {
-        let attributes = std::collections::HashMap::from([("test", "modification")]);
-        let mut item = Item::new("Modification Test", &attributes, Secret::text("data"));
+        let mut item = Item::new(
+            "Modification Test",
+            &[("test", "modification")],
+            Secret::text("data"),
+        );
 
         let original_created = item.created();
         let original_modified = item.modified();

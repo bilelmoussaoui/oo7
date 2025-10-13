@@ -257,18 +257,14 @@ impl<'a> Collection<'a> {
 #[cfg(test)]
 #[cfg(feature = "tokio")]
 mod tests {
-    use std::collections::HashMap;
-
-    use crate::dbus::Service;
+    use crate::{AsAttributes, dbus::Service};
 
     async fn create_item(service: Service<'_>, encrypted: bool) {
-        let mut attributes = HashMap::new();
-        let value = if encrypted {
-            "encrypted-type-test"
+        let attributes = if encrypted {
+            &[("type", "encrypted-type-test")]
         } else {
-            "plain-type-test"
+            &[("type", "plain-type-test")]
         };
-        attributes.insert("type", value);
         let secret = crate::Secret::text("a password");
 
         let collection = service.default_collection().await.unwrap();
@@ -280,7 +276,10 @@ mod tests {
             .unwrap();
 
         assert_eq!(item.secret().await.unwrap(), secret);
-        assert_eq!(item.attributes().await.unwrap()["type"], value);
+        assert_eq!(
+            item.attributes().await.unwrap().as_attributes(),
+            attributes.as_attributes()
+        );
 
         assert_eq!(
             collection.search_items(&attributes).await.unwrap().len(),
@@ -315,44 +314,64 @@ mod tests {
         let secret = crate::Secret::text("search test");
 
         // Create items with unique test attributes
-        let attrs1 = HashMap::from([("test-pattern", "pattern-test-a"), ("category", "group1")]);
         let item1 = collection
-            .create_item("Pattern Test 1", &attrs1, secret.clone(), true, None)
+            .create_item(
+                "Pattern Test 1",
+                &[("test-pattern", "pattern-test-a"), ("category", "group1")],
+                secret.clone(),
+                true,
+                None,
+            )
             .await
             .unwrap();
 
-        let attrs2 = HashMap::from([("test-pattern", "pattern-test-a"), ("category", "group2")]);
         let item2 = collection
-            .create_item("Pattern Test 2", &attrs2, secret.clone(), true, None)
+            .create_item(
+                "Pattern Test 2",
+                &[("test-pattern", "pattern-test-a"), ("category", "group2")],
+                secret.clone(),
+                true,
+                None,
+            )
             .await
             .unwrap();
 
-        let attrs3 = HashMap::from([("test-pattern", "pattern-test-b"), ("category", "group1")]);
         let item3 = collection
-            .create_item("Pattern Test 3", &attrs3, secret.clone(), true, None)
+            .create_item(
+                "Pattern Test 3",
+                &[("test-pattern", "pattern-test-b"), ("category", "group1")],
+                secret.clone(),
+                true,
+                None,
+            )
             .await
             .unwrap();
 
         // Search by test-pattern - should find items with pattern-test-a
-        let search_pattern_a = HashMap::from([("test-pattern", "pattern-test-a")]);
-        let pattern_a_items = collection.search_items(&search_pattern_a).await.unwrap();
+        let pattern_a_items = collection
+            .search_items(&[("test-pattern", "pattern-test-a")])
+            .await
+            .unwrap();
         let found_paths: std::collections::HashSet<_> =
             pattern_a_items.iter().map(|item| item.path()).collect();
         assert!(found_paths.contains(item1.path()));
         assert!(found_paths.contains(item2.path()));
 
         // Search by category - should find items in group1
-        let search_group1 = HashMap::from([("category", "group1")]);
-        let group1_items = collection.search_items(&search_group1).await.unwrap();
+        let group1_items = collection
+            .search_items(&[("category", "group1")])
+            .await
+            .unwrap();
         let found_group1_paths: std::collections::HashSet<_> =
             group1_items.iter().map(|item| item.path()).collect();
         assert!(found_group1_paths.contains(item1.path()));
         assert!(found_group1_paths.contains(item3.path()));
 
         // Search by both attributes - should find only item1
-        let search_specific =
-            HashMap::from([("test-pattern", "pattern-test-a"), ("category", "group1")]);
-        let specific_items = collection.search_items(&search_specific).await.unwrap();
+        let specific_items = collection
+            .search_items(&[("test-pattern", "pattern-test-a"), ("category", "group1")])
+            .await
+            .unwrap();
         let found_specific_paths: std::collections::HashSet<_> =
             specific_items.iter().map(|item| item.path()).collect();
         assert!(found_specific_paths.contains(item1.path()));
@@ -370,15 +389,25 @@ mod tests {
         let secret = crate::Secret::text("items test");
 
         // Create some test items with unique attributes
-        let attrs1 = HashMap::from([("test", "items-test-1"), ("unique", "test-1")]);
         let item1 = collection
-            .create_item("Test Item 1", &attrs1, secret.clone(), true, None)
+            .create_item(
+                "Test Item 1",
+                &[("test", "items-test-1"), ("unique", "test-1")],
+                secret.clone(),
+                true,
+                None,
+            )
             .await
             .unwrap();
 
-        let attrs2 = HashMap::from([("test", "items-test-2"), ("unique", "test-2")]);
         let item2 = collection
-            .create_item("Test Item 2", &attrs2, secret.clone(), true, None)
+            .create_item(
+                "Test Item 2",
+                &[("test", "items-test-2"), ("unique", "test-2")],
+                secret.clone(),
+                true,
+                None,
+            )
             .await
             .unwrap();
 
