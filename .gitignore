@@ -2,3 +2,4 @@
 /portal/target
 #Cargo.lock
 cli/target
+coverage/
