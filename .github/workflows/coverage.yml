@@ -40,7 +40,7 @@ jobs:
       - name: Install system dependencies and setup D-Bus
         run: |
           sudo apt-get update
-          sudo apt-get install -y libssl-dev pkg-config gnome-keyring dbus-x11
+          sudo apt-get install -y libssl-dev pkg-config gnome-keyring dbus-x11 jq
 
           # Start D-Bus session
           mkdir -p ~/.local/share/keyrings
@@ -77,7 +77,7 @@ jobs:
             --ignore-panics \
             --out Lcov \
             --output-dir coverage-raw
-          mv coverage-raw/lcov.info coverage-raw/openssl-async-std.info
+          mv coverage-raw/lcov.info coverage-raw/openssl-tokio.info
 
       - name: Install grcov for merging coverage
         uses: taiki-e/install-action@v2
@@ -103,8 +103,8 @@ jobs:
             --ignore "**/examples/*" \
             --ignore "**/target/*"
 
-          # Extract coverage percentage from the HTML index
-          CURRENT_COVERAGE=$(grep -oP 'Coverage: \K[0-9]+\.[0-9]+' site/coverage/html/index.html | head -1 || echo "0.00")
+          # Extract coverage percentage from the generated JSON file
+          CURRENT_COVERAGE=$(jq -r '.message' site/coverage/html/coverage.json | sed 's/%//')
           echo "CURRENT_COVERAGE=$CURRENT_COVERAGE" >> $GITHUB_ENV
           echo "Combined coverage: $CURRENT_COVERAGE%"
 
