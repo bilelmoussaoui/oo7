@@ -257,6 +257,35 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn secret_mutation_encrypted() {
+        let service = Service::encrypted().await.unwrap();
+        let collection = service.default_collection().await.unwrap();
+
+        let attributes = HashMap::from([("test", "secret-mutation-encrypted")]);
+        let original_secret = crate::Secret::text("original encrypted secret");
+
+        let item = collection
+            .create_item(
+                "Encrypted Secret Test",
+                &attributes,
+                original_secret.clone(),
+                true,
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(item.secret().await.unwrap(), original_secret);
+
+        let new_secret = crate::Secret::text("updated encrypted secret");
+        item.set_secret(new_secret.clone()).await.unwrap();
+
+        assert_eq!(item.secret().await.unwrap(), new_secret);
+
+        item.delete(None).await.unwrap();
+    }
+
+    #[tokio::test]
     async fn attributes_mutation() {
         let service = Service::plain().await.unwrap();
         let collection = service.default_collection().await.unwrap();
