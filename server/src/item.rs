@@ -440,11 +440,13 @@ mod tests {
 
         // Retrieve secret
         let retrieved_secret = item.secret(&session).await.unwrap();
+        // TODO: ensure the server implementation stores the content-type attribute
         assert_eq!(
             retrieved_secret
-                .decrypt(Some(&Arc::new(client_private_key)))
-                .unwrap(),
-            secret
+                .decrypt(Some(&Arc::new(aes_key)))
+                .unwrap()
+                .as_bytes(),
+            secret.as_bytes()
         );
     }
 

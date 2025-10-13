@@ -336,3 +336,182 @@ impl Collection {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use oo7::dbus;
+
+    use super::*;
+
+    /// Helper to create a peer-to-peer connection pair using Unix socket
+    async fn create_p2p_connection() -> (zbus::Connection, zbus::Connection) {
+        let guid = zbus::Guid::generate();
+        let (p0, p1) = tokio::net::UnixStream::pair().unwrap();
+
+        let (client_conn, server_conn) = tokio::try_join!(
+            zbus::connection::Builder::unix_stream(p0).p2p().build(),
+            zbus::connection::Builder::unix_stream(p1)
+                .server(guid)
+                .unwrap()
+                .p2p()
+                .build(),
+        )
+        .unwrap();
+
+        (server_conn, client_conn)
+    }
+
+    #[tokio::test]
+    async fn create_item_plain() {
+        let (server_conn, client_conn) = create_p2p_connection().await;
+
+        let _server = Service::run_with_connection(
+            server_conn,
+            Some(oo7::Secret::from("test-password-long-enough")),
+        )
+        .await
+        .unwrap();
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await.unwrap();
+
+        // Open plain session
+        let (_aes_key, session) = service_api.open_session(None).await.unwrap();
+
+        // Get default collection
+        let collections = service_api.collections().await.unwrap();
+
+        // Create an item using the proper API
+        let secret = oo7::Secret::text("my-secret-password");
+        let attributes = &[("application", "test-app"), ("type", "password")];
+        let dbus_secret = dbus::api::DBusSecret::new(Arc::new(session), secret.clone());
+
+        let item = collections[0]
+            .create_item("Test Item", attributes, &dbus_secret, false, None)
+            .await
+            .unwrap();
+
+        // Verify item exists in collection
+        let items = collections[0].items().await.unwrap();
+        assert_eq!(items.len(), 1, "Collection should have one item");
+        assert_eq!(items[0].inner().path(), item.inner().path());
+
+        // Verify item label
+        let label = item.label().await.unwrap();
+        assert_eq!(label, "Test Item");
+    }
+
+    #[tokio::test]
+    async fn create_item_encrypted() {
+        let (server_conn, client_conn) = create_p2p_connection().await;
+
+        let _server = Service::run_with_connection(
+            server_conn,
+            Some(oo7::Secret::from("test-password-long-enough")),
+        )
+        .await
+        .unwrap();
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await.unwrap();
+
+        // Open encrypted session
+        let client_private_key = oo7::Key::generate_private_key().unwrap();
+        let client_public_key = oo7::Key::generate_public_key(&client_private_key).unwrap();
+
+        let (server_public_key_opt, session) = service_api
+            .open_session(Some(client_public_key))
+            .await
+            .unwrap();
+
+        let server_public_key = server_public_key_opt.unwrap();
+        let aes_key = oo7::Key::generate_aes_key(&client_private_key, &server_public_key).unwrap();
+
+        // Get default collection
+        let collections = service_api.collections().await.unwrap();
+
+        // Create an encrypted item using the proper API
+        let secret = oo7::Secret::text("my-encrypted-secret");
+        let attributes = &[("application", "test-app"), ("type", "encrypted-password")];
+        let dbus_secret =
+            dbus::api::DBusSecret::new_encrypted(Arc::new(session), secret, &aes_key).unwrap();
+
+        let item = collections[0]
+            .create_item("Test Encrypted Item", attributes, &dbus_secret, false, None)
+            .await
+            .unwrap();
+
+        // Verify item exists
+        let items = collections[0].items().await.unwrap();
+        assert_eq!(items.len(), 1, "Collection should have one item");
+        assert_eq!(items[0].inner().path(), item.inner().path());
+    }
+
+    #[tokio::test]
+    async fn search_items_after_creation() {
+        let (server_conn, client_conn) = create_p2p_connection().await;
+
+        let _server = Service::run_with_connection(
+            server_conn,
+            Some(oo7::Secret::from("test-password-long-enough")),
+        )
+        .await
+        .unwrap();
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await.unwrap();
+        let (_aes_key, session) = service_api.open_session(None).await.unwrap();
+        let session = Arc::new(session);
+
+        let collections = service_api.collections().await.unwrap();
+
+        // Create two items with different attributes
+        let secret1 = oo7::Secret::text("password1");
+        let attributes1 = &[("application", "firefox"), ("username", "user1")];
+        let dbus_secret1 = dbus::api::DBusSecret::new(Arc::clone(&session), secret1);
+
+        collections[0]
+            .create_item("Firefox Password", attributes1, &dbus_secret1, false, None)
+            .await
+            .unwrap();
+
+        let secret2 = oo7::Secret::text("password2");
+        let attributes2 = &[("application", "chrome"), ("username", "user2")];
+        let dbus_secret2 = dbus::api::DBusSecret::new(Arc::clone(&session), secret2);
+
+        collections[0]
+            .create_item("Chrome Password", attributes2, &dbus_secret2, false, None)
+            .await
+            .unwrap();
+
+        // Search for firefox item
+        let firefox_attrs = &[("application", "firefox")];
+        let firefox_items = collections[0].search_items(firefox_attrs).await.unwrap();
+
+        assert_eq!(firefox_items.len(), 1, "Should find one firefox item");
+
+        // Search for chrome item
+        let chrome_attrs = &[("application", "chrome")];
+        let chrome_items = collections[0].search_items(chrome_attrs).await.unwrap();
+
+        assert_eq!(chrome_items.len(), 1, "Should find one chrome item");
+
+        // Search for non-existent item
+        let nonexistent_attrs = &[("application", "nonexistent")];
+        let nonexistent_items = collections[0]
+            .search_items(nonexistent_attrs)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            nonexistent_items.len(),
+            0,
+            "Should find no nonexistent items"
+        );
+    }
+}
