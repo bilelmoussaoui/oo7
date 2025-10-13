@@ -230,7 +230,7 @@ impl Drop for Service<'_> {
         let session = Arc::clone(&self.session);
         #[cfg(feature = "tokio")]
         {
-            let _ = tokio::spawn(async move {
+            tokio::spawn(async move {
                 let _ = session.close().await;
             });
         }
