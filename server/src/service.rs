@@ -577,30 +577,29 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn open_session_plain() {
-        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await;
+    async fn open_session_plain() -> Result<(), Box<dyn std::error::Error>> {
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
 
         // Start server on the p2p connection with a test secret
         let _server = Service::run_with_connection(
             server_conn,
             Some(Secret::from("test-password-long-enough")),
         )
-        .await
-        .unwrap();
+        .await?;
 
         // Give the server a moment to fully initialize
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
         // Connect client using the p2p connection via low-level api
-        let service_api = dbus::api::Service::new(&client_conn).await.unwrap();
+        let service_api = dbus::api::Service::new(&client_conn).await?;
 
         // Open a plain session (None = plain, no encryption)
-        let (aes_key, _session) = service_api.open_session(None).await.unwrap();
+        let (aes_key, _session) = service_api.open_session(None).await?;
 
         assert!(aes_key.is_none(), "Plain session should not have AES key");
 
         // Get collections property
-        let collections = service_api.collections().await.unwrap();
+        let collections = service_api.collections().await?;
 
         // Should have 2 collections: default + session
         assert_eq!(
@@ -608,32 +607,30 @@ mod tests {
             2,
             "Expected default and session collections"
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn open_session_encrypted() {
-        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await;
+    async fn open_session_encrypted() -> Result<(), Box<dyn std::error::Error>> {
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
 
         let _server = Service::run_with_connection(
             server_conn,
             Some(Secret::from("test-password-long-enough")),
         )
-        .await
-        .unwrap();
+        .await?;
 
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
-        let service_api = dbus::api::Service::new(&client_conn).await.unwrap();
+        let service_api = dbus::api::Service::new(&client_conn).await?;
 
         // Generate client key pair for encrypted session
-        let client_private_key = Key::generate_private_key().unwrap();
-        let client_public_key = Key::generate_public_key(&client_private_key).unwrap();
+        let client_private_key = Key::generate_private_key()?;
+        let client_public_key = Key::generate_public_key(&client_private_key)?;
 
         // Open encrypted session (Some(key) = encrypted)
-        let (server_public_key_opt, _session) = service_api
-            .open_session(Some(client_public_key))
-            .await
-            .unwrap();
+        let (server_public_key_opt, _session) =
+            service_api.open_session(Some(client_public_key)).await?;
 
         assert!(
             server_public_key_opt.is_some(),
@@ -642,62 +639,63 @@ mod tests {
 
         // Verify we can derive the shared secret
         let server_public_key = server_public_key_opt.unwrap();
-        let shared_aes_key =
-            Key::generate_aes_key(&client_private_key, &server_public_key).unwrap();
+        let shared_aes_key = Key::generate_aes_key(&client_private_key, &server_public_key)?;
         assert_eq!(
             shared_aes_key.as_ref().len(),
             16,
             "AES key should be 16 bytes"
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn session_collection_only() {
-        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await;
+    async fn session_collection_only() -> Result<(), Box<dyn std::error::Error>> {
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
 
         let _server = Service::run_with_connection(
             server_conn,
             None, // No default collection
         )
-        .await
-        .unwrap();
+        .await?;
 
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
-        let service_api = dbus::api::Service::new(&client_conn).await.unwrap();
+        let service_api = dbus::api::Service::new(&client_conn).await?;
 
         // Open session
-        let (_aes_key, _session) = service_api.open_session(None).await.unwrap();
+        let (_aes_key, _session) = service_api.open_session(None).await?;
 
         // Should have only session collection (no default)
-        let collections = service_api.collections().await.unwrap();
+        let collections = service_api.collections().await?;
         assert_eq!(collections.len(), 1, "Should have exactly one collection");
+        Ok(())
     }
 
     #[tokio::test]
-    async fn search_items() {
-        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await;
+    async fn search_items() -> Result<(), Box<dyn std::error::Error>> {
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
 
         let _server = Service::run_with_connection(
             server_conn,
             Some(Secret::from("test-password-long-enough")),
         )
-        .await
-        .unwrap();
+        .await?;
 
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
-        let service_api = dbus::api::Service::new(&client_conn).await.unwrap();
+        let service_api = dbus::api::Service::new(&client_conn).await?;
 
         // Search for items (should return empty initially)
-        let attributes = &[("application", "test-app")];
-
-        let (unlocked, locked) = service_api.search_items(attributes).await.unwrap();
+        let (unlocked, locked) = service_api
+            .search_items(&[("application", "test-app")])
+            .await?;
 
         assert!(
             unlocked.is_empty(),
             "Should have no unlocked items initially"
         );
         assert!(locked.is_empty(), "Should have no locked items initially");
+
+        Ok(())
     }
 }

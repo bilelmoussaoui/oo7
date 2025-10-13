@@ -20,6 +20,8 @@ pub enum Error {
     Capability(capability::Error),
 }
 
+impl std::error::Error for Error {}
+
 impl From<zbus::Error> for Error {
     fn from(err: zbus::Error) -> Self {
         Self::Zbus(err)
