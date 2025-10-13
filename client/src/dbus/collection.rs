@@ -394,4 +394,20 @@ mod tests {
         item1.delete(None).await.unwrap();
         item2.delete(None).await.unwrap();
     }
+
+    #[tokio::test]
+    async fn label_mutation() {
+        let service = Service::plain().await.unwrap();
+        let collection = service.session_collection().await.unwrap();
+
+        let initial_label = collection.label().await.unwrap();
+
+        collection.set_label("Updated Label").await.unwrap();
+        assert_eq!(collection.label().await.unwrap(), "Updated Label");
+        assert_ne!(collection.label().await.unwrap(), initial_label);
+
+        // Restore original label
+        collection.set_label(&initial_label).await.unwrap();
+        assert_eq!(collection.label().await.unwrap(), initial_label);
+    }
 }

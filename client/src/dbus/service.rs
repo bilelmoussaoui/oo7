@@ -260,4 +260,20 @@ mod tests {
         assert!(service.default_collection().await.is_ok());
         assert!(service.session_collection().await.is_ok());
     }
+
+    #[tokio::test]
+    async fn encrypted_session() {
+        let service = Service::encrypted().await.unwrap();
+        assert!(service.default_collection().await.is_ok());
+
+        service.session.close().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn plain_session() {
+        let service = Service::plain().await.unwrap();
+        assert!(service.default_collection().await.is_ok());
+
+        service.session.close().await.unwrap();
+    }
 }
