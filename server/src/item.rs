@@ -222,27 +222,9 @@ mod tests {
 
     use super::*;
 
-    /// Helper to create a peer-to-peer connection pair using Unix socket
-    async fn create_p2p_connection() -> (zbus::Connection, zbus::Connection) {
-        let guid = zbus::Guid::generate();
-        let (p0, p1) = tokio::net::UnixStream::pair().unwrap();
-
-        let (client_conn, server_conn) = tokio::try_join!(
-            zbus::connection::Builder::unix_stream(p0).p2p().build(),
-            zbus::connection::Builder::unix_stream(p1)
-                .server(guid)
-                .unwrap()
-                .p2p()
-                .build(),
-        )
-        .unwrap();
-
-        (server_conn, client_conn)
-    }
-
     #[tokio::test]
     async fn label_property() {
-        let (server_conn, client_conn) = create_p2p_connection().await;
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await;
 
         let _server = Service::run_with_connection(
             server_conn,
@@ -281,7 +263,7 @@ mod tests {
 
     #[tokio::test]
     async fn attributes_property() {
-        let (server_conn, client_conn) = create_p2p_connection().await;
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await;
 
         let _server = Service::run_with_connection(
             server_conn,
@@ -324,7 +306,7 @@ mod tests {
 
     #[tokio::test]
     async fn timestamps() {
-        let (server_conn, client_conn) = create_p2p_connection().await;
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await;
 
         let _server = Service::run_with_connection(
             server_conn,
@@ -368,7 +350,7 @@ mod tests {
 
     #[tokio::test]
     async fn secret_retrieval_plain() {
-        let (server_conn, client_conn) = create_p2p_connection().await;
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await;
 
         let _server = Service::run_with_connection(
             server_conn,
@@ -400,7 +382,7 @@ mod tests {
 
     #[tokio::test]
     async fn secret_retrieval_encrypted() {
-        let (server_conn, client_conn) = create_p2p_connection().await;
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await;
 
         let _server = Service::run_with_connection(
             server_conn,
@@ -452,7 +434,7 @@ mod tests {
 
     #[tokio::test]
     async fn delete_item() {
-        let (server_conn, client_conn) = create_p2p_connection().await;
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await;
 
         let _server = Service::run_with_connection(
             server_conn,

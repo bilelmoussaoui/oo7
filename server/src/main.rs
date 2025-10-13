@@ -7,6 +7,8 @@ mod item;
 mod prompt;
 mod service;
 mod session;
+#[cfg(test)]
+mod tests;
 
 use std::{
     io::{IsTerminal, Read},

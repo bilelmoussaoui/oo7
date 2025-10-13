@@ -337,6 +337,7 @@ impl Service {
         Ok(())
     }
 
+    #[cfg(test)]
     pub async fn run_with_connection(
         connection: zbus::Connection,
         secret: Option<Secret>,
@@ -575,29 +576,9 @@ mod tests {
 
     use super::*;
 
-    /// Helper to create a peer-to-peer connection pair using Unix socket
-    async fn create_p2p_connection() -> (zbus::Connection, zbus::Connection) {
-        let guid = zbus::Guid::generate();
-        let (p0, p1) = tokio::net::UnixStream::pair().unwrap();
-
-        let (client_conn, server_conn) = tokio::try_join!(
-            // Client
-            zbus::connection::Builder::unix_stream(p0).p2p().build(),
-            // Server
-            zbus::connection::Builder::unix_stream(p1)
-                .server(guid)
-                .unwrap()
-                .p2p()
-                .build(),
-        )
-        .unwrap();
-
-        (server_conn, client_conn)
-    }
-
     #[tokio::test]
     async fn open_session_plain() {
-        let (server_conn, client_conn) = create_p2p_connection().await;
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await;
 
         // Start server on the p2p connection with a test secret
         let _server = Service::run_with_connection(
@@ -631,7 +612,7 @@ mod tests {
 
     #[tokio::test]
     async fn open_session_encrypted() {
-        let (server_conn, client_conn) = create_p2p_connection().await;
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await;
 
         let _server = Service::run_with_connection(
             server_conn,
@@ -672,7 +653,7 @@ mod tests {
 
     #[tokio::test]
     async fn session_collection_only() {
-        let (server_conn, client_conn) = create_p2p_connection().await;
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await;
 
         let _server = Service::run_with_connection(
             server_conn,
@@ -695,7 +676,7 @@ mod tests {
 
     #[tokio::test]
     async fn search_items() {
-        let (server_conn, client_conn) = create_p2p_connection().await;
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await;
 
         let _server = Service::run_with_connection(
             server_conn,
