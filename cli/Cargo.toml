@@ -17,6 +17,15 @@ anstyle = "1.0.13"
 time = { version = "0.3", default-features = false, features = ["alloc", "formatting", "local-offset"] }
 clap.workspace = true
 hex = "0.4"
-oo7 = { workspace = true, default-features = true }
+oo7 = { workspace = true, features = ["tokio"] }
 rpassword = "7.4.0"
 tokio = { workspace = true, features = [ "macros", "rt"] }
+
+[features]
+default = ["native_crypto"]
+native_crypto = [
+    "oo7/native_crypto"
+]
+openssl_crypto = [
+    "oo7/openssl_crypto"
+]

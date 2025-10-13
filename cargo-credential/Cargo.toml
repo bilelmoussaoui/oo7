@@ -14,5 +14,14 @@ exclude.workspace = true
 
 [dependencies]
 cargo-credential = "0.4"
-oo7 = {workspace = true, features = ["tokio", "native_crypto"]}
+oo7 = {workspace = true, features = ["tokio"]}
 tokio = {workspace = true, features = ["rt-multi-thread"]}
+
+[features]
+default = ["native_crypto"]
+native_crypto = [
+    "oo7/native_crypto"
+]
+openssl_crypto = [
+    "oo7/openssl_crypto"
+]
