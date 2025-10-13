@@ -32,7 +32,7 @@ use crate::{
 const DEFAULT_COLLECTION_ALIAS_PATH: ObjectPath<'static> =
     ObjectPath::from_static_str_unchecked("/org/freedesktop/secrets/aliases/default");
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct Service {
     // Properties
     collections: Arc<Mutex<Vec<Collection>>>,
@@ -80,13 +80,24 @@ impl Service {
             }
         };
 
-        let sender = header
-            .sender()
-            .ok_or_else(|| custom_service_error("Failed to get sender from header."))?;
+        let sender = if let Some(s) = header.sender() {
+            s.to_owned()
+        } else {
+            #[cfg(test)]
+            {
+                // For p2p test connections, use a dummy sender since p2p connections
+                // don't have a bus to assign unique names
+                UniqueName::try_from(":p2p.test").unwrap().into()
+            }
+            #[cfg(not(test))]
+            {
+                return Err(custom_service_error("Failed to get sender from header."));
+            }
+        };
 
         tracing::info!("Client {} connected", sender);
 
-        let session = Session::new(aes_key.map(Arc::new), self.clone(), sender.to_owned()).await;
+        let session = Session::new(aes_key.map(Arc::new), self.clone(), sender).await;
         let path = OwnedObjectPath::from(session.path().clone());
 
         self.sessions
@@ -315,18 +326,62 @@ impl Service {
             )?
             .build()
             .await?;
-        service.connection.set(connection.clone()).unwrap();
+
+        let default_keyring = if let Some(secret) = secret {
+            Some(Arc::new(Keyring::open("login", secret).await?))
+        } else {
+            None
+        };
+
+        service.initialize(connection, default_keyring).await?;
+        Ok(())
+    }
+
+    pub async fn run_with_connection(
+        connection: zbus::Connection,
+        secret: Option<Secret>,
+    ) -> Result<Self, Error> {
+        let service = Self::default();
+
+        // Serve the service at the standard path
+        connection
+            .object_server()
+            .at(
+                oo7::dbus::api::Service::PATH.as_deref().unwrap(),
+                service.clone(),
+            )
+            .await?;
+
+        let default_keyring = if let Some(secret) = secret {
+            Some(Arc::new(Keyring::temporary(secret).await?))
+        } else {
+            None
+        };
+
+        service.initialize(connection, default_keyring).await?;
+        Ok(service)
+    }
+
+    /// Initialize the service with collections and start client disconnect
+    /// handler
+    async fn initialize(
+        &self,
+        connection: zbus::Connection,
+        default_keyring: Option<Arc<Keyring>>,
+    ) -> Result<(), Error> {
+        self.connection.set(connection.clone()).unwrap();
 
         let object_server = connection.object_server();
-        let mut collections = service.collections.lock().await;
+        let mut collections = self.collections.lock().await;
 
-        if let Some(secret) = secret {
+        // Set up default/login collection if keyring is provided
+        if let Some(keyring) = default_keyring {
             let collection = Collection::new(
                 "Login",
                 oo7::dbus::Service::DEFAULT_COLLECTION,
                 false,
-                service.clone(),
-                Arc::new(Keyring::open("login", secret).await?),
+                self.clone(),
+                keyring,
             );
             collections.push(collection.clone());
             collection.dispatch_items().await?;
@@ -338,11 +393,12 @@ impl Service {
                 .await?;
         }
 
+        // Always create session collection (always temporary)
         let collection = Collection::new(
             "session",
             oo7::dbus::Service::SESSION_COLLECTION,
             false,
-            service.clone(),
+            self.clone(),
             Arc::new(Keyring::temporary(Secret::random().unwrap()).await?),
         );
         object_server
@@ -350,8 +406,12 @@ impl Service {
             .await?;
         collections.push(collection);
 
-        let service = service.clone();
+        drop(collections); // Release the lock
+
+        // Spawn client disconnect handler
+        let service = self.clone();
         tokio::spawn(async move { service.on_client_disconnect().await });
+
         Ok(())
     }
 
@@ -506,5 +566,157 @@ impl Service {
         let signal_emitter = zbus::object_server::SignalEmitter::new(self.connection(), path)?;
 
         Ok(signal_emitter)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use oo7::dbus;
+
+    use super::*;
+
+    /// Helper to create a peer-to-peer connection pair using Unix socket
+    async fn create_p2p_connection() -> (zbus::Connection, zbus::Connection) {
+        let guid = zbus::Guid::generate();
+        let (p0, p1) = tokio::net::UnixStream::pair().unwrap();
+
+        let (client_conn, server_conn) = tokio::try_join!(
+            // Client
+            zbus::connection::Builder::unix_stream(p0).p2p().build(),
+            // Server
+            zbus::connection::Builder::unix_stream(p1)
+                .server(guid)
+                .unwrap()
+                .p2p()
+                .build(),
+        )
+        .unwrap();
+
+        (server_conn, client_conn)
+    }
+
+    #[tokio::test]
+    async fn open_session_plain() {
+        let (server_conn, client_conn) = create_p2p_connection().await;
+
+        // Start server on the p2p connection with a test secret
+        let _server = Service::run_with_connection(
+            server_conn,
+            Some(Secret::from("test-password-long-enough")),
+        )
+        .await
+        .unwrap();
+
+        // Give the server a moment to fully initialize
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        // Connect client using the p2p connection via low-level api
+        let service_api = dbus::api::Service::new(&client_conn).await.unwrap();
+
+        // Open a plain session (None = plain, no encryption)
+        let (aes_key, _session) = service_api.open_session(None).await.unwrap();
+
+        assert!(aes_key.is_none(), "Plain session should not have AES key");
+
+        // Get collections property
+        let collections = service_api.collections().await.unwrap();
+
+        // Should have 2 collections: default + session
+        assert_eq!(
+            collections.len(),
+            2,
+            "Expected default and session collections"
+        );
+    }
+
+    #[tokio::test]
+    async fn open_session_encrypted() {
+        let (server_conn, client_conn) = create_p2p_connection().await;
+
+        let _server = Service::run_with_connection(
+            server_conn,
+            Some(Secret::from("test-password-long-enough")),
+        )
+        .await
+        .unwrap();
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await.unwrap();
+
+        // Generate client key pair for encrypted session
+        let client_private_key = Key::generate_private_key().unwrap();
+        let client_public_key = Key::generate_public_key(&client_private_key).unwrap();
+
+        // Open encrypted session (Some(key) = encrypted)
+        let (server_public_key_opt, _session) = service_api
+            .open_session(Some(client_public_key))
+            .await
+            .unwrap();
+
+        assert!(
+            server_public_key_opt.is_some(),
+            "Encrypted session should have server public key"
+        );
+
+        // Verify we can derive the shared secret
+        let server_public_key = server_public_key_opt.unwrap();
+        let shared_aes_key =
+            Key::generate_aes_key(&client_private_key, &server_public_key).unwrap();
+        assert_eq!(
+            shared_aes_key.as_ref().len(),
+            16,
+            "AES key should be 16 bytes"
+        );
+    }
+
+    #[tokio::test]
+    async fn session_collection_only() {
+        let (server_conn, client_conn) = create_p2p_connection().await;
+
+        let _server = Service::run_with_connection(
+            server_conn,
+            None, // No default collection
+        )
+        .await
+        .unwrap();
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await.unwrap();
+
+        // Open session
+        let (_aes_key, _session) = service_api.open_session(None).await.unwrap();
+
+        // Should have only session collection (no default)
+        let collections = service_api.collections().await.unwrap();
+        assert_eq!(collections.len(), 1, "Should have exactly one collection");
+    }
+
+    #[tokio::test]
+    async fn search_items() {
+        let (server_conn, client_conn) = create_p2p_connection().await;
+
+        let _server = Service::run_with_connection(
+            server_conn,
+            Some(Secret::from("test-password-long-enough")),
+        )
+        .await
+        .unwrap();
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await.unwrap();
+
+        // Search for items (should return empty initially)
+        let attributes = &[("application", "test-app")];
+
+        let (unlocked, locked) = service_api.search_items(attributes).await.unwrap();
+
+        assert!(
+            unlocked.is_empty(),
+            "Should have no unlocked items initially"
+        );
+        assert!(locked.is_empty(), "Should have no locked items initially");
     }
 }

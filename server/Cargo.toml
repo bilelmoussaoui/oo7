@@ -28,7 +28,7 @@ tokio = { workspace = true, features = ["full"] }
 tokio-stream = "0.1"
 tracing = "0.1"
 tracing-subscriber.workspace = true
-zbus.workspace = true
+zbus = { workspace = true, features = ["p2p"] }
 zeroize.workspace = true
 
 [features]

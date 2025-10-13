@@ -2395,6 +2395,7 @@ dependencies = [
  "hex",
  "nix",
  "ordered-stream",
+ "rand 0.9.2",
  "serde",
  "serde_repr",
  "tokio",
