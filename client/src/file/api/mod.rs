@@ -393,4 +393,27 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn key_strength() {
+        let mut keyring = Keyring::new();
+        keyring.iteration_count = 50000; // Less than MIN_ITERATION_COUNT (100000)
+        let secret = Secret::from("test-password-that-is-long-enough");
+        let result = keyring.key_strength(&secret);
+        assert!(matches!(
+            result,
+            Err(WeakKeyError::IterationCountTooLow(50000))
+        ));
+
+        let keyring = Keyring::new();
+        let secret = Secret::from("ab");
+        let result = keyring.key_strength(&secret);
+        assert!(matches!(result, Err(WeakKeyError::PasswordTooShort(2))));
+
+        let mut keyring = Keyring::new();
+        keyring.salt = vec![1, 2, 3, 4]; // Less than MIN_SALT_SIZE (32)
+        let secret = Secret::from("test-password-that-is-long-enough");
+        let result = keyring.key_strength(&secret);
+        assert!(matches!(result, Err(WeakKeyError::SaltTooShort(4))));
+    }
 }
