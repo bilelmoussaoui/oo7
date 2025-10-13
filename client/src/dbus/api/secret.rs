@@ -28,8 +28,18 @@ pub struct DBusSecret<'a> {
     pub(crate) content_type: ContentType,
 }
 
+impl PartialEq for DBusSecret<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.parameters == other.parameters
+            && self.value == other.value
+            && self.content_type == other.content_type
+            && self.session.inner().path() == other.session.inner().path()
+    }
+}
+
 impl<'a> DBusSecret<'a> {
-    pub(crate) fn new(session: Arc<Session<'a>>, secret: impl Into<Secret>) -> Self {
+    /// Create a new plain (unencrypted) DBusSecret
+    pub fn new(session: Arc<Session<'a>>, secret: impl Into<Secret>) -> Self {
         let secret = secret.into();
         Self {
             session,
@@ -39,7 +49,8 @@ impl<'a> DBusSecret<'a> {
         }
     }
 
-    pub(crate) fn new_encrypted(
+    /// Create a new encrypted DBusSecret
+    pub fn new_encrypted(
         session: Arc<Session<'a>>,
         secret: impl Into<Secret>,
         aes_key: &Key,
@@ -66,7 +77,7 @@ impl<'a> DBusSecret<'a> {
         })
     }
 
-    pub(crate) fn decrypt(&self, key: Option<&Arc<Key>>) -> Result<Secret, Error> {
+    pub fn decrypt(&self, key: Option<&Arc<Key>>) -> Result<Secret, Error> {
         let value = match key {
             Some(key) => &crypto::decrypt(&self.value, key, &self.parameters)?,
             None => &self.value,
