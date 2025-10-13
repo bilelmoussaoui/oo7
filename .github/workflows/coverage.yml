@@ -79,21 +79,6 @@ jobs:
             --output-dir coverage-raw
           mv coverage-raw/lcov.info coverage-raw/openssl-async-std.info
 
-      - name: Generate coverage summary for PR comparison
-        if: github.event_name == 'pull_request'
-        run: |
-          # Extract PR coverage percentage using the same method as main branch
-          PR_COVERAGE=$(cargo tarpaulin \
-            --package oo7 \
-            --lib \
-            --no-default-features \
-            --features "tracing,tokio,native_crypto" \
-            --ignore-panics \
-            --skip-clean 2>&1 | grep "% coverage" | grep -o '[0-9]\+\.[0-9]\+' | head -1 || echo "0.00")
-
-          echo "PR_COVERAGE=$PR_COVERAGE" >> $GITHUB_ENV
-          echo "PR coverage: $PR_COVERAGE%"
-
       - name: Install grcov for merging coverage
         uses: taiki-e/install-action@v2
         with:
@@ -118,18 +103,20 @@ jobs:
             --ignore "**/examples/*" \
             --ignore "**/target/*"
 
+          # Extract coverage percentage from the HTML index
+          CURRENT_COVERAGE=$(grep -oP 'Coverage: \K[0-9]+\.[0-9]+' site/coverage/html/index.html | head -1 || echo "0.00")
+          echo "CURRENT_COVERAGE=$CURRENT_COVERAGE" >> $GITHUB_ENV
+          echo "Combined coverage: $CURRENT_COVERAGE%"
+
+      - name: Generate coverage summary for PR comparison
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "PR_COVERAGE=$CURRENT_COVERAGE" >> $GITHUB_ENV
+          echo "PR coverage: $CURRENT_COVERAGE%"
+
       - name: Store coverage percentage for main branch
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: |
-          # Run tarpaulin and extract coverage percentage from the summary line
-          CURRENT_COVERAGE=$(cargo tarpaulin \
-            --package oo7 \
-            --lib \
-            --no-default-features \
-            --features "tracing,tokio,native_crypto" \
-            --ignore-panics \
-            --skip-clean 2>&1 | grep "% coverage" | grep -o '[0-9]\+\.[0-9]\+' | head -1 || echo "0.00")
-
           echo "Main branch coverage: $CURRENT_COVERAGE%"
 
           # Store in a simple text file artifact for PR comparisons
