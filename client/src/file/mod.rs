@@ -1569,7 +1569,7 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let keyring_path = temp_dir.path().join("partially_corrupted.keyring");
 
-        // 1) Create keyring with correct password and add 2 valid items
+        // Create keyring with correct password and add 2 valid items
         let correct_secret = Secret::from("correct-password-long-enough".as_bytes());
         let keyring = Keyring::load(&keyring_path, correct_secret.clone()).await?;
         keyring
@@ -1590,8 +1590,7 @@ mod tests {
             .await?;
         drop(keyring);
 
-        // 2) Load_unchecked with wrong password and add 3 broken items (more than
-        //    valid)
+        // Load_unchecked with wrong password and add 3 broken items (more than valid)
         let wrong_secret = Secret::from("wrong-password-long-enough".as_bytes());
         let keyring = unsafe { Keyring::load_unchecked(&keyring_path, wrong_secret).await? };
         keyring
@@ -1620,10 +1619,7 @@ mod tests {
             .await?;
         drop(keyring);
 
-        // 3) Try to load with correct password - should fail with
-        //    PartiallyCorruptedKeyring
         let result = Keyring::load(&keyring_path, correct_secret).await;
-
         assert!(result.is_err());
         match result.unwrap_err() {
             Error::PartiallyCorruptedKeyring {
@@ -1681,6 +1677,35 @@ mod tests {
             items_result[1].as_ref().unwrap_err(),
             super::error::InvalidItemError { .. }
         ));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn replace_item_index_invalid() -> Result<(), Error> {
+        let temp_dir = tempdir().unwrap();
+        let keyring_path = temp_dir.path().join("replace_invalid_index.keyring");
+        let keyring = Keyring::load(&keyring_path, strong_key()).await?;
+
+        // Create one item
+        keyring
+            .create_item(
+                "Test Item",
+                &HashMap::from([("app", "test")]),
+                "secret",
+                false,
+            )
+            .await?;
+
+        // Try to replace at invalid index
+        let new_item = Item::new(
+            "Replacement",
+            &HashMap::from([("app", "test2")]),
+            "new_secret",
+        );
+        let result = keyring.replace_item_index(100, &new_item).await;
+
+        assert!(matches!(result, Err(Error::InvalidItemIndex(100))));
 
         Ok(())
     }
