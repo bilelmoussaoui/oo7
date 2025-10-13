@@ -1563,4 +1563,125 @@ mod tests {
         assert_eq!(all_items_after.len(), 3);
         Ok(())
     }
+
+    #[tokio::test]
+    async fn partially_corrupted_keyring_error() -> Result<(), Error> {
+        let temp_dir = tempdir().unwrap();
+        let keyring_path = temp_dir.path().join("partially_corrupted.keyring");
+
+        // 1) Create keyring with correct password and add 2 valid items
+        let correct_secret = Secret::from("correct-password-long-enough".as_bytes());
+        let keyring = Keyring::load(&keyring_path, correct_secret.clone()).await?;
+        keyring
+            .create_item(
+                "valid1",
+                &HashMap::from([("attr", "value1")]),
+                "password1",
+                false,
+            )
+            .await?;
+        keyring
+            .create_item(
+                "valid2",
+                &HashMap::from([("attr", "value2")]),
+                "password2",
+                false,
+            )
+            .await?;
+        drop(keyring);
+
+        // 2) Load_unchecked with wrong password and add 3 broken items (more than
+        //    valid)
+        let wrong_secret = Secret::from("wrong-password-long-enough".as_bytes());
+        let keyring = unsafe { Keyring::load_unchecked(&keyring_path, wrong_secret).await? };
+        keyring
+            .create_item(
+                "broken1",
+                &HashMap::from([("bad", "value1")]),
+                "bad_password1",
+                false,
+            )
+            .await?;
+        keyring
+            .create_item(
+                "broken2",
+                &HashMap::from([("bad", "value2")]),
+                "bad_password2",
+                false,
+            )
+            .await?;
+        keyring
+            .create_item(
+                "broken3",
+                &HashMap::from([("bad", "value3")]),
+                "bad_password3",
+                false,
+            )
+            .await?;
+        drop(keyring);
+
+        // 3) Try to load with correct password - should fail with
+        //    PartiallyCorruptedKeyring
+        let result = Keyring::load(&keyring_path, correct_secret).await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            Error::PartiallyCorruptedKeyring {
+                valid_items,
+                broken_items,
+            } => {
+                assert_eq!(valid_items, 2);
+                assert_eq!(broken_items, 3);
+                assert!(broken_items > valid_items);
+            }
+            other => panic!("Expected PartiallyCorruptedKeyring, got: {:?}", other),
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn invalid_item_error_on_decrypt_failure() -> Result<(), Error> {
+        let temp_dir = tempdir().unwrap();
+        let keyring_path = temp_dir.path().join("invalid_item_test.keyring");
+
+        // 1) Create keyring with correct password and add 2 items
+        let correct_secret = Secret::from("correct-password-long-enough".as_bytes());
+        let keyring = Keyring::load(&keyring_path, correct_secret).await?;
+        keyring
+            .create_item(
+                "item1",
+                &HashMap::from([("app", "test1")]),
+                "password1",
+                false,
+            )
+            .await?;
+        keyring
+            .create_item(
+                "item2",
+                &HashMap::from([("app", "test2")]),
+                "password2",
+                false,
+            )
+            .await?;
+        drop(keyring);
+
+        // 2) Load_unchecked with wrong password - items won't decrypt
+        let wrong_secret = Secret::from("wrong-password-long-enough".as_bytes());
+        let keyring = unsafe { Keyring::load_unchecked(&keyring_path, wrong_secret).await? };
+
+        let items_result = keyring.items().await?;
+        assert_eq!(items_result.len(), 2);
+
+        assert!(matches!(
+            items_result[0].as_ref().unwrap_err(),
+            super::error::InvalidItemError { .. }
+        ));
+        assert!(matches!(
+            items_result[1].as_ref().unwrap_err(),
+            super::error::InvalidItemError { .. }
+        ));
+
+        Ok(())
+    }
 }
