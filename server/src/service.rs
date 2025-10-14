@@ -890,4 +890,96 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn search_items_with_results() -> Result<(), Box<dyn std::error::Error>> {
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
+
+        let _server = Service::run_with_connection(
+            server_conn,
+            Some(Secret::from("test-password-long-enough")),
+        )
+        .await?;
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await?;
+        let (_aes_key, session) = service_api.open_session(None).await?;
+        let session = Arc::new(session);
+
+        let collections = service_api.collections().await?;
+
+        // Create items in default collection
+        let secret1 = Secret::text("password1");
+        let dbus_secret1 = dbus::api::DBusSecret::new(Arc::clone(&session), secret1);
+
+        collections[0]
+            .create_item(
+                "Firefox Login",
+                &[("application", "firefox"), ("type", "login")],
+                &dbus_secret1,
+                false,
+                None,
+            )
+            .await?;
+
+        let secret2 = Secret::text("password2");
+        let dbus_secret2 = dbus::api::DBusSecret::new(Arc::clone(&session), secret2);
+
+        collections[0]
+            .create_item(
+                "Chrome Login",
+                &[("application", "chrome"), ("type", "login")],
+                &dbus_secret2,
+                false,
+                None,
+            )
+            .await?;
+
+        // Create item in session collection
+        let secret3 = Secret::text("password3");
+        let dbus_secret3 = dbus::api::DBusSecret::new(Arc::clone(&session), secret3);
+
+        collections[1]
+            .create_item(
+                "Session Item",
+                &[("application", "firefox"), ("type", "session")],
+                &dbus_secret3,
+                false,
+                None,
+            )
+            .await?;
+
+        // Search for all firefox items
+        let (unlocked, locked) = service_api
+            .search_items(&[("application", "firefox")])
+            .await?;
+
+        assert_eq!(unlocked.len(), 2, "Should find 2 firefox items");
+        assert!(locked.is_empty(), "Should have no locked items");
+
+        // Search for login type items
+        let (unlocked, locked) = service_api.search_items(&[("type", "login")]).await?;
+
+        assert_eq!(unlocked.len(), 2, "Should find 2 login items");
+        assert!(locked.is_empty(), "Should have no locked items");
+
+        // Search for chrome items
+        let (unlocked, locked) = service_api
+            .search_items(&[("application", "chrome")])
+            .await?;
+
+        assert_eq!(unlocked.len(), 1, "Should find 1 chrome item");
+        assert!(locked.is_empty(), "Should have no locked items");
+
+        // Search for non-existent
+        let (unlocked, locked) = service_api
+            .search_items(&[("application", "nonexistent")])
+            .await?;
+
+        assert!(unlocked.is_empty(), "Should find no items");
+        assert!(locked.is_empty(), "Should have no locked items");
+
+        Ok(())
+    }
 }
