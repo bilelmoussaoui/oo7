@@ -121,6 +121,24 @@ impl Collection {
         );
         *self.item_index.write().await = n_items + 1;
 
+        // Remove any existing items with the same attributes
+        if replace {
+            let existing_items = self.search_inner_items(&attributes).await;
+            if !existing_items.is_empty() {
+                let mut items = self.items.lock().await;
+                for existing in &existing_items {
+                    let existing_path = existing.path();
+
+                    items.retain(|i| i.path() != existing_path);
+                    object_server.remove::<item::Item, _>(existing_path).await?;
+                    Self::item_deleted(&signal_emitter, existing_path).await?;
+
+                    tracing::debug!("Replaced item `{}`", existing_path);
+                }
+                drop(items);
+            }
+        }
+
         self.items.lock().await.push(item.clone());
 
         object_server.at(&item_path, item).await?;
@@ -509,6 +527,71 @@ mod tests {
             0,
             "Should find no nonexistent items"
         );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn create_item_with_replace() -> Result<(), Box<dyn std::error::Error>> {
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
+
+        let _server = Service::run_with_connection(
+            server_conn,
+            Some(oo7::Secret::from("test-password-long-enough")),
+        )
+        .await?;
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await?;
+        let (_aes_key, session) = service_api.open_session(None).await?;
+        let session = Arc::new(session);
+
+        let collections = service_api.collections().await?;
+
+        // Create first item
+        let secret1 = oo7::Secret::text("original-password");
+        let dbus_secret1 = dbus::api::DBusSecret::new(Arc::clone(&session), secret1.clone());
+
+        let item1 = collections[0]
+            .create_item(
+                "Test Item",
+                &[("application", "myapp"), ("username", "user")],
+                &dbus_secret1,
+                false,
+                None,
+            )
+            .await?;
+
+        // Verify one item exists
+        let items = collections[0].items().await?;
+        assert_eq!(items.len(), 1, "Should have one item");
+
+        // Get the secret from first item
+        let retrieved1 = item1.secret(&session).await?;
+        assert_eq!(retrieved1.value(), secret1.as_bytes());
+
+        // Create second item with same attributes and replace=true
+        let secret2 = oo7::Secret::text("replaced-password");
+        let dbus_secret2 = dbus::api::DBusSecret::new(Arc::clone(&session), secret2.clone());
+
+        let item2 = collections[0]
+            .create_item(
+                "Test Item",
+                &[("application", "myapp"), ("username", "user")],
+                &dbus_secret2,
+                true, // replace=true
+                None,
+            )
+            .await?;
+
+        // Should still have only one item (replaced)
+        let items = collections[0].items().await?;
+        assert_eq!(items.len(), 1, "Should still have one item after replace");
+
+        // Verify the new item has the updated secret
+        let retrieved2 = item2.secret(&session).await?;
+        assert_eq!(retrieved2.value(), secret2.as_bytes());
 
         Ok(())
     }
