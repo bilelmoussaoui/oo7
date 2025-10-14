@@ -28,15 +28,6 @@ pub struct DBusSecret<'a> {
     pub(crate) content_type: ContentType,
 }
 
-impl PartialEq for DBusSecret<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        self.parameters == other.parameters
-            && self.value == other.value
-            && self.content_type == other.content_type
-            && self.session.inner().path() == other.session.inner().path()
-    }
-}
-
 impl<'a> DBusSecret<'a> {
     /// Create a new plain (unencrypted) DBusSecret
     pub fn new(session: Arc<Session<'a>>, secret: impl Into<Secret>) -> Self {
