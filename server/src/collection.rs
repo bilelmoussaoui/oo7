@@ -33,7 +33,6 @@ pub struct Collection {
     modified: Arc<Mutex<Duration>>,
     // Other attributes
     alias: Arc<Mutex<String>>,
-    #[allow(unused)]
     keyring: Arc<Keyring>,
     service: Service,
     item_index: Arc<RwLock<u32>>,
@@ -181,6 +180,8 @@ impl Collection {
 
         object_server.at(&item_path, item).await?;
 
+        self.update_modified().await?;
+
         Self::item_created(&signal_emitter, &item_path).await?;
         self.items_changed(&signal_emitter).await?;
 
@@ -207,6 +208,13 @@ impl Collection {
     #[zbus(property, name = "Label")]
     pub async fn set_label(&self, label: &str) {
         *self.label.lock().await = label.to_owned();
+
+        if let Err(err) = self.update_modified().await {
+            tracing::error!(
+                "Failed to emit PropertyChanged signal for Modified: {}",
+                err
+            );
+        }
 
         let service_path = oo7::dbus::api::Service::PATH.as_ref().unwrap();
         if let Ok(signal_emitter) = self.service.signal_emitter(service_path) {
@@ -399,8 +407,23 @@ impl Collection {
         items.retain(|item| item.path() != path);
         drop(items);
 
+        self.update_modified().await?;
+
         let signal_emitter = self.service.signal_emitter(&self.path)?;
         self.items_changed(&signal_emitter).await?;
+
+        Ok(())
+    }
+
+    /// Update the modified timestamp and emit the PropertiesChanged signal
+    async fn update_modified(&self) -> Result<(), ServiceError> {
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap();
+        *self.modified.lock().await = now;
+
+        let signal_emitter = self.service.signal_emitter(&self.path)?;
+        self.modified_changed(&signal_emitter).await?;
 
         Ok(())
     }
@@ -418,6 +441,12 @@ mod tests {
     #[tokio::test]
     async fn create_item_plain() -> Result<(), Box<dyn std::error::Error>> {
         let setup = TestServiceSetup::plain_session(true).await?;
+
+        // Get initial modified timestamp
+        let initial_modified = setup.collections[0].modified().await?;
+
+        // Wait to ensure timestamp will be different
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
         // Create an item using the proper API
         let secret = oo7::Secret::text("my-secret-password");
@@ -441,6 +470,13 @@ mod tests {
         // Verify item label
         let label = item.label().await?;
         assert_eq!(label, "Test Item");
+
+        // Verify modified timestamp was updated
+        let new_modified = setup.collections[0].modified().await?;
+        assert!(
+            new_modified > initial_modified,
+            "Modified timestamp should be updated after creating item"
+        );
 
         Ok(())
     }
@@ -596,12 +632,25 @@ mod tests {
         let label = login_collection.label().await?;
         assert_eq!(label, "Login");
 
+        // Get initial modified timestamp
+        let initial_modified = login_collection.modified().await?;
+
+        // Wait to ensure timestamp will be different
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
         // Set new label
         login_collection.set_label("My Custom Collection").await?;
 
         // Verify new label
         let label = login_collection.label().await?;
         assert_eq!(label, "My Custom Collection");
+
+        // Verify modified timestamp was updated
+        let new_modified = login_collection.modified().await?;
+        assert!(
+            new_modified > initial_modified,
+            "Modified timestamp should be updated after label change"
+        );
 
         Ok(())
     }

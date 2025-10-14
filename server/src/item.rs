@@ -134,6 +134,15 @@ impl Item {
         let signal_emitter = self.service.signal_emitter(&self.collection_path)?;
         Collection::item_changed(&signal_emitter, &self.path).await?;
 
+        if let Ok(signal_emitter) = self.service.signal_emitter(&self.path) {
+            if let Err(err) = self.modified_changed(&signal_emitter).await {
+                tracing::error!(
+                    "Failed to emit PropertiesChanged signal for Modified: {}",
+                    err
+                );
+            }
+        }
+
         Ok(())
     }
 
@@ -169,6 +178,12 @@ impl Item {
                     err
                 );
             }
+            if let Err(err) = self.modified_changed(&signal_emitter).await {
+                tracing::error!(
+                    "Failed to emit PropertiesChanged signal for Modified: {}",
+                    err
+                );
+            }
         }
     }
 
@@ -189,6 +204,12 @@ impl Item {
         if let Ok(signal_emitter) = self.service.signal_emitter(&self.path) {
             if let Err(err) = self.label_changed(&signal_emitter).await {
                 tracing::error!("Failed to emit PropertiesChanged signal for Label: {}", err);
+            }
+            if let Err(err) = self.modified_changed(&signal_emitter).await {
+                tracing::error!(
+                    "Failed to emit PropertiesChanged signal for Modified: {}",
+                    err
+                );
             }
         }
     }
@@ -274,12 +295,28 @@ mod tests {
         let label = item.label().await?;
         assert_eq!(label, "Original Label");
 
+        // Get initial modified timestamp
+        let initial_modified = item.modified().await?;
+
+        // Wait to ensure timestamp will be different
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
         // Set label
         item.set_label("New Label").await?;
 
         // Verify new label
         let label = item.label().await?;
         assert_eq!(label, "New Label");
+
+        // Verify modified timestamp was updated
+        let new_modified = item.modified().await?;
+        println!("New modified: {:?}", new_modified);
+        assert!(
+            new_modified > initial_modified,
+            "Modified timestamp should be updated after label change (initial: {:?}, new: {:?})",
+            initial_modified,
+            new_modified
+        );
 
         Ok(())
     }
@@ -306,6 +343,12 @@ mod tests {
         assert_eq!(attrs.get("app").unwrap(), "firefox");
         assert_eq!(attrs.get("username").unwrap(), "user@example.com");
 
+        // Get initial modified timestamp
+        let initial_modified = item.modified().await?;
+
+        // Wait to ensure timestamp will be different
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
         // Set new attributes
         item.set_attributes(&[("app", "chrome"), ("username", "newuser@example.com")])
             .await?;
@@ -314,6 +357,13 @@ mod tests {
         let attrs = item.attributes().await?;
         assert_eq!(attrs.get("app").unwrap(), "chrome");
         assert_eq!(attrs.get("username").unwrap(), "newuser@example.com");
+
+        // Verify modified timestamp was updated
+        let new_modified = item.modified().await?;
+        assert!(
+            new_modified > initial_modified,
+            "Modified timestamp should be updated after attributes change"
+        );
 
         Ok(())
     }
@@ -433,6 +483,12 @@ mod tests {
         let retrieved = item.secret(&setup.session).await?;
         assert_eq!(retrieved.value(), original_secret.as_bytes());
 
+        // Get initial modified timestamp
+        let initial_modified = item.modified().await?;
+
+        // Wait to ensure timestamp will be different
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
         // Update the secret
         let new_secret = oo7::Secret::text("new-password");
         let new_dbus_secret =
@@ -442,6 +498,13 @@ mod tests {
         // Verify updated secret
         let retrieved = item.secret(&setup.session).await?;
         assert_eq!(retrieved.value(), new_secret.as_bytes());
+
+        // Verify modified timestamp was updated
+        let new_modified = item.modified().await?;
+        assert!(
+            new_modified > initial_modified,
+            "Modified timestamp should be updated after secret change"
+        );
 
         Ok(())
     }
@@ -469,6 +532,12 @@ mod tests {
             original_secret.as_bytes()
         );
 
+        // Get initial modified timestamp
+        let initial_modified = item.modified().await?;
+
+        // Wait to ensure timestamp will be different
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
         // Update the secret
         let new_secret = oo7::Secret::text("new-encrypted-password");
         let new_dbus_secret = dbus::api::DBusSecret::new_encrypted(
@@ -483,6 +552,13 @@ mod tests {
         assert_eq!(
             retrieved.decrypt(Some(&aes_key.clone()))?.as_bytes(),
             new_secret.as_bytes()
+        );
+
+        // Verify modified timestamp was updated
+        let new_modified = item.modified().await?;
+        assert!(
+            new_modified > initial_modified,
+            "Modified timestamp should be updated after secret change"
         );
 
         Ok(())
