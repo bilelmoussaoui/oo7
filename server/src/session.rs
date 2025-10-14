@@ -60,3 +60,42 @@ impl Session {
         self.aes_key.as_ref().map(Arc::clone)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[tokio::test]
+    async fn close() -> Result<(), Box<dyn std::error::Error>> {
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
+        let server = crate::Service::run_with_connection(
+            server_conn,
+            Some(oo7::Secret::from("test-password-long-enough")),
+        )
+        .await?;
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = oo7::dbus::api::Service::new(&client_conn).await?;
+
+        // Open a session
+        let (_aes_key, session) = service_api.open_session(None).await?;
+        let path = session.inner().path().to_owned();
+
+        // Verify session exists on the server
+        let session_check = server.session(&path).await;
+        assert!(
+            session_check.is_some(),
+            "Session should exist on server before close"
+        );
+
+        // Close the session
+        session.close().await?;
+
+        // Verify session no longer exists on the server
+        let session_check_after = server.session(&path).await;
+        assert!(
+            session_check_after.is_none(),
+            "Session should not exist on server after close"
+        );
+
+        Ok(())
+    }
+}
