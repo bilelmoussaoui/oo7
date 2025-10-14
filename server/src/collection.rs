@@ -123,7 +123,7 @@ impl Collection {
 
         // Remove any existing items with the same attributes
         if replace {
-            let existing_items = self.search_inner_items(&attributes).await;
+            let existing_items = self.search_inner_items(attributes).await;
             if !existing_items.is_empty() {
                 let mut items = self.items.lock().await;
                 for existing in &existing_items {
