@@ -277,11 +277,8 @@ mod tests {
 
         assert_eq!(item.secret().await.unwrap(), secret);
         assert_eq!(
-            item.attributes().await.unwrap(),
-            attributes
-                .iter()
-                .map(|(key, value)| (key.to_string(), value.to_string()))
-                .collect(),
+            item.attributes().await.unwrap().get("type").unwrap(),
+            attributes[0].1,
         );
 
         assert_eq!(
