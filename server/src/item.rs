@@ -162,6 +162,14 @@ impl Item {
                 tracing::error!("Failed to emit ItemChanged signal: {}", err);
             }
         }
+        if let Ok(signal_emitter) = self.service.signal_emitter(&self.path) {
+            if let Err(err) = self.attributes_changed(&signal_emitter).await {
+                tracing::error!(
+                    "Failed to emit PropertiesChanged signal for Attributes: {}",
+                    err
+                );
+            }
+        }
     }
 
     #[zbus(property, name = "Label")]
@@ -176,6 +184,11 @@ impl Item {
         if let Ok(signal_emitter) = self.service.signal_emitter(&self.collection_path) {
             if let Err(err) = Collection::item_changed(&signal_emitter, &self.path).await {
                 tracing::error!("Failed to emit ItemChanged signal: {}", err);
+            }
+        }
+        if let Ok(signal_emitter) = self.service.signal_emitter(&self.path) {
+            if let Err(err) = self.label_changed(&signal_emitter).await {
+                tracing::error!("Failed to emit PropertiesChanged signal for Label: {}", err);
             }
         }
     }

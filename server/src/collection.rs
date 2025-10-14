@@ -176,6 +176,12 @@ impl Collection {
                 tracing::error!("Failed to emit CollectionChanged signal: {}", err);
             }
         }
+
+        if let Ok(signal_emitter) = self.service.signal_emitter(&self.path) {
+            if let Err(err) = self.label_changed(&signal_emitter).await {
+                tracing::error!("Failed to emit PropertiesChanged signal for Label: {}", err);
+            }
+        }
     }
 
     #[zbus(property, name = "Locked")]
