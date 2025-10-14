@@ -595,4 +595,67 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn label_property() -> Result<(), Box<dyn std::error::Error>> {
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
+
+        let _server = Service::run_with_connection(
+            server_conn,
+            Some(oo7::Secret::from("test-password-long-enough")),
+        )
+        .await?;
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await?;
+        let collections = service_api.collections().await?;
+
+        // Get initial label (should be "Login" for default collection)
+        let label = collections[0].label().await?;
+        assert_eq!(label, "Login");
+
+        // Set new label
+        collections[0].set_label("My Custom Collection").await?;
+
+        // Verify new label
+        let label = collections[0].label().await?;
+        assert_eq!(label, "My Custom Collection");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn timestamps() -> Result<(), Box<dyn std::error::Error>> {
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
+
+        let _server = Service::run_with_connection(
+            server_conn,
+            Some(oo7::Secret::from("test-password-long-enough")),
+        )
+        .await?;
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await?;
+        let collections = service_api.collections().await?;
+
+        // Get created timestamp
+        let created = collections[0].created().await?;
+        assert!(created.as_secs() > 0, "Created timestamp should be set");
+
+        // Get modified timestamp
+        let modified = collections[0].modified().await?;
+        assert!(modified.as_secs() > 0, "Modified timestamp should be set");
+
+        // Created and modified should be close (within a second for new collection)
+        let diff = if created > modified {
+            created.as_secs() - modified.as_secs()
+        } else {
+            modified.as_secs() - created.as_secs()
+        };
+        assert!(diff <= 1, "Created and modified should be within 1 second");
+
+        Ok(())
+    }
 }
