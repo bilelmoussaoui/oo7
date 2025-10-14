@@ -696,6 +696,19 @@ mod tests {
         );
         assert!(locked.is_empty(), "Should have no locked items initially");
 
+        // Search with empty attributes - edge case
+        let attributes: HashMap<&str, &str> = HashMap::default();
+        let (unlocked, locked) = service_api.search_items(&attributes).await?;
+
+        assert!(
+            locked.is_empty(),
+            "Should have no locked items with empty search"
+        );
+        assert!(
+            unlocked.is_empty(),
+            "Should have no unlocked items with empty search"
+        );
+
         Ok(())
     }
 
@@ -716,6 +729,13 @@ mod tests {
         let session = Arc::new(session);
 
         let collections = service_api.collections().await?;
+
+        // Test with empty items list - edge case
+        let secrets = service_api.secrets(&vec![], &session).await?;
+        assert!(
+            secrets.is_empty(),
+            "Should return empty secrets for empty items list"
+        );
 
         // Create two items with different secrets
         let secret1 = Secret::text("password1");
@@ -1059,6 +1079,245 @@ mod tests {
                 ))
             ),
             "Should be NoSuchObject error"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn get_secrets_with_non_existent_items() -> Result<(), Box<dyn std::error::Error>> {
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
+
+        let _server = Service::run_with_connection(
+            server_conn,
+            Some(Secret::from("test-password-long-enough")),
+        )
+        .await?;
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await?;
+        let (_aes_key, session) = service_api.open_session(None).await?;
+        let session = Arc::new(session);
+
+        let collections = service_api.collections().await?;
+
+        // Create one real item
+        let secret = Secret::text("password1");
+        let dbus_secret = dbus::api::DBusSecret::new(Arc::clone(&session), secret.clone());
+
+        let item1 = collections[0]
+            .create_item("Item 1", &[("app", "test")], &dbus_secret, false, None)
+            .await?;
+
+        // Create a fake item path that doesn't exist
+        let fake_item = dbus::api::Item::new(
+            &client_conn,
+            "/org/freedesktop/secrets/collection/Login/999",
+        )
+        .await?;
+
+        // Request secrets for both real and fake items
+        let item_paths = vec![item1.clone(), fake_item];
+        let secrets = service_api.secrets(&item_paths, &session).await?;
+
+        // Should only get the secret for the real item
+        assert_eq!(
+            secrets.len(),
+            1,
+            "Should only retrieve secret for existing item"
+        );
+        assert!(secrets.contains_key(&item1), "Should have item1 secret");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn search_items_across_collections() -> Result<(), Box<dyn std::error::Error>> {
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
+
+        let _server = Service::run_with_connection(
+            server_conn,
+            Some(Secret::from("test-password-long-enough")),
+        )
+        .await?;
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await?;
+        let (_aes_key, session) = service_api.open_session(None).await?;
+        let session = Arc::new(session);
+
+        let collections = service_api.collections().await?;
+        assert_eq!(collections.len(), 2, "Should have 2 collections");
+
+        // Create item in first collection
+        let secret1 = Secret::text("password1");
+        let dbus_secret1 = dbus::api::DBusSecret::new(Arc::clone(&session), secret1);
+
+        collections[0]
+            .create_item(
+                "Default Item",
+                &[("shared", "attr")],
+                &dbus_secret1,
+                false,
+                None,
+            )
+            .await?;
+
+        // Create item in second collection with same attributes
+        let secret2 = Secret::text("password2");
+        let dbus_secret2 = dbus::api::DBusSecret::new(Arc::clone(&session), secret2);
+
+        collections[1]
+            .create_item(
+                "Session Item",
+                &[("shared", "attr")],
+                &dbus_secret2,
+                false,
+                None,
+            )
+            .await?;
+
+        // Search should find items from both collections
+        let (unlocked, locked) = service_api.search_items(&[("shared", "attr")]).await?;
+
+        assert_eq!(unlocked.len(), 2, "Should find items from both collections");
+        assert!(locked.is_empty(), "Should have no locked items");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn unlock_edge_cases() -> Result<(), Box<dyn std::error::Error>> {
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
+
+        let _server = Service::run_with_connection(
+            server_conn,
+            Some(Secret::from("test-password-long-enough")),
+        )
+        .await?;
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await?;
+        let (_aes_key, session) = service_api.open_session(None).await?;
+        let session = Arc::new(session);
+
+        let collections = service_api.collections().await?;
+
+        // Test 1: Empty object list
+        let items: Vec<ObjectPath<'_>> = vec![];
+        let unlocked = service_api.unlock(&items, None).await?;
+        assert!(unlocked.is_empty(), "Should return empty for empty input");
+
+        // Test 2: Non-existent objects
+        let fake_collection = dbus::api::Collection::new(
+            &client_conn,
+            "/org/freedesktop/secrets/collection/NonExistent",
+        )
+        .await?;
+
+        let fake_item = dbus::api::Item::new(
+            &client_conn,
+            "/org/freedesktop/secrets/collection/Login/999",
+        )
+        .await?;
+
+        let unlocked = service_api
+            .unlock(
+                &[fake_collection.inner().path(), fake_item.inner().path()],
+                None,
+            )
+            .await?;
+
+        assert!(
+            unlocked.is_empty(),
+            "Should have no unlocked objects for non-existent paths"
+        );
+
+        // Test 3: Already unlocked objects
+        let secret = Secret::text("test-password");
+        let dbus_secret = dbus::api::DBusSecret::new(Arc::clone(&session), secret);
+
+        let item = collections[0]
+            .create_item("Test Item", &[("app", "test")], &dbus_secret, false, None)
+            .await?;
+
+        // Verify item is unlocked
+        assert!(!item.is_locked().await?, "Item should be unlocked");
+
+        // Try to unlock already unlocked item
+        let unlocked = service_api.unlock(&[item.inner().path()], None).await?;
+
+        assert_eq!(unlocked.len(), 1, "Should return the already-unlocked item");
+        assert_eq!(
+            unlocked[0].as_str(),
+            item.inner().path().as_str(),
+            "Should return the same item path"
+        );
+
+        // Also test with collection (starts unlocked by default)
+        assert!(
+            !collections[0].is_locked().await?,
+            "Collection should be unlocked"
+        );
+
+        let unlocked = service_api
+            .unlock(&[collections[0].inner().path()], None)
+            .await?;
+
+        assert_eq!(
+            unlocked.len(),
+            1,
+            "Should return the already-unlocked collection"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn lock_non_existent_objects() -> Result<(), Box<dyn std::error::Error>> {
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
+
+        let _server = Service::run_with_connection(
+            server_conn,
+            Some(Secret::from("test-password-long-enough")),
+        )
+        .await?;
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await?;
+
+        // Test with empty object list
+        let items: Vec<ObjectPath<'_>> = vec![];
+        let locked = service_api.lock(&items, None).await?;
+        assert!(locked.is_empty(), "Should return empty for empty input");
+
+        // Test locking non-existent objects
+        let fake_collection = dbus::api::Collection::new(
+            &client_conn,
+            "/org/freedesktop/secrets/collection/NonExistent",
+        )
+        .await?;
+
+        let fake_item = dbus::api::Item::new(
+            &client_conn,
+            "/org/freedesktop/secrets/collection/Login/999",
+        )
+        .await?;
+
+        let locked = service_api
+            .lock(
+                &[fake_collection.inner().path(), fake_item.inner().path()],
+                None,
+            )
+            .await?;
+
+        assert!(
+            locked.is_empty(),
+            "Should have no locked objects for non-existent paths"
         );
 
         Ok(())
