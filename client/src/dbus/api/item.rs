@@ -10,7 +10,7 @@ use crate::{
     dbus::{Error, ServiceError},
 };
 
-#[derive(Type)]
+#[derive(Type, Clone)]
 #[zvariant(signature = "o")]
 #[doc(alias = "org.freedesktop.Secret.Item")]
 pub struct Item<'a>(zbus::Proxy<'a>);

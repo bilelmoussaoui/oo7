@@ -698,4 +698,125 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn get_secrets() -> Result<(), Box<dyn std::error::Error>> {
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
+
+        let _server = Service::run_with_connection(
+            server_conn,
+            Some(Secret::from("test-password-long-enough")),
+        )
+        .await?;
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await?;
+        let (_aes_key, session) = service_api.open_session(None).await?;
+        let session = Arc::new(session);
+
+        let collections = service_api.collections().await?;
+
+        // Create two items with different secrets
+        let secret1 = Secret::text("password1");
+        let dbus_secret1 = dbus::api::DBusSecret::new(Arc::clone(&session), secret1.clone());
+
+        let item1 = collections[0]
+            .create_item("Item 1", &[("app", "test1")], &dbus_secret1, false, None)
+            .await?;
+
+        let secret2 = Secret::text("password2");
+        let dbus_secret2 = dbus::api::DBusSecret::new(Arc::clone(&session), secret2.clone());
+
+        let item2 = collections[0]
+            .create_item("Item 2", &[("app", "test2")], &dbus_secret2, false, None)
+            .await?;
+
+        // Get secrets for both items
+        let item_paths = vec![item1.clone(), item2.clone()];
+        let secrets = service_api.secrets(&item_paths, &session).await?;
+
+        // Should have both secrets
+        assert_eq!(secrets.len(), 2, "Should retrieve both secrets");
+
+        // Verify first secret
+        let retrieved_secret1 = secrets.get(&item1).unwrap();
+        assert_eq!(retrieved_secret1.value(), secret1.as_bytes());
+
+        // Verify second secret
+        let retrieved_secret2 = secrets.get(&item2).unwrap();
+        assert_eq!(retrieved_secret2.value(), secret2.as_bytes());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn get_secrets_multiple_collections() -> Result<(), Box<dyn std::error::Error>> {
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
+
+        let _server = Service::run_with_connection(
+            server_conn,
+            Some(Secret::from("test-password-long-enough")),
+        )
+        .await?;
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await?;
+        let (_aes_key, session) = service_api.open_session(None).await?;
+        let session = Arc::new(session);
+
+        let collections = service_api.collections().await?;
+        // Should have 2 collections: default (Login) and session
+        assert_eq!(collections.len(), 2);
+
+        // Create item in default collection (index 0)
+        let secret1 = Secret::text("default-password");
+        let dbus_secret1 = dbus::api::DBusSecret::new(Arc::clone(&session), secret1.clone());
+
+        let item1 = collections[0]
+            .create_item(
+                "Default Item",
+                &[("app", "default-app")],
+                &dbus_secret1,
+                false,
+                None,
+            )
+            .await?;
+
+        // Create item in session collection (index 1)
+        let secret2 = Secret::text("session-password");
+        let dbus_secret2 = dbus::api::DBusSecret::new(Arc::clone(&session), secret2.clone());
+
+        let item2 = collections[1]
+            .create_item(
+                "Session Item",
+                &[("app", "session-app")],
+                &dbus_secret2,
+                false,
+                None,
+            )
+            .await?;
+
+        // Get secrets for both items from different collections
+        let item_paths = vec![item1.clone(), item2.clone()];
+        let secrets = service_api.secrets(&item_paths, &session).await?;
+
+        // Should have both secrets
+        assert_eq!(
+            secrets.len(),
+            2,
+            "Should retrieve secrets from both collections"
+        );
+
+        // Verify default collection secret
+        let retrieved_secret1 = secrets.get(&item1).unwrap();
+        assert_eq!(retrieved_secret1.value(), secret1.as_bytes());
+
+        // Verify session collection secret
+        let retrieved_secret2 = secrets.get(&item2).unwrap();
+        assert_eq!(retrieved_secret2.value(), secret2.as_bytes());
+
+        Ok(())
+    }
 }
