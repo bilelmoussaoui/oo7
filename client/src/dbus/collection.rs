@@ -257,7 +257,7 @@ impl<'a> Collection<'a> {
 #[cfg(test)]
 #[cfg(feature = "tokio")]
 mod tests {
-    use crate::{AsAttributes, dbus::Service};
+    use crate::dbus::Service;
 
     async fn create_item(service: Service<'_>, encrypted: bool) {
         let attributes = if encrypted {
@@ -277,8 +277,11 @@ mod tests {
 
         assert_eq!(item.secret().await.unwrap(), secret);
         assert_eq!(
-            item.attributes().await.unwrap().as_attributes(),
-            attributes.as_attributes()
+            item.attributes().await.unwrap(),
+            attributes
+                .iter()
+                .map(|(key, value)| (key.to_string(), value.to_string()))
+                .collect(),
         );
 
         assert_eq!(
