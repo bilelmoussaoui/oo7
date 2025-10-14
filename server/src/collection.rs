@@ -375,33 +375,17 @@ mod tests {
     use oo7::dbus;
     use tokio_stream::StreamExt;
 
-    use super::*;
+    use crate::tests::TestServiceSetup;
 
     #[tokio::test]
     async fn create_item_plain() -> Result<(), Box<dyn std::error::Error>> {
-        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
-
-        let _server = Service::run_with_connection(
-            server_conn,
-            Some(oo7::Secret::from("test-password-long-enough")),
-        )
-        .await?;
-
-        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-
-        let service_api = dbus::api::Service::new(&client_conn).await?;
-
-        // Open plain session
-        let (_aes_key, session) = service_api.open_session(None).await?;
-
-        // Get default collection
-        let collections = service_api.collections().await?;
+        let setup = TestServiceSetup::plain_session(true).await?;
 
         // Create an item using the proper API
         let secret = oo7::Secret::text("my-secret-password");
-        let dbus_secret = dbus::api::DBusSecret::new(Arc::new(session), secret.clone());
+        let dbus_secret = dbus::api::DBusSecret::new(setup.session, secret.clone());
 
-        let item = collections[0]
+        let item = setup.collections[0]
             .create_item(
                 "Test Item",
                 &[("application", "test-app"), ("type", "password")],
@@ -412,7 +396,7 @@ mod tests {
             .await?;
 
         // Verify item exists in collection
-        let items = collections[0].items().await?;
+        let items = setup.collections[0].items().await?;
         assert_eq!(items.len(), 1, "Collection should have one item");
         assert_eq!(items[0].inner().path(), item.inner().path());
 
@@ -425,37 +409,14 @@ mod tests {
 
     #[tokio::test]
     async fn create_item_encrypted() -> Result<(), Box<dyn std::error::Error>> {
-        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
-
-        let _server = Service::run_with_connection(
-            server_conn,
-            Some(oo7::Secret::from("test-password-long-enough")),
-        )
-        .await?;
-
-        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-
-        let service_api = dbus::api::Service::new(&client_conn).await?;
-
-        // Open encrypted session
-        let client_private_key = oo7::Key::generate_private_key()?;
-        let client_public_key = oo7::Key::generate_public_key(&client_private_key)?;
-
-        let (server_public_key_opt, session) =
-            service_api.open_session(Some(client_public_key)).await?;
-
-        let server_public_key = server_public_key_opt.unwrap();
-        let aes_key = oo7::Key::generate_aes_key(&client_private_key, &server_public_key)?;
-
-        // Get default collection
-        let collections = service_api.collections().await?;
+        let setup = TestServiceSetup::encrypted_session(true).await?;
+        let aes_key = setup.aes_key.unwrap();
 
         // Create an encrypted item using the proper API
         let secret = oo7::Secret::text("my-encrypted-secret");
-        let dbus_secret =
-            dbus::api::DBusSecret::new_encrypted(Arc::new(session), secret, &aes_key)?;
+        let dbus_secret = dbus::api::DBusSecret::new_encrypted(setup.session, secret, &aes_key)?;
 
-        let item = collections[0]
+        let item = setup.collections[0]
             .create_item(
                 "Test Encrypted Item",
                 &[("application", "test-app"), ("type", "encrypted-password")],
@@ -466,7 +427,7 @@ mod tests {
             .await?;
 
         // Verify item exists
-        let items = collections[0].items().await?;
+        let items = setup.collections[0].items().await?;
         assert_eq!(items.len(), 1, "Collection should have one item");
         assert_eq!(items[0].inner().path(), item.inner().path());
 
@@ -475,27 +436,13 @@ mod tests {
 
     #[tokio::test]
     async fn search_items_after_creation() -> Result<(), Box<dyn std::error::Error>> {
-        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
-
-        let _server = Service::run_with_connection(
-            server_conn,
-            Some(oo7::Secret::from("test-password-long-enough")),
-        )
-        .await?;
-
-        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-
-        let service_api = dbus::api::Service::new(&client_conn).await?;
-        let (_aes_key, session) = service_api.open_session(None).await?;
-        let session = Arc::new(session);
-
-        let collections = service_api.collections().await?;
+        let setup = TestServiceSetup::plain_session(true).await?;
 
         // Create two items with different attributes
         let secret1 = oo7::Secret::text("password1");
-        let dbus_secret1 = dbus::api::DBusSecret::new(Arc::clone(&session), secret1);
+        let dbus_secret1 = dbus::api::DBusSecret::new(Arc::clone(&setup.session), secret1);
 
-        collections[0]
+        setup.collections[0]
             .create_item(
                 "Firefox Password",
                 &[("application", "firefox"), ("username", "user1")],
@@ -506,9 +453,9 @@ mod tests {
             .await?;
 
         let secret2 = oo7::Secret::text("password2");
-        let dbus_secret2 = dbus::api::DBusSecret::new(Arc::clone(&session), secret2);
+        let dbus_secret2 = dbus::api::DBusSecret::new(Arc::clone(&setup.session), secret2);
 
-        collections[0]
+        setup.collections[0]
             .create_item(
                 "Chrome Password",
                 &[("application", "chrome"), ("username", "user2")],
@@ -520,19 +467,19 @@ mod tests {
 
         // Search for firefox item
         let firefox_attrs = &[("application", "firefox")];
-        let firefox_items = collections[0].search_items(firefox_attrs).await?;
+        let firefox_items = setup.collections[0].search_items(firefox_attrs).await?;
 
         assert_eq!(firefox_items.len(), 1, "Should find one firefox item");
 
         // Search for chrome item
-        let chrome_items = collections[0]
+        let chrome_items = setup.collections[0]
             .search_items(&[("application", "chrome")])
             .await?;
 
         assert_eq!(chrome_items.len(), 1, "Should find one chrome item");
 
         // Search for non-existent item
-        let nonexistent_items = collections[0]
+        let nonexistent_items = setup.collections[0]
             .search_items(&[("application", "nonexistent")])
             .await?;
 
@@ -547,27 +494,13 @@ mod tests {
 
     #[tokio::test]
     async fn create_item_with_replace() -> Result<(), Box<dyn std::error::Error>> {
-        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
-
-        let _server = Service::run_with_connection(
-            server_conn,
-            Some(oo7::Secret::from("test-password-long-enough")),
-        )
-        .await?;
-
-        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-
-        let service_api = dbus::api::Service::new(&client_conn).await?;
-        let (_aes_key, session) = service_api.open_session(None).await?;
-        let session = Arc::new(session);
-
-        let collections = service_api.collections().await?;
+        let setup = TestServiceSetup::plain_session(true).await?;
 
         // Create first item
         let secret1 = oo7::Secret::text("original-password");
-        let dbus_secret1 = dbus::api::DBusSecret::new(Arc::clone(&session), secret1.clone());
+        let dbus_secret1 = dbus::api::DBusSecret::new(Arc::clone(&setup.session), secret1.clone());
 
-        let item1 = collections[0]
+        let item1 = setup.collections[0]
             .create_item(
                 "Test Item",
                 &[("application", "myapp"), ("username", "user")],
@@ -578,18 +511,18 @@ mod tests {
             .await?;
 
         // Verify one item exists
-        let items = collections[0].items().await?;
+        let items = setup.collections[0].items().await?;
         assert_eq!(items.len(), 1, "Should have one item");
 
         // Get the secret from first item
-        let retrieved1 = item1.secret(&session).await?;
+        let retrieved1 = item1.secret(&setup.session).await?;
         assert_eq!(retrieved1.value(), secret1.as_bytes());
 
         // Create second item with same attributes and replace=true
         let secret2 = oo7::Secret::text("replaced-password");
-        let dbus_secret2 = dbus::api::DBusSecret::new(Arc::clone(&session), secret2.clone());
+        let dbus_secret2 = dbus::api::DBusSecret::new(Arc::clone(&setup.session), secret2.clone());
 
-        let item2 = collections[0]
+        let item2 = setup.collections[0]
             .create_item(
                 "Test Item",
                 &[("application", "myapp"), ("username", "user")],
@@ -600,11 +533,11 @@ mod tests {
             .await?;
 
         // Should still have only one item (replaced)
-        let items = collections[0].items().await?;
+        let items = setup.collections[0].items().await?;
         assert_eq!(items.len(), 1, "Should still have one item after replace");
 
         // Verify the new item has the updated secret
-        let retrieved2 = item2.secret(&session).await?;
+        let retrieved2 = item2.secret(&setup.session).await?;
         assert_eq!(retrieved2.value(), secret2.as_bytes());
 
         Ok(())
@@ -612,28 +545,19 @@ mod tests {
 
     #[tokio::test]
     async fn label_property() -> Result<(), Box<dyn std::error::Error>> {
-        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
-
-        let _server = Service::run_with_connection(
-            server_conn,
-            Some(oo7::Secret::from("test-password-long-enough")),
-        )
-        .await?;
-
-        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-
-        let service_api = dbus::api::Service::new(&client_conn).await?;
-        let collections = service_api.collections().await?;
+        let setup = TestServiceSetup::plain_session(true).await?;
 
         // Get initial label (should be "Login" for default collection)
-        let label = collections[0].label().await?;
+        let label = setup.collections[0].label().await?;
         assert_eq!(label, "Login");
 
         // Set new label
-        collections[0].set_label("My Custom Collection").await?;
+        setup.collections[0]
+            .set_label("My Custom Collection")
+            .await?;
 
         // Verify new label
-        let label = collections[0].label().await?;
+        let label = setup.collections[0].label().await?;
         assert_eq!(label, "My Custom Collection");
 
         Ok(())
@@ -641,25 +565,14 @@ mod tests {
 
     #[tokio::test]
     async fn timestamps() -> Result<(), Box<dyn std::error::Error>> {
-        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
-
-        let _server = Service::run_with_connection(
-            server_conn,
-            Some(oo7::Secret::from("test-password-long-enough")),
-        )
-        .await?;
-
-        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-
-        let service_api = dbus::api::Service::new(&client_conn).await?;
-        let collections = service_api.collections().await?;
+        let setup = TestServiceSetup::plain_session(true).await?;
 
         // Get created timestamp
-        let created = collections[0].created().await?;
+        let created = setup.collections[0].created().await?;
         assert!(created.as_secs() > 0, "Created timestamp should be set");
 
         // Get modified timestamp
-        let modified = collections[0].modified().await?;
+        let modified = setup.collections[0].modified().await?;
         assert!(modified.as_secs() > 0, "Modified timestamp should be set");
 
         // Created and modified should be close (within a second for new collection)
@@ -675,31 +588,15 @@ mod tests {
 
     #[tokio::test]
     async fn create_item_invalid_session() -> Result<(), Box<dyn std::error::Error>> {
-        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
-
-        let _server = Service::run_with_connection(
-            server_conn,
-            Some(oo7::Secret::from("test-password-long-enough")),
-        )
-        .await?;
-
-        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-
-        let service_api = dbus::api::Service::new(&client_conn).await?;
-
-        // Open plain session
-        let (_aes_key, _session) = service_api.open_session(None).await?;
-
-        // Get default collection
-        let collections = service_api.collections().await?;
+        let setup = TestServiceSetup::plain_session(true).await?;
 
         // Create an item using the proper API
         let secret = oo7::Secret::text("my-secret-password");
         let invalid_session =
-            dbus::api::Session::new(&client_conn, "/invalid/session/path").await?;
+            dbus::api::Session::new(&setup.client_conn, "/invalid/session/path").await?;
         let dbus_secret = dbus::api::DBusSecret::new(Arc::new(invalid_session), secret.clone());
 
-        let result = collections[0]
+        let result = setup.collections[0]
             .create_item(
                 "Test Item",
                 &[("application", "test-app"), ("type", "password")],
@@ -724,31 +621,17 @@ mod tests {
 
     #[tokio::test]
     async fn item_created_signal() -> Result<(), Box<dyn std::error::Error>> {
-        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
-
-        let _server = Service::run_with_connection(
-            server_conn,
-            Some(oo7::Secret::from("test-password-long-enough")),
-        )
-        .await?;
-
-        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-
-        let service_api = dbus::api::Service::new(&client_conn).await?;
-        let (_aes_key, session) = service_api.open_session(None).await?;
-        let session = Arc::new(session);
-
-        let collections = service_api.collections().await?;
+        let setup = TestServiceSetup::plain_session(true).await?;
 
         // Subscribe to ItemCreated signal
-        let signal_stream = collections[0].receive_item_created().await?;
+        let signal_stream = setup.collections[0].receive_item_created().await?;
         tokio::pin!(signal_stream);
 
         // Create an item
         let secret = oo7::Secret::text("test-secret");
-        let dbus_secret = dbus::api::DBusSecret::new(Arc::clone(&session), secret);
+        let dbus_secret = dbus::api::DBusSecret::new(Arc::clone(&setup.session), secret);
 
-        let item = collections[0]
+        let item = setup.collections[0]
             .create_item("Test Item", &[("app", "test")], &dbus_secret, false, None)
             .await?;
 
@@ -772,34 +655,20 @@ mod tests {
 
     #[tokio::test]
     async fn item_deleted_signal() -> Result<(), Box<dyn std::error::Error>> {
-        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
-
-        let _server = Service::run_with_connection(
-            server_conn,
-            Some(oo7::Secret::from("test-password-long-enough")),
-        )
-        .await?;
-
-        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-
-        let service_api = dbus::api::Service::new(&client_conn).await?;
-        let (_aes_key, session) = service_api.open_session(None).await?;
-        let session = Arc::new(session);
-
-        let collections = service_api.collections().await?;
+        let setup = TestServiceSetup::plain_session(true).await?;
 
         // Create an item
         let secret = oo7::Secret::text("test-secret");
-        let dbus_secret = dbus::api::DBusSecret::new(Arc::clone(&session), secret);
+        let dbus_secret = dbus::api::DBusSecret::new(Arc::clone(&setup.session), secret);
 
-        let item = collections[0]
+        let item = setup.collections[0]
             .create_item("Test Item", &[("app", "test")], &dbus_secret, false, None)
             .await?;
 
         let item_path = item.inner().path().to_owned();
 
         // Subscribe to ItemDeleted signal
-        let signal_stream = collections[0].receive_item_deleted().await?;
+        let signal_stream = setup.collections[0].receive_item_deleted().await?;
         tokio::pin!(signal_stream);
 
         // Delete the item
@@ -825,25 +694,16 @@ mod tests {
 
     #[tokio::test]
     async fn collection_changed_signal() -> Result<(), Box<dyn std::error::Error>> {
-        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
-
-        let _server = Service::run_with_connection(
-            server_conn,
-            Some(oo7::Secret::from("test-password-long-enough")),
-        )
-        .await?;
-
-        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-
-        let service_api = dbus::api::Service::new(&client_conn).await?;
-        let collections = service_api.collections().await?;
+        let setup = TestServiceSetup::plain_session(true).await?;
 
         // Subscribe to CollectionChanged signal
-        let signal_stream = service_api.receive_collection_changed().await?;
+        let signal_stream = setup.service_api.receive_collection_changed().await?;
         tokio::pin!(signal_stream);
 
         // Change the collection label
-        collections[0].set_label("Updated Collection Label").await?;
+        setup.collections[0]
+            .set_label("Updated Collection Label")
+            .await?;
 
         // Wait for signal with timeout
         let signal_result =
@@ -859,7 +719,7 @@ mod tests {
         let signal_collection = signal.unwrap();
         assert_eq!(
             signal_collection.inner().path().as_str(),
-            collections[0].inner().path().as_str(),
+            setup.collections[0].inner().path().as_str(),
             "Signal should contain the changed collection path"
         );
 
