@@ -315,6 +315,11 @@ impl Keyring {
         }
     }
 
+    /// Return the associated file if any.
+    pub fn path(&self) -> Option<&std::path::Path> {
+        self.path.as_deref()
+    }
+
     /// Retrieve the number of items
     ///
     /// This function will not trigger a key derivation and can therefore be

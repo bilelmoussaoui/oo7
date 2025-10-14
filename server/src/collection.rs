@@ -44,7 +44,45 @@ pub struct Collection {
 impl Collection {
     #[zbus(out_args("prompt"))]
     pub async fn delete(&self) -> Result<ObjectPath<'_>, ServiceError> {
-        todo!()
+        // Check if collection is locked
+        if self.is_locked().await {
+            return Err(ServiceError::IsLocked(format!(
+                "Cannot delete locked collection `{}`",
+                self.path
+            )));
+        }
+        let object_server = self.service.object_server();
+
+        // Remove all items from the object server
+        let items = self.items.lock().await;
+        for item in items.iter() {
+            object_server.remove::<item::Item, _>(item.path()).await?;
+        }
+        drop(items);
+
+        // Delete the keyring file if it's persistent
+        if let Some(path) = self.keyring.path() {
+            tokio::fs::remove_file(&path).await.map_err(|err| {
+                custom_service_error(&format!("Failed to delete keyring file: {err}"))
+            })?;
+            tracing::debug!("Deleted keyring file: {}", path.display());
+        }
+
+        // Emit CollectionDeleted signal before removing from object server
+        let service_path = oo7::dbus::api::Service::PATH.as_ref().unwrap();
+        let signal_emitter = self.service.signal_emitter(service_path)?;
+        Service::collection_deleted(&signal_emitter, &self.path).await?;
+
+        // Remove collection from object server
+        object_server.remove::<Collection, _>(&self.path).await?;
+
+        // Notify service to remove from collections list
+        self.service.remove_collection(&self.path).await;
+
+        tracing::info!("Collection `{}` deleted.", self.path);
+
+        // Return empty prompt path (no prompt needed, per gnome-keyring behaviour)
+        Ok(ObjectPath::default())
     }
 
     #[zbus(out_args("results"))]
@@ -547,17 +585,22 @@ mod tests {
     async fn label_property() -> Result<(), Box<dyn std::error::Error>> {
         let setup = TestServiceSetup::plain_session(true).await?;
 
+        // Get the Login collection via alias (don't rely on collection ordering)
+        let login_collection = setup
+            .service_api
+            .read_alias("default")
+            .await?
+            .expect("Default collection should exist");
+
         // Get initial label (should be "Login" for default collection)
-        let label = setup.collections[0].label().await?;
+        let label = login_collection.label().await?;
         assert_eq!(label, "Login");
 
         // Set new label
-        setup.collections[0]
-            .set_label("My Custom Collection")
-            .await?;
+        login_collection.set_label("My Custom Collection").await?;
 
         // Verify new label
-        let label = setup.collections[0].label().await?;
+        let label = login_collection.label().await?;
         assert_eq!(label, "My Custom Collection");
 
         Ok(())
@@ -721,6 +764,97 @@ mod tests {
             signal_collection.inner().path().as_str(),
             setup.collections[0].inner().path().as_str(),
             "Signal should contain the changed collection path"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn delete_collection() -> Result<(), Box<dyn std::error::Error>> {
+        let setup = TestServiceSetup::plain_session(true).await?;
+
+        // Create some items in the collection
+        let secret1 = oo7::Secret::text("password1");
+        let dbus_secret1 = dbus::api::DBusSecret::new(Arc::clone(&setup.session), secret1);
+
+        setup.collections[0]
+            .create_item("Item 1", &[("app", "test")], &dbus_secret1, false, None)
+            .await?;
+
+        let secret2 = oo7::Secret::text("password2");
+        let dbus_secret2 = dbus::api::DBusSecret::new(Arc::clone(&setup.session), secret2);
+
+        setup.collections[0]
+            .create_item("Item 2", &[("app", "test")], &dbus_secret2, false, None)
+            .await?;
+
+        // Verify items were created
+        let items = setup.collections[0].items().await?;
+        assert_eq!(items.len(), 2, "Should have 2 items before deletion");
+
+        // Get collection path for later verification
+        let collection_path = setup.collections[0].inner().path().to_owned();
+
+        // Verify collection exists in service
+        let collections_before = setup.service_api.collections().await?;
+        let initial_count = collections_before.len();
+
+        // Delete the collection
+        setup.collections[0].delete(None).await?;
+
+        // Give the system a moment to process the deletion
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        // Verify collection is no longer in service's collection list
+        let collections_after = setup.service_api.collections().await?;
+        assert_eq!(
+            collections_after.len(),
+            initial_count - 1,
+            "Service should have one less collection after deletion"
+        );
+
+        // Verify the specific collection is not in the list
+        let collection_paths: Vec<_> = collections_after
+            .iter()
+            .map(|c| c.inner().path().as_str())
+            .collect();
+        assert!(
+            !collection_paths.contains(&collection_path.as_str()),
+            "Deleted collection should not be in service collections list"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn collection_deleted_signal() -> Result<(), Box<dyn std::error::Error>> {
+        let setup = TestServiceSetup::plain_session(true).await?;
+
+        // Subscribe to CollectionDeleted signal
+        let signal_stream = setup.service_api.receive_collection_deleted().await?;
+        tokio::pin!(signal_stream);
+
+        let collection_path = setup.collections[0].inner().path().to_owned();
+
+        // Delete the collection
+        setup.collections[0].delete(None).await?;
+
+        // Wait for signal with timeout
+        let signal_result =
+            tokio::time::timeout(tokio::time::Duration::from_secs(1), signal_stream.next()).await;
+
+        assert!(
+            signal_result.is_ok(),
+            "Should receive CollectionDeleted signal"
+        );
+        let signal = signal_result.unwrap();
+        assert!(signal.is_some(), "Signal should not be None");
+
+        let signal_collection = signal.unwrap();
+        assert_eq!(
+            signal_collection.as_str(),
+            collection_path.as_str(),
+            "Signal should contain the deleted collection path"
         );
 
         Ok(())

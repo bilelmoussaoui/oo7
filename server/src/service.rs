@@ -35,7 +35,7 @@ const DEFAULT_COLLECTION_ALIAS_PATH: ObjectPath<'static> =
 #[derive(Debug, Default, Clone)]
 pub struct Service {
     // Properties
-    collections: Arc<Mutex<Vec<Collection>>>,
+    collections: Arc<Mutex<HashMap<OwnedObjectPath, Collection>>>,
     // Other attributes
     connection: Arc<OnceLock<zbus::Connection>>,
     // sessions mapped to their corresponding object path on the bus
@@ -132,7 +132,7 @@ impl Service {
         let mut locked = Vec::new();
         let collections = self.collections.lock().await;
 
-        for collection in collections.iter() {
+        for (_path, collection) in collections.iter() {
             let items = collection.search_inner_items(&attributes).await;
             for item in items {
                 if item.is_locked().await {
@@ -206,7 +206,7 @@ impl Service {
         let mut secrets = HashMap::new();
         let collections = self.collections.lock().await;
 
-        'outer: for collection in collections.iter() {
+        'outer: for (_path, collection) in collections.iter() {
             for item in &items {
                 if let Some(item) = collection.item_from_path(item).await {
                     match item.get_secret(session.clone()).await {
@@ -237,14 +237,10 @@ impl Service {
     pub async fn read_alias(&self, name: &str) -> Result<OwnedObjectPath, ServiceError> {
         let collections = self.collections.lock().await;
 
-        for collection in collections.iter() {
+        for (path, collection) in collections.iter() {
             if collection.alias().await == name {
-                tracing::debug!(
-                    "Collection: {} found for alias: {}.",
-                    collection.path(),
-                    name
-                );
-                return Ok(collection.path().clone().into());
+                tracing::debug!("Collection: {} found for alias: {}.", path, name);
+                return Ok(path.to_owned());
             }
         }
 
@@ -260,8 +256,8 @@ impl Service {
     ) -> Result<(), ServiceError> {
         let collections = self.collections.lock().await;
 
-        for other_collection in collections.iter() {
-            if *other_collection.path() == *collection {
+        for (path, other_collection) in collections.iter() {
+            if *path == collection {
                 other_collection.set_alias(name).await;
 
                 tracing::info!("Collection: {} alias updated to {}.", collection, name);
@@ -278,22 +274,17 @@ impl Service {
 
     #[zbus(property, name = "Collections")]
     pub async fn collections(&self) -> Vec<OwnedObjectPath> {
-        self.collections
-            .lock()
-            .await
-            .iter()
-            .map(|c| c.path().to_owned().into())
-            .collect()
+        self.collections.lock().await.keys().cloned().collect()
     }
 
     #[zbus(signal, name = "CollectionCreated")]
-    async fn collection_created(
+    pub async fn collection_created(
         signal_emitter: &SignalEmitter<'_>,
         collection: &ObjectPath<'_>,
     ) -> zbus::Result<()>;
 
     #[zbus(signal, name = "CollectionDeleted")]
-    async fn collection_deleted(
+    pub async fn collection_deleted(
         signal_emitter: &SignalEmitter<'_>,
         collection: &ObjectPath<'_>,
     ) -> zbus::Result<()>;
@@ -307,14 +298,7 @@ impl Service {
 
 impl Service {
     pub async fn run(secret: Option<Secret>, request_replacement: bool) -> Result<(), Error> {
-        let service = Self {
-            collections: Default::default(),
-            connection: Default::default(),
-            sessions: Default::default(),
-            session_index: Default::default(),
-            prompts: Default::default(),
-            prompt_index: Default::default(),
-        };
+        let service = Self::default();
 
         let connection = zbus::connection::Builder::session()?
             .allow_name_replacements(true)
@@ -384,7 +368,7 @@ impl Service {
                 self.clone(),
                 keyring,
             );
-            collections.push(collection.clone());
+            collections.insert(collection.path().to_owned().into(), collection.clone());
             collection.dispatch_items().await?;
             object_server
                 .at(collection.path(), collection.clone())
@@ -405,7 +389,7 @@ impl Service {
         object_server
             .at(collection.path(), collection.clone())
             .await?;
-        collections.push(collection);
+        collections.insert(collection.path().to_owned().into(), collection);
 
         drop(collections); // Release the lock
 
@@ -459,9 +443,9 @@ impl Service {
         let collections = self.collections.lock().await;
 
         for object in objects {
-            for collection in collections.iter() {
+            for (path, collection) in collections.iter() {
                 let collection_locked = collection.is_locked().await;
-                if **object == *collection.path() {
+                if *object == *path {
                     if collection_locked == locked {
                         tracing::debug!(
                             "Collection: {} is already {}.",
@@ -516,8 +500,7 @@ impl Service {
 
     pub async fn collection_from_path(&self, path: &ObjectPath<'_>) -> Option<Collection> {
         let collections = self.collections.lock().await;
-
-        collections.iter().find(|c| c.path() == path).cloned()
+        collections.get(path).cloned()
     }
 
     pub async fn session_index(&self) -> u32 {
@@ -539,6 +522,16 @@ impl Service {
 
     pub async fn remove_session(&self, path: &ObjectPath<'_>) {
         self.sessions.lock().await.remove(path);
+    }
+
+    pub async fn remove_collection(&self, path: &ObjectPath<'_>) {
+        self.collections.lock().await.remove(path);
+
+        if let Ok(signal_emitter) =
+            self.signal_emitter(oo7::dbus::api::Service::PATH.as_deref().unwrap())
+        {
+            let _ = self.collections_changed(&signal_emitter).await;
+        }
     }
 
     pub async fn prompt_index(&self) -> u32 {
@@ -769,10 +762,12 @@ mod tests {
             default_collection.is_some(),
             "Default alias should return a collection"
         );
+
+        // Verify it's the Login collection by checking its label
+        let label = default_collection.as_ref().unwrap().label().await?;
         assert_eq!(
-            default_collection.unwrap().inner().path(),
-            setup.collections[0].inner().path(),
-            "Default alias should point to default collection"
+            label, "Login",
+            "Default alias should point to Login collection"
         );
 
         // Non-existent alias should return None
