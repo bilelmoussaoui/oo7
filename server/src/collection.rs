@@ -169,6 +169,13 @@ impl Collection {
     #[zbus(property, name = "Label")]
     pub async fn set_label(&self, label: &str) {
         *self.label.lock().await = label.to_owned();
+
+        let service_path = oo7::dbus::api::Service::PATH.as_ref().unwrap();
+        if let Ok(signal_emitter) = self.service.signal_emitter(service_path) {
+            if let Err(err) = Service::collection_changed(&signal_emitter, &self.path).await {
+                tracing::error!("Failed to emit CollectionChanged signal: {}", err);
+            }
+        }
     }
 
     #[zbus(property, name = "Locked")]
@@ -360,6 +367,7 @@ mod tests {
     use std::sync::Arc;
 
     use oo7::dbus;
+    use tokio_stream::StreamExt;
 
     use super::*;
 
@@ -703,6 +711,150 @@ mod tests {
                 ))
             ),
             "Should be NoSession error"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn item_created_signal() -> Result<(), Box<dyn std::error::Error>> {
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
+
+        let _server = Service::run_with_connection(
+            server_conn,
+            Some(oo7::Secret::from("test-password-long-enough")),
+        )
+        .await?;
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await?;
+        let (_aes_key, session) = service_api.open_session(None).await?;
+        let session = Arc::new(session);
+
+        let collections = service_api.collections().await?;
+
+        // Subscribe to ItemCreated signal
+        let signal_stream = collections[0].receive_item_created().await?;
+        tokio::pin!(signal_stream);
+
+        // Create an item
+        let secret = oo7::Secret::text("test-secret");
+        let dbus_secret = dbus::api::DBusSecret::new(Arc::clone(&session), secret);
+
+        let item = collections[0]
+            .create_item("Test Item", &[("app", "test")], &dbus_secret, false, None)
+            .await?;
+
+        // Wait for signal with timeout
+        let signal_result =
+            tokio::time::timeout(tokio::time::Duration::from_secs(1), signal_stream.next()).await;
+
+        assert!(signal_result.is_ok(), "Should receive ItemCreated signal");
+        let signal = signal_result.unwrap();
+        assert!(signal.is_some(), "Signal should not be None");
+
+        let signal_item = signal.unwrap();
+        assert_eq!(
+            signal_item.inner().path().as_str(),
+            item.inner().path().as_str(),
+            "Signal should contain the created item path"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn item_deleted_signal() -> Result<(), Box<dyn std::error::Error>> {
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
+
+        let _server = Service::run_with_connection(
+            server_conn,
+            Some(oo7::Secret::from("test-password-long-enough")),
+        )
+        .await?;
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await?;
+        let (_aes_key, session) = service_api.open_session(None).await?;
+        let session = Arc::new(session);
+
+        let collections = service_api.collections().await?;
+
+        // Create an item
+        let secret = oo7::Secret::text("test-secret");
+        let dbus_secret = dbus::api::DBusSecret::new(Arc::clone(&session), secret);
+
+        let item = collections[0]
+            .create_item("Test Item", &[("app", "test")], &dbus_secret, false, None)
+            .await?;
+
+        let item_path = item.inner().path().to_owned();
+
+        // Subscribe to ItemDeleted signal
+        let signal_stream = collections[0].receive_item_deleted().await?;
+        tokio::pin!(signal_stream);
+
+        // Delete the item
+        item.delete(None).await?;
+
+        // Wait for signal with timeout
+        let signal_result =
+            tokio::time::timeout(tokio::time::Duration::from_secs(1), signal_stream.next()).await;
+
+        assert!(signal_result.is_ok(), "Should receive ItemDeleted signal");
+        let signal = signal_result.unwrap();
+        assert!(signal.is_some(), "Signal should not be None");
+
+        let signal_item = signal.unwrap();
+        assert_eq!(
+            signal_item.as_str(),
+            item_path.as_str(),
+            "Signal should contain the deleted item path"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn collection_changed_signal() -> Result<(), Box<dyn std::error::Error>> {
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
+
+        let _server = Service::run_with_connection(
+            server_conn,
+            Some(oo7::Secret::from("test-password-long-enough")),
+        )
+        .await?;
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await?;
+        let collections = service_api.collections().await?;
+
+        // Subscribe to CollectionChanged signal
+        let signal_stream = service_api.receive_collection_changed().await?;
+        tokio::pin!(signal_stream);
+
+        // Change the collection label
+        collections[0].set_label("Updated Collection Label").await?;
+
+        // Wait for signal with timeout
+        let signal_result =
+            tokio::time::timeout(tokio::time::Duration::from_secs(1), signal_stream.next()).await;
+
+        assert!(
+            signal_result.is_ok(),
+            "Should receive CollectionChanged signal after label change"
+        );
+        let signal = signal_result.unwrap();
+        assert!(signal.is_some(), "Signal should not be None");
+
+        let signal_collection = signal.unwrap();
+        assert_eq!(
+            signal_collection.inner().path().as_str(),
+            collections[0].inner().path().as_str(),
+            "Signal should contain the changed collection path"
         );
 
         Ok(())

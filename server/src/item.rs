@@ -129,6 +129,11 @@ impl Item {
             }
         }
 
+        drop(inner);
+
+        let signal_emitter = self.service.signal_emitter(&self.collection_path)?;
+        Collection::item_changed(&signal_emitter, &self.path).await?;
+
         Ok(())
     }
 
@@ -151,6 +156,12 @@ impl Item {
     #[zbus(property, name = "Attributes")]
     pub async fn set_attributes(&self, attributes: HashMap<String, String>) {
         self.inner.lock().await.set_attributes(&attributes);
+
+        if let Ok(signal_emitter) = self.service.signal_emitter(&self.collection_path) {
+            if let Err(err) = Collection::item_changed(&signal_emitter, &self.path).await {
+                tracing::error!("Failed to emit ItemChanged signal: {}", err);
+            }
+        }
     }
 
     #[zbus(property, name = "Label")]
@@ -161,6 +172,12 @@ impl Item {
     #[zbus(property, name = "Label")]
     pub async fn set_label(&self, label: &str) {
         self.inner.lock().await.set_label(label);
+
+        if let Ok(signal_emitter) = self.service.signal_emitter(&self.collection_path) {
+            if let Err(err) = Collection::item_changed(&signal_emitter, &self.path).await {
+                tracing::error!("Failed to emit ItemChanged signal: {}", err);
+            }
+        }
     }
 
     #[zbus(property, name = "Created")]
@@ -219,6 +236,7 @@ mod tests {
     use std::sync::Arc;
 
     use oo7::dbus;
+    use tokio_stream::StreamExt;
 
     use super::*;
 
@@ -659,6 +677,82 @@ mod tests {
                 ))
             ),
             "Should be NoSession error"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn item_changed_signal() -> Result<(), Box<dyn std::error::Error>> {
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
+
+        let _server = Service::run_with_connection(
+            server_conn,
+            Some(oo7::Secret::from("test-password-long-enough")),
+        )
+        .await?;
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await?;
+        let (_aes_key, session) = service_api.open_session(None).await?;
+        let session = Arc::new(session);
+
+        let collections = service_api.collections().await?;
+        let secret = oo7::Secret::text("test-secret");
+        let dbus_secret = dbus::api::DBusSecret::new(Arc::clone(&session), secret);
+
+        let item = collections[0]
+            .create_item("Test Item", &[("app", "test")], &dbus_secret, false, None)
+            .await?;
+
+        // Subscribe to ItemChanged signal
+        let signal_stream = collections[0].receive_item_changed().await?;
+        tokio::pin!(signal_stream);
+
+        // Change the label
+        item.set_label("Updated Label").await?;
+
+        // Wait for signal
+        let signal_result =
+            tokio::time::timeout(tokio::time::Duration::from_secs(1), signal_stream.next()).await;
+
+        assert!(
+            signal_result.is_ok(),
+            "Should receive ItemChanged signal after label change"
+        );
+        let signal = signal_result.unwrap();
+        assert!(signal.is_some(), "Signal should not be None");
+
+        let signal_item = signal.unwrap();
+        assert_eq!(
+            signal_item.inner().path().as_str(),
+            item.inner().path().as_str(),
+            "Signal should contain the changed item path"
+        );
+
+        // Change attributes and verify signal again
+        item.set_attributes(&[("app", "updated-app")]).await?;
+
+        let signal_result =
+            tokio::time::timeout(tokio::time::Duration::from_secs(1), signal_stream.next()).await;
+
+        assert!(
+            signal_result.is_ok(),
+            "Should receive ItemChanged signal after attributes change"
+        );
+
+        // Change secret and verify signal again
+        let new_secret = oo7::Secret::text("new-secret");
+        let new_dbus_secret = dbus::api::DBusSecret::new(Arc::clone(&session), new_secret);
+        item.set_secret(&new_dbus_secret).await?;
+
+        let signal_result =
+            tokio::time::timeout(tokio::time::Duration::from_secs(1), signal_stream.next()).await;
+
+        assert!(
+            signal_result.is_ok(),
+            "Should receive ItemChanged signal after secret change"
         );
 
         Ok(())
