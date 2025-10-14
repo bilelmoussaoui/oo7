@@ -982,4 +982,85 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn get_secrets_invalid_session() -> Result<(), Box<dyn std::error::Error>> {
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
+
+        let _server = Service::run_with_connection(
+            server_conn,
+            Some(Secret::from("test-password-long-enough")),
+        )
+        .await?;
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await?;
+        let (_aes_key, session) = service_api.open_session(None).await?;
+        let session = Arc::new(session);
+
+        let collections = service_api.collections().await?;
+
+        // Create an item
+        let secret = Secret::text("test-password");
+        let dbus_secret = dbus::api::DBusSecret::new(Arc::clone(&session), secret);
+
+        let item = collections[0]
+            .create_item("Test Item", &[("app", "test")], &dbus_secret, false, None)
+            .await?;
+
+        // Try to get secrets with invalid session path
+        let invalid_session =
+            dbus::api::Session::new(&client_conn, "/invalid/session/path").await?;
+        let result = service_api.secrets(&[item], &invalid_session).await;
+
+        assert!(
+            matches!(
+                result,
+                Err(oo7::dbus::Error::Service(
+                    oo7::dbus::ServiceError::NoSession(_)
+                ))
+            ),
+            "Should be NoSession error"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn set_alias_invalid_collection() -> Result<(), Box<dyn std::error::Error>> {
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
+
+        let _server = Service::run_with_connection(
+            server_conn,
+            Some(Secret::from("test-password-long-enough")),
+        )
+        .await?;
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await?;
+
+        // Try to set alias for non-existent collection
+        let invalid_collection = dbus::api::Collection::new(
+            &client_conn,
+            "/org/freedesktop/secrets/collection/nonexistent",
+        )
+        .await?;
+        let result = service_api
+            .set_alias("test-alias", &invalid_collection)
+            .await;
+
+        assert!(
+            matches!(
+                result,
+                Err(oo7::dbus::Error::Service(
+                    oo7::dbus::ServiceError::NoSuchObject(_)
+                ))
+            ),
+            "Should be NoSuchObject error"
+        );
+
+        Ok(())
+    }
 }

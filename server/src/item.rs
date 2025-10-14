@@ -575,4 +575,92 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn get_secret_invalid_session() -> Result<(), Box<dyn std::error::Error>> {
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
+
+        let _server = Service::run_with_connection(
+            server_conn,
+            Some(oo7::Secret::from("test-password-long-enough")),
+        )
+        .await?;
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await?;
+        let (_aes_key, session) = service_api.open_session(None).await?;
+        let session = Arc::new(session);
+
+        let collections = service_api.collections().await?;
+        let secret = oo7::Secret::text("test-secret");
+        let dbus_secret = dbus::api::DBusSecret::new(session, secret);
+
+        let item = collections[0]
+            .create_item("Test Item", &[("app", "test")], &dbus_secret, false, None)
+            .await?;
+
+        // Try to get secret with invalid session path
+        let invalid_session =
+            oo7::dbus::api::Session::new(&client_conn, "/invalid/session").await?;
+        let result = item.secret(&invalid_session).await;
+
+        assert!(
+            matches!(
+                result,
+                Err(oo7::dbus::Error::Service(
+                    oo7::dbus::ServiceError::NoSession(_)
+                ))
+            ),
+            "Should be NoSession error"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn set_secret_invalid_session() -> Result<(), Box<dyn std::error::Error>> {
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
+
+        let _server = Service::run_with_connection(
+            server_conn,
+            Some(oo7::Secret::from("test-password-long-enough")),
+        )
+        .await?;
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await?;
+        let (_aes_key, session) = service_api.open_session(None).await?;
+        let session = Arc::new(session);
+
+        let collections = service_api.collections().await?;
+        let secret = oo7::Secret::text("test-secret");
+        let dbus_secret = dbus::api::DBusSecret::new(Arc::clone(&session), secret);
+
+        let item = collections[0]
+            .create_item("Test Item", &[("app", "test")], &dbus_secret, false, None)
+            .await?;
+
+        let new_secret = oo7::Secret::text("new-secret");
+        let invalid_dbus_secret = dbus::api::DBusSecret::new(
+            Arc::new(dbus::api::Session::new(&client_conn, "/invalid/session").await?),
+            new_secret,
+        );
+
+        let result = item.set_secret(&invalid_dbus_secret).await;
+
+        // Should return NoSession error
+        assert!(
+            matches!(
+                result,
+                Err(oo7::dbus::Error::Service(
+                    oo7::dbus::ServiceError::NoSession(_)
+                ))
+            ),
+            "Should be NoSession error"
+        );
+
+        Ok(())
+    }
 }
