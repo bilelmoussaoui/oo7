@@ -658,4 +658,53 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn create_item_invalid_session() -> Result<(), Box<dyn std::error::Error>> {
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
+
+        let _server = Service::run_with_connection(
+            server_conn,
+            Some(oo7::Secret::from("test-password-long-enough")),
+        )
+        .await?;
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await?;
+
+        // Open plain session
+        let (_aes_key, _session) = service_api.open_session(None).await?;
+
+        // Get default collection
+        let collections = service_api.collections().await?;
+
+        // Create an item using the proper API
+        let secret = oo7::Secret::text("my-secret-password");
+        let invalid_session =
+            dbus::api::Session::new(&client_conn, "/invalid/session/path").await?;
+        let dbus_secret = dbus::api::DBusSecret::new(Arc::new(invalid_session), secret.clone());
+
+        let result = collections[0]
+            .create_item(
+                "Test Item",
+                &[("application", "test-app"), ("type", "password")],
+                &dbus_secret,
+                false,
+                None,
+            )
+            .await;
+
+        assert!(
+            matches!(
+                result,
+                Err(oo7::dbus::Error::Service(
+                    oo7::dbus::ServiceError::NoSession(_)
+                ))
+            ),
+            "Should be NoSession error"
+        );
+
+        Ok(())
+    }
 }
