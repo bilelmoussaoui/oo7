@@ -819,4 +819,75 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn read_alias() -> Result<(), Box<dyn std::error::Error>> {
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
+
+        let _server = Service::run_with_connection(
+            server_conn,
+            Some(Secret::from("test-password-long-enough")),
+        )
+        .await?;
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await?;
+        let collections = service_api.collections().await?;
+
+        // Default collection should have "default" alias
+        let default_collection = service_api.read_alias("default").await?;
+        assert!(
+            default_collection.is_some(),
+            "Default alias should return a collection"
+        );
+        assert_eq!(
+            default_collection.unwrap().inner().path(),
+            collections[0].inner().path(),
+            "Default alias should point to default collection"
+        );
+
+        // Non-existent alias should return None
+        let nonexistent = service_api.read_alias("nonexistent").await?;
+        assert!(
+            nonexistent.is_none(),
+            "Non-existent alias should return None"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn set_alias() -> Result<(), Box<dyn std::error::Error>> {
+        let (server_conn, client_conn) = crate::tests::create_p2p_connection().await?;
+
+        let _server = Service::run_with_connection(
+            server_conn,
+            Some(Secret::from("test-password-long-enough")),
+        )
+        .await?;
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await?;
+        let collections = service_api.collections().await?;
+        // collections[0] is default/Login, collections[1] is session
+
+        // Set alias for session collection
+        service_api.set_alias("my-alias", &collections[1]).await?;
+
+        // Read the alias back
+        let alias_collection = service_api.read_alias("my-alias").await?;
+        assert!(
+            alias_collection.is_some(),
+            "Alias should return a collection"
+        );
+        assert_eq!(
+            alias_collection.unwrap().inner().path(),
+            collections[1].inner().path(),
+            "Alias should point to session collection"
+        );
+
+        Ok(())
+    }
 }
