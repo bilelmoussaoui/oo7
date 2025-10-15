@@ -12,7 +12,7 @@ use crate::{
     service::Service,
 };
 
-#[derive(Debug, Serialize, Deserialize, Type)]
+#[derive(Debug, Serialize, Deserialize, Type, Default)]
 #[zvariant(signature = "dict")]
 #[serde(rename_all = "kebab-case")]
 // GcrPrompt properties <https://gitlab.gnome.org/GNOME/gcr/-/blob/main/gcr/gcr-prompt.c#L95>
@@ -197,7 +197,7 @@ pub struct PrompterCallback {
 
 #[zbus::interface(name = "org.gnome.keyring.internal.Prompter.Callback")]
 impl PrompterCallback {
-    async fn prompt_ready(
+    pub async fn prompt_ready(
         &self,
         reply: Optional<Reply>,
         _properties: Properties,
