@@ -115,6 +115,14 @@ impl Item {
             )));
         };
 
+        if self.is_locked().await {
+            tracing::error!("Cannot set secret of a locked object `{}`", self.path);
+            return Err(ServiceError::IsLocked(format!(
+                "Cannot set secret of a locked object `{}`.",
+                self.path
+            )));
+        }
+
         let mut inner = self.inner.lock().await;
 
         match session.aes_key() {
@@ -163,28 +171,32 @@ impl Item {
     }
 
     #[zbus(property, name = "Attributes")]
-    pub async fn set_attributes(&self, attributes: HashMap<String, String>) {
+    pub async fn set_attributes(
+        &self,
+        attributes: HashMap<String, String>,
+    ) -> Result<(), zbus::Error> {
+        if self.is_locked().await {
+            tracing::error!("Cannot set attributes of a locked object `{}`", self.path);
+            return Err(zbus::Error::FDO(Box::new(zbus::fdo::Error::Failed(
+                format!("Cannot set attributes of a locked object `{}`.", self.path),
+            ))));
+        }
+
         self.inner.lock().await.set_attributes(&attributes);
 
-        if let Ok(signal_emitter) = self.service.signal_emitter(&self.collection_path) {
-            if let Err(err) = Collection::item_changed(&signal_emitter, &self.path).await {
-                tracing::error!("Failed to emit ItemChanged signal: {}", err);
-            }
-        }
-        if let Ok(signal_emitter) = self.service.signal_emitter(&self.path) {
-            if let Err(err) = self.attributes_changed(&signal_emitter).await {
-                tracing::error!(
-                    "Failed to emit PropertiesChanged signal for Attributes: {}",
-                    err
-                );
-            }
-            if let Err(err) = self.modified_changed(&signal_emitter).await {
-                tracing::error!(
-                    "Failed to emit PropertiesChanged signal for Modified: {}",
-                    err
-                );
-            }
-        }
+        let signal_emitter = self
+            .service
+            .signal_emitter(&self.collection_path)
+            .map_err(|err| zbus::Error::FDO(Box::new(zbus::fdo::Error::Failed(err.to_string()))))?;
+        Collection::item_changed(&signal_emitter, &self.path).await?;
+
+        let signal_emitter = self
+            .service
+            .signal_emitter(&self.path)
+            .map_err(|err| zbus::Error::FDO(Box::new(zbus::fdo::Error::Failed(err.to_string()))))?;
+        self.attributes_changed(&signal_emitter).await?;
+        self.modified_changed(&signal_emitter).await?;
+        Ok(())
     }
 
     #[zbus(property, name = "Label")]
@@ -193,25 +205,29 @@ impl Item {
     }
 
     #[zbus(property, name = "Label")]
-    pub async fn set_label(&self, label: &str) {
-        self.inner.lock().await.set_label(label);
+    pub async fn set_label(&self, label: &str) -> Result<(), zbus::Error> {
+        if self.is_locked().await {
+            tracing::error!("Cannot set label of a locked object `{}`", self.path);
+            return Err(zbus::Error::FDO(Box::new(zbus::fdo::Error::Failed(
+                format!("Cannot set label of a locked object `{}`.", self.path),
+            ))));
+        }
 
-        if let Ok(signal_emitter) = self.service.signal_emitter(&self.collection_path) {
-            if let Err(err) = Collection::item_changed(&signal_emitter, &self.path).await {
-                tracing::error!("Failed to emit ItemChanged signal: {}", err);
-            }
-        }
-        if let Ok(signal_emitter) = self.service.signal_emitter(&self.path) {
-            if let Err(err) = self.label_changed(&signal_emitter).await {
-                tracing::error!("Failed to emit PropertiesChanged signal for Label: {}", err);
-            }
-            if let Err(err) = self.modified_changed(&signal_emitter).await {
-                tracing::error!(
-                    "Failed to emit PropertiesChanged signal for Modified: {}",
-                    err
-                );
-            }
-        }
+        self.inner.lock().await.set_label(label);
+        let signal_emitter = self
+            .service
+            .signal_emitter(&self.collection_path)
+            .map_err(|err| zbus::Error::FDO(Box::new(zbus::fdo::Error::Failed(err.to_string()))))?;
+        Collection::item_changed(&signal_emitter, &self.path).await?;
+
+        let signal_emitter = self
+            .service
+            .signal_emitter(&self.path)
+            .map_err(|err| zbus::Error::FDO(Box::new(zbus::fdo::Error::Failed(err.to_string()))))?;
+        self.label_changed(&signal_emitter).await?;
+        self.modified_changed(&signal_emitter).await?;
+
+        Ok(())
     }
 
     #[zbus(property, name = "Created")]
@@ -684,6 +700,96 @@ mod tests {
         assert!(
             signal_result.is_ok(),
             "Should receive ItemChanged signal after secret change"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn locked_item_operations() -> Result<(), Box<dyn std::error::Error>> {
+        let setup = TestServiceSetup::plain_session(true).await?;
+
+        // Create an item
+        let secret = oo7::Secret::text("test-password");
+        let dbus_secret = dbus::api::DBusSecret::new(Arc::clone(&setup.session), secret.clone());
+
+        let item = setup.collections[0]
+            .create_item("Test Item", &[("app", "test")], &dbus_secret, false, None)
+            .await?;
+
+        // Verify item is unlocked initially
+        assert!(!item.is_locked().await?, "Item should start unlocked");
+
+        // Lock the collection (which locks the item)
+        let collection = setup
+            .server
+            .collection_from_path(setup.collections[0].inner().path())
+            .await
+            .expect("Collection should exist");
+        collection.set_locked(true).await?;
+
+        // Verify item is now locked
+        assert!(
+            item.is_locked().await?,
+            "Item should be locked after locking collection"
+        );
+
+        // Test 1: get_secret should fail with IsLocked
+        let result = item.secret(&setup.session).await;
+        assert!(
+            matches!(
+                result,
+                Err(oo7::dbus::Error::Service(
+                    oo7::dbus::ServiceError::IsLocked(_)
+                ))
+            ),
+            "get_secret should fail with IsLocked error, got: {:?}",
+            result
+        );
+
+        // Test 2: set_secret should fail with IsLocked
+        let new_secret = oo7::Secret::text("new-password");
+        let new_dbus_secret = dbus::api::DBusSecret::new(Arc::clone(&setup.session), new_secret);
+        let result = item.set_secret(&new_dbus_secret).await;
+        assert!(
+            matches!(
+                result,
+                Err(oo7::dbus::Error::Service(
+                    oo7::dbus::ServiceError::IsLocked(_)
+                ))
+            ),
+            "set_secret should fail with IsLocked error, got: {:?}",
+            result
+        );
+
+        // Test 3: set_attributes should fail with IsLocked
+        let result = item.set_attributes(&[("app", "new-app")]).await;
+        assert!(
+            matches!(result, Err(oo7::dbus::Error::ZBus(zbus::Error::FDO(_)))),
+            "set_attributes should fail with IsLocked error, got: {:?}",
+            result
+        );
+
+        // Test 4: set_label should fail with IsLocked
+        let result = item.set_label("New Label").await;
+        assert!(
+            matches!(result, Err(oo7::dbus::Error::ZBus(zbus::Error::FDO(_)))),
+            "set_label should fail with IsLocked error, got: {:?}",
+            result
+        );
+
+        // Verify read-only operations still work on locked items
+        let label = item.label().await?;
+        assert_eq!(
+            label, "Test Item",
+            "Should be able to read label of locked item"
+        );
+
+        let attrs = item.attributes().await?;
+        assert_eq!(
+            attrs.get("app").unwrap(),
+            "test",
+            "Should be able to read attributes of locked item"
         );
 
         Ok(())

@@ -122,6 +122,13 @@ impl Collection {
         #[zbus(object_server)] object_server: &zbus::ObjectServer,
         #[zbus(signal_emitter)] signal_emitter: zbus::object_server::SignalEmitter<'_>,
     ) -> Result<(OwnedObjectPath, OwnedObjectPath), ServiceError> {
+        if self.is_locked().await {
+            return Err(ServiceError::IsLocked(format!(
+                "Cannot create item in locked collection `{}`",
+                self.path
+            )));
+        }
+
         let DBusSecretInner(session, iv, secret, _content_type) = secret;
         let label = properties.label();
         // Safe to unwrap as an item always has attributes
@@ -206,28 +213,34 @@ impl Collection {
     }
 
     #[zbus(property, name = "Label")]
-    pub async fn set_label(&self, label: &str) {
+    pub async fn set_label(&self, label: &str) -> Result<(), zbus::Error> {
+        if self.is_locked().await {
+            tracing::error!("Cannot set label of a locked collection `{}`", self.path);
+            return Err(zbus::Error::FDO(Box::new(zbus::fdo::Error::Failed(
+                format!("Cannot set label of a locked collection `{}`.", self.path),
+            ))));
+        }
+
         *self.label.lock().await = label.to_owned();
 
-        if let Err(err) = self.update_modified().await {
-            tracing::error!(
-                "Failed to emit PropertyChanged signal for Modified: {}",
-                err
-            );
-        }
+        self.update_modified()
+            .await
+            .map_err(|err| zbus::Error::FDO(Box::new(zbus::fdo::Error::Failed(err.to_string()))))?;
 
         let service_path = oo7::dbus::api::Service::PATH.as_ref().unwrap();
-        if let Ok(signal_emitter) = self.service.signal_emitter(service_path) {
-            if let Err(err) = Service::collection_changed(&signal_emitter, &self.path).await {
-                tracing::error!("Failed to emit CollectionChanged signal: {}", err);
-            }
-        }
+        let signal_emitter = self
+            .service
+            .signal_emitter(service_path)
+            .map_err(|err| zbus::Error::FDO(Box::new(zbus::fdo::Error::Failed(err.to_string()))))?;
+        Service::collection_changed(&signal_emitter, &self.path).await?;
 
-        if let Ok(signal_emitter) = self.service.signal_emitter(&self.path) {
-            if let Err(err) = self.label_changed(&signal_emitter).await {
-                tracing::error!("Failed to emit PropertiesChanged signal for Label: {}", err);
-            }
-        }
+        let signal_emitter = self
+            .service
+            .signal_emitter(&self.path)
+            .map_err(|err| zbus::Error::FDO(Box::new(zbus::fdo::Error::Failed(err.to_string()))))?;
+        self.label_changed(&signal_emitter).await?;
+
+        Ok(())
     }
 
     #[zbus(property, name = "Locked")]
@@ -904,6 +917,83 @@ mod tests {
             signal_collection.as_str(),
             collection_path.as_str(),
             "Signal should contain the deleted collection path"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn locked_collection_operations() -> Result<(), Box<dyn std::error::Error>> {
+        let setup = TestServiceSetup::plain_session(true).await?;
+
+        // Verify collection is unlocked initially
+        assert!(
+            !setup.collections[0].is_locked().await?,
+            "Collection should start unlocked"
+        );
+
+        // Lock the collection
+        let collection = setup
+            .server
+            .collection_from_path(setup.collections[0].inner().path())
+            .await
+            .expect("Collection should exist");
+        collection.set_locked(true).await?;
+
+        // Verify collection is now locked
+        assert!(
+            setup.collections[0].is_locked().await?,
+            "Collection should be locked"
+        );
+
+        // Test 1: delete should fail with IsLocked
+        let result = setup.collections[0].delete(None).await;
+        assert!(
+            matches!(
+                result,
+                Err(oo7::dbus::Error::Service(
+                    oo7::dbus::ServiceError::IsLocked(_)
+                ))
+            ),
+            "delete should fail with IsLocked error, got: {:?}",
+            result
+        );
+
+        // Test 2: create_item should fail with IsLocked
+        let secret = oo7::Secret::text("test-password");
+        let dbus_secret = dbus::api::DBusSecret::new(Arc::clone(&setup.session), secret);
+        let result = setup.collections[0]
+            .create_item("Test Item", &[("app", "test")], &dbus_secret, false, None)
+            .await;
+        assert!(
+            matches!(
+                result,
+                Err(oo7::dbus::Error::Service(
+                    oo7::dbus::ServiceError::IsLocked(_)
+                ))
+            ),
+            "create_item should fail with IsLocked error, got: {:?}",
+            result
+        );
+
+        // Test 3: set_label should fail with IsLocked
+        let result = setup.collections[0].set_label("New Label").await;
+        assert!(
+            matches!(result, Err(oo7::dbus::Error::ZBus(zbus::Error::FDO(_)))),
+            "set_label should fail with IsLocked error, got: {:?}",
+            result
+        );
+
+        // Verify read-only operations still work on locked collections
+        assert!(
+            setup.collections[0].label().await.is_ok(),
+            "Should be able to read label of locked collection"
+        );
+
+        let items = setup.collections[0].items().await?;
+        assert!(
+            items.is_empty(),
+            "Should be able to read items (empty) from locked collection"
         );
 
         Ok(())
