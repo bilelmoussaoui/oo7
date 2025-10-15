@@ -18,7 +18,7 @@ use crate::{
 // GcrPrompt properties <https://gitlab.gnome.org/GNOME/gcr/-/blob/main/gcr/gcr-prompt.c#L95>
 // This would fail to serialize till <https://gitlab.gnome.org/GNOME/gcr/-/merge_requests/169>
 // is resolved.
-struct Properties {
+pub struct Properties {
     #[serde(
         with = "as_value::optional",
         skip_serializing_if = "Option::is_none",
@@ -130,7 +130,7 @@ impl Properties {
 #[derive(Deserialize, Serialize, Debug, Type)]
 #[serde(rename_all = "lowercase")]
 #[zvariant(signature = "s")]
-enum Reply {
+pub enum Reply {
     No,
     Yes,
 }
@@ -155,10 +155,10 @@ impl TryFrom<String> for Reply {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Type)]
+#[derive(Deserialize, Serialize, Debug, Type, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "lowercase")]
 #[zvariant(signature = "s")]
-enum PromptType {
+pub enum PromptType {
     Confirm,
     Password,
 }
@@ -346,7 +346,15 @@ impl PrompterCallback {
                 // TODO: this should check if the service has a keyring, check the secret
                 // without opening it again.
                 match oo7::file::Keyring::open(&label, secret).await {
-                    Ok(_) => tracing::debug!("Keyring secret matches for {label}."),
+                    Ok(_) => {
+                        tracing::debug!("Keyring secret matches for {label}.");
+                        // Unlock the collection after successful validation
+                        let service = self.service.clone();
+                        let objects = prompt.objects().to_owned();
+                        tokio::spawn(async move {
+                            let _ = service.set_locked(false, &objects, true).await;
+                        });
+                    }
                     Err(oo7::file::Error::IncorrectSecret) => {
                         tracing::error!("Keyring {label} failed to unlock, incorrect secret.");
                         let properties = Properties::for_unlock(
