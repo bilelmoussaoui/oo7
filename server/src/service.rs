@@ -642,6 +642,52 @@ mod tests {
             "Should have no unlocked items with empty search"
         );
 
+        // Test with both locked and unlocked items
+        // Create items in default collection (unlocked)
+        let secret1 = Secret::text("password1");
+        let dbus_secret1 = dbus::api::DBusSecret::new(Arc::clone(&setup.session), secret1);
+
+        setup.collections[0]
+            .create_item(
+                "Unlocked Item",
+                &[("app", "testapp")],
+                &dbus_secret1,
+                false,
+                None,
+            )
+            .await?;
+
+        // Create item in session collection
+        let secret2 = Secret::text("password2");
+        let dbus_secret2 = dbus::api::DBusSecret::new(Arc::clone(&setup.session), secret2);
+
+        setup.collections[1]
+            .create_item(
+                "Locked Item",
+                &[("app", "testapp")],
+                &dbus_secret2,
+                false,
+                None,
+            )
+            .await?;
+
+        // Lock the session collection (which locks its items)
+        let collection = setup
+            .server
+            .collection_from_path(setup.collections[1].inner().path())
+            .await
+            .expect("Collection should exist");
+        collection.set_locked(true).await?;
+
+        // Search for items with the shared attribute
+        let (unlocked, locked) = setup
+            .service_api
+            .search_items(&[("app", "testapp")])
+            .await?;
+
+        assert_eq!(unlocked.len(), 1, "Should find 1 unlocked item");
+        assert_eq!(locked.len(), 1, "Should find 1 locked item");
+
         Ok(())
     }
 
