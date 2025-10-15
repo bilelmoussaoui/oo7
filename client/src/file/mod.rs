@@ -1616,4 +1616,49 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn set_attributes() -> Result<(), Error> {
+        let data_dir = tempdir().unwrap();
+        let dir = data_dir.path().join("keyrings");
+        fs::create_dir_all(&dir).await.unwrap();
+        let path = dir.join("default.keyring");
+
+        let keyring = Keyring::load(&path, strong_key()).await?;
+
+        let items = keyring.items().await?;
+        assert_eq!(items.len(), 0);
+
+        keyring
+            .create_item("my item", &vec![("key", "value")], "my_secret", false)
+            .await?;
+
+        let mut items = keyring.items().await?;
+        assert_eq!(items.len(), 1);
+        let mut item = items.remove(0).unwrap();
+        assert_eq!(item.label(), "my item");
+        assert_eq!(item.secret(), Secret::text("my_secret"));
+        let attrs = item.attributes();
+        assert_eq!(attrs.len(), 2);
+        assert_eq!(attrs.get("key").unwrap(), "value");
+
+        // Update attributes on the item
+        item.set_attributes(&vec![("key", "changed_value"), ("new_key", "new_value")]);
+
+        // Write the updated item back to the keyring at index 0
+        keyring.replace_item_index(0, &item).await?;
+
+        // Now retrieve the item again from the keyring to verify the changes persisted
+        let mut items = keyring.items().await?;
+        assert_eq!(items.len(), 1);
+        let item = items.remove(0).unwrap();
+        assert_eq!(item.label(), "my item");
+        assert_eq!(item.secret(), Secret::text("my_secret"));
+        let attrs = item.attributes();
+        assert_eq!(attrs.len(), 3);
+        assert_eq!(attrs.get("key").unwrap(), "changed_value");
+        assert_eq!(attrs.get("new_key").unwrap(), "new_value");
+
+        Ok(())
+    }
 }
