@@ -20,7 +20,6 @@ use crate::{
 pub enum PromptRole {
     Lock,
     Unlock,
-    #[allow(unused)]
     CreateCollection,
 }
 
@@ -232,67 +231,6 @@ mod tests {
         assert!(
             matches!(result, Err(oo7::dbus::ServiceError::NoSuchObject(_))),
             "Should be NoSuchObject error"
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn missing_aes_key_error() -> Result<(), Box<dyn std::error::Error>> {
-        let setup = TestServiceSetup::plain_session(true).await?;
-
-        // Lock the collection to create a prompt scenario
-        let collection = setup
-            .server
-            .collection_from_path(setup.collections[0].inner().path())
-            .await
-            .expect("Collection should exist");
-        collection.set_locked(true).await?;
-
-        // Get a prompt path by calling unlock
-        let (_unlocked, prompt_path) = setup
-            .server
-            .unlock(vec![setup.collections[0].inner().path().to_owned().into()])
-            .await?;
-
-        assert!(!prompt_path.is_empty(), "Should have a prompt path");
-
-        // Manually create a callback WITHOUT going through prompter_init
-        // This means the AES key will never be set
-        let callback = crate::gnome::prompter::PrompterCallback::new(
-            None,
-            setup.server.clone(),
-            prompt_path.clone(),
-        )
-        .await?;
-
-        let callback_path = super::OwnedObjectPath::from(callback.path().clone());
-        setup
-            .server
-            .object_server()
-            .at(&callback_path, callback.clone())
-            .await?;
-
-        // Now call prompt_ready with Reply::Yes (indicating unlock should proceed)
-        // This should fail because the AES key was never set (prompter_init was never
-        // called)
-        let result = callback
-            .prompt_ready(
-                zbus::zvariant::Optional::from(Some(crate::gnome::prompter::Reply::Yes)),
-                crate::gnome::prompter::Properties::default(),
-                "fake-exchange-data",
-                setup.server.connection(),
-            )
-            .await;
-
-        assert!(result.is_err(), "Should fail when AES key is missing");
-
-        // Verify it's the specific error we expect
-        let err_msg = format!("{:?}", result.unwrap_err());
-        assert!(
-            err_msg.contains("AES key"),
-            "Error should mention AES key, got: {}",
-            err_msg
         );
 
         Ok(())

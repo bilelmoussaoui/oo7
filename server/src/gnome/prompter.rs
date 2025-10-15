@@ -125,6 +125,24 @@ impl Properties {
             cancel_label: Some("Cancel".to_owned()),
         }
     }
+
+    fn for_create_collection(label: &str, window_id: Option<&WindowIdentifierType>) -> Self {
+        Self {
+            title: Some("New Keyring Password".to_owned()),
+            message: Some("Choose password for new keyring".to_owned()),
+            description: Some(format!(
+                "An application wants to create a new keyring called '{label}'. Choose the password you want to use for it."
+            )),
+            warning: None,
+            password_new: Some(true),
+            password_strength: None,
+            choice_label: None,
+            choice_chosen: None,
+            caller_window: window_id.map(ToOwned::to_owned),
+            continue_label: Some("Create".to_owned()),
+            cancel_label: Some("Cancel".to_owned()),
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Type)]
@@ -188,7 +206,6 @@ pub struct PrompterCallback {
     window_id: Option<WindowIdentifierType>,
     private_key: Arc<Key>,
     public_key: Arc<Key>,
-    aes_key: Arc<OnceCell<Key>>,
     exchange: OnceCell<String>,
     service: Service,
     prompt_path: OwnedObjectPath,
@@ -261,7 +278,6 @@ impl PrompterCallback {
             window_id,
             public_key,
             private_key,
-            aes_key: Default::default(),
             exchange: Default::default(),
             path: OwnedObjectPath::try_from(format!("/org/gnome/keyring/Prompt/p{index}")).unwrap(),
             service,
@@ -274,35 +290,45 @@ impl PrompterCallback {
     }
 
     async fn prompter_init(&self, prompt: &Prompt) -> Result<(), ServiceError> {
-        let label = self
-            .object_label(prompt.objects())
-            .await
-            .unwrap_or_default();
         let connection = self.service.connection();
         let exchange = secret_exchange::begin(&self.public_key);
         self.exchange.set(exchange).unwrap();
 
         let (properties, prompt_type) = match prompt.role() {
-            PromptRole::Lock => (
-                Properties::for_lock(&label, self.window_id.as_ref()),
-                PromptType::Confirm,
-            ),
+            PromptRole::Lock => {
+                let label = self
+                    .object_label(prompt.objects())
+                    .await
+                    .unwrap_or_default();
+                (
+                    Properties::for_lock(&label, self.window_id.as_ref()),
+                    PromptType::Confirm,
+                )
+            }
             PromptRole::Unlock => {
-                let aes_key =
-                    secret_exchange::handshake(&self.private_key, self.exchange.get().unwrap())
-                        .map_err(|err| {
-                            custom_service_error(&format!(
-                                "Failed to generate AES key for SecretExchange {err}."
-                            ))
-                        })?;
-                self.aes_key.set(aes_key).unwrap();
-
+                let label = self
+                    .object_label(prompt.objects())
+                    .await
+                    .unwrap_or_default();
                 (
                     Properties::for_unlock(&label, None, self.window_id.as_ref()),
                     PromptType::Password,
                 )
             }
-            PromptRole::CreateCollection => todo!(),
+            PromptRole::CreateCollection => {
+                // Get the collection label from pending collections
+                let label = self
+                    .service
+                    .pending_collection(&self.prompt_path)
+                    .await
+                    .map(|(label, _alias)| label)
+                    .unwrap_or_default();
+
+                (
+                    Properties::for_create_collection(&label, self.window_id.as_ref()),
+                    PromptType::Password,
+                )
+            }
         };
 
         let prompter = PrompterProxy::new(connection).await?;
@@ -317,14 +343,15 @@ impl PrompterCallback {
     }
 
     async fn prompter_done(&self, prompt: &Prompt, exchange: &str) -> Result<(), ServiceError> {
-        let label = self
-            .object_label(prompt.objects())
-            .await
-            .unwrap_or_default();
         let prompter = PrompterProxy::new(self.service.connection()).await?;
 
         match prompt.role() {
             PromptRole::Lock => {
+                let label = self
+                    .object_label(prompt.objects())
+                    .await
+                    .unwrap_or_default();
+
                 let service = self.service.clone();
                 let objects = prompt.objects().to_owned();
                 tokio::spawn(async move {
@@ -332,16 +359,22 @@ impl PrompterCallback {
                 });
             }
             PromptRole::Unlock => {
-                let Some(aes_key) = self.aes_key.get() else {
-                    return Err(custom_service_error(
-                        "Failed to retrieve AES key for SecretExchange.",
-                    ));
-                };
-                let Some(secret) = secret_exchange::retrieve(exchange, aes_key) else {
+                let aes_key =
+                    secret_exchange::handshake(&self.private_key, exchange).map_err(|err| {
+                        custom_service_error(&format!(
+                            "Failed to generate AES key for SecretExchange {err}."
+                        ))
+                    })?;
+
+                let Some(secret) = secret_exchange::retrieve(exchange, &aes_key) else {
                     return Err(custom_service_error(
                         "Failed to retrieve keyring secret from SecretExchange.",
                     ));
                 };
+                let label = self
+                    .object_label(prompt.objects())
+                    .await
+                    .unwrap_or_default();
 
                 // TODO: this should check if the service has a keyring, check the secret
                 // without opening it again.
@@ -389,7 +422,53 @@ impl PrompterCallback {
                     }
                 }
             }
-            PromptRole::CreateCollection => todo!(),
+            PromptRole::CreateCollection => {
+                // Compute AES key from client's public key in the final exchange
+                let aes_key =
+                    secret_exchange::handshake(&self.private_key, exchange).map_err(|err| {
+                        custom_service_error(&format!(
+                            "Failed to generate AES key for SecretExchange {err}."
+                        ))
+                    })?;
+
+                let Some(secret) = secret_exchange::retrieve(exchange, &aes_key) else {
+                    return Err(custom_service_error(
+                        "Failed to retrieve keyring secret from SecretExchange.",
+                    ));
+                };
+
+                // Create the collection with the provided secret
+                let service = self.service.clone();
+
+                match service
+                    .complete_collection_creation(prompt.path(), secret)
+                    .await
+                {
+                    Ok(collection_path) => {
+                        tracing::info!("Collection created at: {}", collection_path);
+
+                        let path = self.path.clone();
+                        tokio::spawn(async move { prompter.stop_prompting(&path).await });
+
+                        let signal_emitter =
+                            self.service.signal_emitter(prompt.path().to_owned())?;
+                        let result = zvariant::Value::new(collection_path)
+                            .try_into_owned()
+                            .unwrap();
+
+                        tokio::spawn(async move {
+                            tracing::debug!("CreateCollection prompt completed.");
+                            Prompt::completed(&signal_emitter, false, result).await
+                        });
+                        return Ok(());
+                    }
+                    Err(err) => {
+                        return Err(custom_service_error(&format!(
+                            "Failed to create collection: {err}."
+                        )));
+                    }
+                }
+            }
         }
 
         let path = self.path.clone();

@@ -44,6 +44,8 @@ pub struct Service {
     // prompts mapped to their corresponding object path on the bus
     prompts: Arc<Mutex<HashMap<OwnedObjectPath, Prompt>>>,
     prompt_index: Arc<RwLock<u32>>,
+    // pending collection creations: prompt_path -> (label, alias)
+    pending_collections: Arc<Mutex<HashMap<OwnedObjectPath, (String, String)>>>,
 }
 
 #[zbus::interface(name = "org.freedesktop.Secret.Service")]
@@ -117,10 +119,34 @@ impl Service {
     #[zbus(out_args("collection", "prompt"))]
     pub async fn create_collection(
         &self,
-        _properties: Properties,
-        _alias: &str,
+        properties: Properties,
+        alias: &str,
     ) -> Result<(OwnedObjectPath, ObjectPath<'_>), ServiceError> {
-        todo!()
+        let label = properties.label().to_owned();
+        let alias = alias.to_owned();
+
+        // Create a prompt to get the password for the new collection
+        let prompt = Prompt::new(self.clone(), vec![], PromptRole::CreateCollection).await;
+        let prompt_path = OwnedObjectPath::from(prompt.path().clone());
+
+        // Store the collection metadata for later creation
+        self.pending_collections
+            .lock()
+            .await
+            .insert(prompt_path.clone(), (label, alias));
+
+        // Register the prompt
+        self.prompts
+            .lock()
+            .await
+            .insert(prompt_path.clone(), prompt.clone());
+
+        self.object_server().at(&prompt_path, prompt).await?;
+
+        tracing::debug!("CreateCollection prompt created at `{}`", prompt_path);
+
+        // Return empty collection path and the prompt path
+        Ok((OwnedObjectPath::default(), prompt_path.into()))
     }
 
     #[zbus(out_args("unlocked", "locked"))]
@@ -547,6 +573,80 @@ impl Service {
 
     pub async fn remove_prompt(&self, path: &ObjectPath<'_>) {
         self.prompts.lock().await.remove(path);
+        // Also clean up pending collection if it exists
+        self.pending_collections.lock().await.remove(path);
+    }
+
+    pub async fn pending_collection(
+        &self,
+        prompt_path: &ObjectPath<'_>,
+    ) -> Option<(String, String)> {
+        self.pending_collections
+            .lock()
+            .await
+            .get(prompt_path)
+            .cloned()
+    }
+
+    pub async fn complete_collection_creation(
+        &self,
+        prompt_path: &ObjectPath<'_>,
+        secret: Secret,
+    ) -> Result<OwnedObjectPath, ServiceError> {
+        // Retrieve the pending collection metadata
+        let Some((label, alias)) = self.pending_collection(prompt_path).await else {
+            return Err(ServiceError::NoSuchObject(format!(
+                "No pending collection for prompt `{}`",
+                prompt_path
+            )));
+        };
+
+        // Create a persistent keyring with the provided secret
+        let keyring = Keyring::open(&label, secret)
+            .await
+            .map_err(|err| custom_service_error(&format!("Failed to create keyring: {err}")))?;
+
+        // Write the keyring file to disk immediately
+        keyring
+            .write()
+            .await
+            .map_err(|err| custom_service_error(&format!("Failed to write keyring file: {err}")))?;
+
+        let keyring = Arc::new(keyring);
+
+        // Create the collection
+        let collection = Collection::new(&label, &alias, false, self.clone(), keyring);
+        let collection_path: OwnedObjectPath = collection.path().to_owned().into();
+
+        // Register with object server
+        self.object_server()
+            .at(collection.path(), collection.clone())
+            .await?;
+
+        // Add to collections
+        self.collections
+            .lock()
+            .await
+            .insert(collection_path.clone(), collection);
+
+        // Clean up pending collection
+        self.pending_collections.lock().await.remove(prompt_path);
+
+        // Emit CollectionCreated signal
+        let service_path = oo7::dbus::api::Service::PATH.as_ref().unwrap();
+        let signal_emitter = self.signal_emitter(service_path)?;
+        Service::collection_created(&signal_emitter, &collection_path).await?;
+
+        // Emit PropertiesChanged for Collections property to invalidate client cache
+        self.collections_changed(&signal_emitter).await?;
+
+        tracing::info!(
+            "Collection `{}` created with label '{}'",
+            collection_path,
+            label
+        );
+
+        Ok(collection_path)
     }
 
     pub fn signal_emitter<'a, P>(
@@ -1419,6 +1519,223 @@ mod tests {
             "Collection should still be unlocked after dismissing prompt"
         );
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn create_collection_basic() -> Result<(), Box<dyn std::error::Error>> {
+        let setup = TestServiceSetup::plain_session(true).await?;
+
+        // Get initial collection count
+        let initial_collections = setup.service_api.collections().await?;
+        let initial_count = initial_collections.len();
+
+        // Create a new collection
+        let collection = setup
+            .service_api
+            .create_collection("MyNewKeyring", Some("my-custom-alias"), None)
+            .await?;
+
+        // Verify collection appears in collections list
+        let collections = setup.service_api.collections().await?;
+        assert_eq!(
+            collections.len(),
+            initial_count + 1,
+            "Should have one more collection"
+        );
+
+        // Verify the collection label
+        let label = collection.label().await?;
+        assert_eq!(
+            label, "MyNewKeyring",
+            "Collection should have correct label"
+        );
+
+        // Verify the keyring file exists on disk
+        let server_collection = setup
+            .server
+            .collection_from_path(collection.inner().path())
+            .await
+            .expect("Collection should exist on server");
+        let keyring_path = server_collection.keyring.path().unwrap();
+
+        assert!(
+            keyring_path.exists(),
+            "Keyring file should exist on disk at {:?}",
+            keyring_path
+        );
+
+        // Verify the alias was set
+        let alias_collection = setup.service_api.read_alias("my-custom-alias").await?;
+        assert!(
+            alias_collection.is_some(),
+            "Should be able to read collection by alias"
+        );
+        assert_eq!(
+            alias_collection.unwrap().inner().path(),
+            collection.inner().path(),
+            "Alias should point to the new collection"
+        );
+
+        tokio::fs::remove_file(keyring_path).await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn create_collection_signal() -> Result<(), Box<dyn std::error::Error>> {
+        let setup = TestServiceSetup::plain_session(true).await?;
+
+        // Subscribe to CollectionCreated signal
+        let signal_stream = setup.service_api.receive_collection_created().await?;
+        tokio::pin!(signal_stream);
+
+        // Create a new collection
+        let collection = setup
+            .service_api
+            .create_collection("TestKeyring", None, None)
+            .await?;
+
+        // Wait for signal with timeout
+        let signal_result =
+            tokio::time::timeout(tokio::time::Duration::from_secs(1), signal_stream.next()).await;
+
+        assert!(
+            signal_result.is_ok(),
+            "Should receive CollectionCreated signal"
+        );
+        let signal = signal_result.unwrap();
+        assert!(signal.is_some(), "Signal should not be None");
+
+        let signal_collection = signal.unwrap();
+        assert_eq!(
+            signal_collection.inner().path().as_str(),
+            collection.inner().path().as_str(),
+            "Signal should contain the created collection path"
+        );
+
+        let server_collection = setup
+            .server
+            .collection_from_path(collection.inner().path())
+            .await
+            .expect("Collection should exist on server");
+        let keyring_path = server_collection.keyring.path().unwrap();
+        tokio::fs::remove_file(keyring_path).await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn create_collection_and_add_items() -> Result<(), Box<dyn std::error::Error>> {
+        let setup = TestServiceSetup::plain_session(true).await?;
+
+        // Create a new collection
+        let collection = setup
+            .service_api
+            .create_collection("ItemTestKeyring", None, None)
+            .await?;
+
+        // Verify collection is unlocked and ready for items
+        assert!(
+            !collection.is_locked().await?,
+            "New collection should be unlocked"
+        );
+
+        // Create an item in the new collection
+        let secret = oo7::Secret::text("hello-world-test");
+        let dbus_secret = dbus::api::DBusSecret::new(Arc::clone(&setup.session), secret.clone());
+
+        let item = collection
+            .create_item(
+                "Test Item",
+                &[("app", "test-app")],
+                &dbus_secret,
+                false,
+                None,
+            )
+            .await?;
+
+        // Verify item was created
+        let items = collection.items().await?;
+        assert_eq!(items.len(), 1, "Should have one item in new collection");
+        assert_eq!(
+            items[0].inner().path(),
+            item.inner().path(),
+            "Item path should match"
+        );
+
+        // Verify we can retrieve the secret
+        let retrieved_secret = item.secret(&setup.session).await?;
+        assert_eq!(
+            retrieved_secret.value(),
+            secret.as_bytes(),
+            "Should be able to retrieve secret from item in new collection"
+        );
+
+        let server_collection = setup
+            .server
+            .collection_from_path(collection.inner().path())
+            .await
+            .expect("Collection should exist on server");
+        let keyring_path = server_collection.keyring.path().unwrap();
+        tokio::fs::remove_file(&keyring_path).await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn create_collection_dismissed() -> Result<(), Box<dyn std::error::Error>> {
+        let setup = TestServiceSetup::plain_session(true).await?;
+
+        // Get initial collection count
+        let initial_collections = setup.service_api.collections().await?;
+        let initial_count = initial_collections.len();
+
+        // Set mock prompter to dismiss
+        setup.mock_prompter.set_accept(false).await;
+
+        // Try to create a collection
+        let result = setup
+            .service_api
+            .create_collection("DismissedKeyring", None, None)
+            .await;
+
+        // Should get Dismissed error
+        assert!(
+            matches!(result, Err(oo7::dbus::Error::Dismissed)),
+            "Should return Dismissed error when prompt dismissed"
+        );
+
+        // Verify collection was NOT created
+        let collections = setup.service_api.collections().await?;
+        assert_eq!(
+            collections.len(),
+            initial_count,
+            "Should not have created a new collection after dismissal"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn complete_collection_creation_no_pending() -> Result<(), Box<dyn std::error::Error>> {
+        let setup = TestServiceSetup::plain_session(true).await?;
+
+        // Try to complete collection creation with a prompt path that has no pending
+        // collection
+        let fake_prompt_path =
+            ObjectPath::try_from("/org/freedesktop/secrets/prompt/p999").unwrap();
+        let secret = Secret::from("test-password-long-enough");
+
+        let result = setup
+            .server
+            .complete_collection_creation(&fake_prompt_path, secret)
+            .await;
+
+        // Should get NoSuchObject error
+        assert!(
+            matches!(result, Err(ServiceError::NoSuchObject(_))),
+            "Should return NoSuchObject error when no pending collection exists"
+        );
         Ok(())
     }
 }

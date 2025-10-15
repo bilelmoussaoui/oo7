@@ -33,7 +33,7 @@ pub struct Collection {
     modified: Arc<Mutex<Duration>>,
     // Other attributes
     alias: Arc<Mutex<String>>,
-    keyring: Arc<Keyring>,
+    pub(crate) keyring: Arc<Keyring>,
     service: Service,
     item_index: Arc<RwLock<u32>>,
     path: OwnedObjectPath,

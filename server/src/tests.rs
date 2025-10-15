@@ -151,9 +151,9 @@ pub(crate) struct MockPrompterService {
 impl MockPrompterService {
     pub fn new() -> Self {
         Self {
-            unlock_password: Arc::new(tokio::sync::Mutex::new(Some(
-                oo7::Secret::random().unwrap(),
-            ))),
+            unlock_password: Arc::new(tokio::sync::Mutex::new(Some(oo7::Secret::from(
+                "test-password-long-enough",
+            )))),
             should_accept: Arc::new(tokio::sync::Mutex::new(true)),
         }
     }
@@ -249,6 +249,21 @@ impl MockPrompterService {
                     )
                     .await?;
                 tracing::debug!("MockPrompter: PromptReady(no) completed");
+
+                // Call PromptDone to clean up the callback
+                tracing::debug!("MockPrompter: calling PromptDone");
+                connection
+                    .call_method(
+                        None::<()>,
+                        &callback_path,
+                        Some("org.gnome.keyring.internal.Prompter.Callback"),
+                        "PromptDone",
+                        &(),
+                    )
+                    .await?;
+                tracing::debug!("MockPrompter: PromptDone completed");
+
+                return Ok(());
             } else if type_ == PromptType::Password {
                 tracing::debug!("MockPrompter: performing unlock (password prompt)");
                 // Unlock prompt - perform secret exchange
@@ -298,6 +313,19 @@ impl MockPrompterService {
                     .await?;
                 tracing::debug!("MockPrompter: PromptReady(yes) completed");
             }
+
+            // Call PromptDone to clean up the callback
+            tracing::debug!("MockPrompter: calling PromptDone");
+            connection
+                .call_method(
+                    None::<()>,
+                    &callback_path,
+                    Some("org.gnome.keyring.internal.Prompter.Callback"),
+                    "PromptDone",
+                    &(),
+                )
+                .await?;
+            tracing::debug!("MockPrompter: PromptDone completed");
 
             Ok::<_, zbus::Error>(())
         });
