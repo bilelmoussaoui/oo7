@@ -54,7 +54,7 @@ pub struct Properties {
         skip_serializing_if = "Option::is_none",
         default
     )]
-    password_strength: Option<u32>,
+    password_strength: Option<i32>,
     #[serde(
         with = "as_value::optional",
         skip_serializing_if = "Option::is_none",
