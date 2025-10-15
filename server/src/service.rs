@@ -208,7 +208,7 @@ impl Service {
         &self,
         objects: Vec<OwnedObjectPath>,
     ) -> Result<(Vec<OwnedObjectPath>, OwnedObjectPath), ServiceError> {
-        let (unlocked, not_unlocked) = self.set_locked(false, &objects, false).await?;
+        let (unlocked, not_unlocked) = self.set_locked(false, &objects).await?;
         if !not_unlocked.is_empty() {
             // Extract the label and collection before creating the prompt
             let label = self.extract_label_from_objects(&not_unlocked).await;
@@ -222,7 +222,21 @@ impl Service {
             let action = PromptAction::new(move |_secret: Option<Secret>| async move {
                 // The prompter will handle secret validation
                 // Here we just perform the unlock operation
-                let _ = service.set_locked(false, &not_unlocked, true).await;
+                let collections = service.collections.lock().await;
+                for object in &not_unlocked {
+                    // Try to find as collection first
+                    if let Some(collection) = collections.get(object) {
+                        let _ = collection.set_locked(false).await;
+                    } else {
+                        // Try to find as item within collections
+                        for (_path, collection) in collections.iter() {
+                            if let Some(item) = collection.item_from_path(object).await {
+                                let _ = item.set_locked(false).await;
+                                break;
+                            }
+                        }
+                    }
+                }
                 Ok(Value::new(not_unlocked).try_into_owned().unwrap())
             });
 
@@ -245,7 +259,7 @@ impl Service {
         &self,
         objects: Vec<OwnedObjectPath>,
     ) -> Result<(Vec<OwnedObjectPath>, OwnedObjectPath), ServiceError> {
-        let (locked, not_locked) = self.set_locked(true, &objects, false).await?;
+        let (locked, not_locked) = self.set_locked(true, &objects).await?;
         if !not_locked.is_empty() {
             // Extract the label before creating the prompt
             let label = self.extract_label_from_objects(&not_locked).await;
@@ -257,7 +271,21 @@ impl Service {
             let service = self.clone();
             let action = PromptAction::new(move |_secret: Option<Secret>| async move {
                 // Lock operation doesn't need secret validation
-                let _ = service.set_locked(true, &not_locked, true).await;
+                let collections = service.collections.lock().await;
+                for object in &not_locked {
+                    // Try to find as collection first
+                    if let Some(collection) = collections.get(object) {
+                        let _ = collection.set_locked(true).await;
+                    } else {
+                        // Try to find as item within collections
+                        for (_path, collection) in collections.iter() {
+                            if let Some(item) = collection.item_from_path(object).await {
+                                let _ = item.set_locked(true).await;
+                                break;
+                            }
+                        }
+                    }
+                }
                 Ok(Value::new(not_locked).try_into_owned().unwrap())
             });
 
@@ -514,7 +542,6 @@ impl Service {
         &self,
         locked: bool,
         objects: &[OwnedObjectPath],
-        from_prompt: bool,
     ) -> Result<(Vec<OwnedObjectPath>, Vec<OwnedObjectPath>), ServiceError> {
         let mut without_prompt = Vec::new();
         let mut with_prompt = Vec::new();
@@ -532,10 +559,6 @@ impl Service {
                         );
                         without_prompt.push(object.clone());
                     } else {
-                        // TODO: get rid of from_prompt and use futures
-                        if from_prompt {
-                            collection.set_locked(locked).await?;
-                        }
                         with_prompt.push(object.clone());
                     }
                     break;
@@ -553,10 +576,6 @@ impl Service {
                         item.set_locked(locked).await?;
                         without_prompt.push(object.clone());
                     } else {
-                        // TODO: get rid of from_prompt and use futures
-                        if from_prompt {
-                            item.set_locked(locked).await?;
-                        }
                         with_prompt.push(object.clone());
                     }
                     break;
