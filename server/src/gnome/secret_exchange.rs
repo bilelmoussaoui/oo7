@@ -50,8 +50,10 @@ pub fn retrieve(exchange: &str, aes_key: &Key) -> Option<oo7::Secret> {
     // or IV. The following is to avoid `Option::unwrap()` on a `None` value
     let secret = decoded.get(SECRET)?;
 
-    if secret.len() != CIPHER_TEXT_LEN {
-        // To avoid a short secret/cipher-text causing an UnpadError during decryption
+    // AES ciphertext must be a multiple of 16 bytes (block size)
+    // and at least 16 bytes (minimum for PKCS7 padding)
+    if secret.is_empty() || secret.len() % 16 != 0 {
+        // Invalid ciphertext - return a false secret to avoid decryption errors
         let false_secret = vec![0, 1];
         return Some(oo7::Secret::from(false_secret));
     }
@@ -145,5 +147,64 @@ iv=8e3N+gx553PgQlfTKRK3JA==";
 
         let decrypted = retrieve(&final_exchange, &peer_2_aes_key).unwrap();
         assert_eq!(b"password".to_vec(), decrypted.to_vec());
+    }
+
+    #[test]
+    fn test_retrieve_with_different_lengths() {
+        let peer_1_private_key = Key::generate_private_key().unwrap();
+        let peer_1_public_key =
+            crate::gnome::crypto::generate_public_key(&peer_1_private_key).unwrap();
+        let peer_1_exchange = begin(&peer_1_public_key);
+
+        let peer_2_private_key = Key::generate_private_key().unwrap();
+        let peer_2_public_key =
+            crate::gnome::crypto::generate_public_key(&peer_2_private_key).unwrap();
+        let peer_2_exchange = begin(&peer_2_public_key);
+
+        let peer_1_aes_key = handshake(&peer_1_private_key, &peer_2_exchange).unwrap();
+        let peer_2_aes_key = handshake(&peer_2_private_key, &peer_1_exchange).unwrap();
+
+        let test_cases = vec![
+            "a",                                                            /* 1 byte -> 16 bytes encrypted */
+            "short",                     // 5 bytes -> 16 bytes encrypted
+            "password",                  // 8 bytes -> 16 bytes encrypted
+            "exactly-16-byte",           // 16 bytes -> 32 bytes encrypted
+            "test-password-long-enough", // 25 bytes -> 32 bytes encrypted
+            "this-is-a-very-long-password-that-should-encrypt-to-48-bytes", // 48+ bytes
+        ];
+
+        for password in test_cases {
+            let iv = crypto::generate_iv().unwrap();
+            let encrypted = crypto::encrypt(password.as_bytes(), &peer_1_aes_key, &iv).unwrap();
+
+            // Verify encrypted length is a multiple of 16
+            assert_eq!(
+                encrypted.len() % 16,
+                0,
+                "Encrypted password should be multiple of 16"
+            );
+
+            let map = HashMap::from([
+                (PUBLIC, peer_1_public_key.as_ref()),
+                (SECRET, encrypted.as_ref()),
+                (IV, iv.as_ref()),
+            ]);
+            let final_exchange = encode(&map);
+
+            let decrypted = retrieve(&final_exchange, &peer_2_aes_key);
+
+            // All valid AES ciphertexts should decrypt successfully
+            assert!(
+                decrypted.is_some(),
+                "Should decrypt password '{}'",
+                password
+            );
+            assert_eq!(
+                password.as_bytes().to_vec(),
+                decrypted.unwrap().to_vec(),
+                "Decrypted password should match original for '{}'",
+                password
+            );
+        }
     }
 }
