@@ -1144,4 +1144,235 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn unlock_collection_prompt() -> Result<(), Box<dyn std::error::Error>> {
+        let setup = TestServiceSetup::plain_session(true).await?;
+
+        // Lock the collection using server-side API
+        let collection = setup
+            .server
+            .collection_from_path(setup.collections[0].inner().path())
+            .await
+            .expect("Collection should exist");
+        collection.set_locked(true).await?;
+
+        assert!(
+            setup.collections[0].is_locked().await?,
+            "Collection should be locked"
+        );
+
+        // Test 1: Unlock with accept
+        let unlocked = setup
+            .service_api
+            .unlock(&[setup.collections[0].inner().path()], None)
+            .await?;
+
+        assert_eq!(unlocked.len(), 1, "Should have unlocked 1 collection");
+        assert_eq!(
+            unlocked[0].as_str(),
+            setup.collections[0].inner().path().as_str(),
+            "Should return the collection path"
+        );
+        assert!(
+            !setup.collections[0].is_locked().await?,
+            "Collection should be unlocked after accepting prompt"
+        );
+
+        // Lock the collection again for dismiss test
+        collection.set_locked(true).await?;
+        assert!(
+            setup.collections[0].is_locked().await?,
+            "Collection should be locked again"
+        );
+
+        // Test 2: Unlock with dismiss
+        setup.mock_prompter.set_accept(false).await;
+        let result = setup
+            .service_api
+            .unlock(&[setup.collections[0].inner().path()], None)
+            .await;
+
+        assert!(
+            matches!(result, Err(oo7::dbus::Error::Dismissed)),
+            "Should return Dismissed error when prompt dismissed"
+        );
+        assert!(
+            setup.collections[0].is_locked().await?,
+            "Collection should still be locked after dismissing prompt"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn unlock_item_prompt() -> Result<(), Box<dyn std::error::Error>> {
+        let setup = TestServiceSetup::plain_session(true).await?;
+
+        // Create an item
+        let secret = Secret::text("test-password");
+        let dbus_secret = dbus::api::DBusSecret::new(Arc::clone(&setup.session), secret);
+        let item = setup.collections[0]
+            .create_item("Test Item", &[("app", "test")], &dbus_secret, false, None)
+            .await?;
+
+        // Lock the collection (which locks the item)
+        let collection = setup
+            .server
+            .collection_from_path(setup.collections[0].inner().path())
+            .await
+            .expect("Collection should exist");
+        collection.set_locked(true).await?;
+
+        assert!(
+            item.is_locked().await?,
+            "Item should be locked when collection is locked"
+        );
+
+        // Test 1: Unlock with accept
+        let unlocked = setup
+            .service_api
+            .unlock(&[item.inner().path()], None)
+            .await?;
+
+        assert_eq!(unlocked.len(), 1, "Should have unlocked 1 item");
+        assert_eq!(
+            unlocked[0].as_str(),
+            item.inner().path().as_str(),
+            "Should return the item path"
+        );
+        assert!(
+            !item.is_locked().await?,
+            "Item should be unlocked after accepting prompt"
+        );
+
+        // Lock the item again for dismiss test
+        collection.set_locked(true).await?;
+        assert!(item.is_locked().await?, "Item should be locked again");
+
+        // Test 2: Unlock with dismiss
+        setup.mock_prompter.set_accept(false).await;
+        let result = setup.service_api.unlock(&[item.inner().path()], None).await;
+
+        assert!(
+            matches!(result, Err(oo7::dbus::Error::Dismissed)),
+            "Should return Dismissed error when prompt dismissed"
+        );
+        assert!(
+            item.is_locked().await?,
+            "Item should still be locked after dismissing prompt"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn lock_item_prompt() -> Result<(), Box<dyn std::error::Error>> {
+        let setup = TestServiceSetup::plain_session(true).await?;
+
+        // Create an item (starts unlocked)
+        let secret = Secret::text("test-password");
+        let dbus_secret = dbus::api::DBusSecret::new(Arc::clone(&setup.session), secret);
+        let item = setup.collections[0]
+            .create_item("Test Item", &[("app", "test")], &dbus_secret, false, None)
+            .await?;
+
+        assert!(!item.is_locked().await?, "Item should start unlocked");
+
+        // Test 1: Lock with accept
+        let locked = setup.service_api.lock(&[item.inner().path()], None).await?;
+
+        assert_eq!(locked.len(), 1, "Should have locked 1 item");
+        assert_eq!(
+            locked[0].as_str(),
+            item.inner().path().as_str(),
+            "Should return the item path"
+        );
+        assert!(
+            item.is_locked().await?,
+            "Item should be locked after accepting prompt"
+        );
+
+        // Unlock the item for dismiss test
+        let collection = setup
+            .server
+            .collection_from_path(setup.collections[0].inner().path())
+            .await
+            .expect("Collection should exist");
+        collection.set_locked(false).await?;
+        assert!(!item.is_locked().await?, "Item should be unlocked again");
+
+        // Test 2: Lock with dismiss
+        setup.mock_prompter.set_accept(false).await;
+        let result = setup.service_api.lock(&[item.inner().path()], None).await;
+
+        assert!(
+            matches!(result, Err(oo7::dbus::Error::Dismissed)),
+            "Should return Dismissed error when prompt dismissed"
+        );
+        assert!(
+            !item.is_locked().await?,
+            "Item should still be unlocked after dismissing prompt"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn lock_collection_prompt() -> Result<(), Box<dyn std::error::Error>> {
+        let setup = TestServiceSetup::plain_session(true).await?;
+
+        // Collection starts unlocked
+        assert!(
+            !setup.collections[0].is_locked().await?,
+            "Collection should start unlocked"
+        );
+
+        // Test 1: Lock with accept
+        let locked = setup
+            .service_api
+            .lock(&[setup.collections[0].inner().path()], None)
+            .await?;
+
+        assert_eq!(locked.len(), 1, "Should have locked 1 collection");
+        assert_eq!(
+            locked[0].as_str(),
+            setup.collections[0].inner().path().as_str(),
+            "Should return the collection path"
+        );
+        assert!(
+            setup.collections[0].is_locked().await?,
+            "Collection should be locked after accepting prompt"
+        );
+
+        // Unlock the collection again for dismiss test
+        let collection = setup
+            .server
+            .collection_from_path(setup.collections[0].inner().path())
+            .await
+            .expect("Collection should exist");
+        collection.set_locked(false).await?;
+        assert!(
+            !setup.collections[0].is_locked().await?,
+            "Collection should be unlocked again"
+        );
+
+        // Test 2: Lock with dismiss
+        setup.mock_prompter.set_accept(false).await;
+        let result = setup
+            .service_api
+            .lock(&[setup.collections[0].inner().path()], None)
+            .await;
+
+        assert!(
+            matches!(result, Err(oo7::dbus::Error::Dismissed)),
+            "Should return Dismissed error when prompt dismissed"
+        );
+        assert!(
+            !setup.collections[0].is_locked().await?,
+            "Collection should still be unlocked after dismissing prompt"
+        );
+
+        Ok(())
+    }
 }

@@ -148,7 +148,7 @@ impl Item {
 
     #[zbus(property, name = "Locked")]
     pub async fn is_locked(&self) -> bool {
-        self.locked.load(std::sync::atomic::Ordering::Relaxed)
+        self.locked.load(std::sync::atomic::Ordering::Acquire)
     }
 
     #[zbus(property, name = "Attributes")]
@@ -248,7 +248,7 @@ impl Item {
 
     pub async fn set_locked(&self, locked: bool) -> Result<(), ServiceError> {
         self.locked
-            .store(locked, std::sync::atomic::Ordering::Relaxed);
+            .store(locked, std::sync::atomic::Ordering::Release);
         let signal_emitter = self.service.signal_emitter(&self.path)?;
         self.locked_changed(&signal_emitter).await?;
 
