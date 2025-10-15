@@ -455,11 +455,9 @@ impl PrompterCallback {
                         });
                         Ok(())
                     }
-                    Err(err) => {
-                        Err(custom_service_error(&format!(
-                            "Failed to create collection: {err}."
-                        )))
-                    }
+                    Err(err) => Err(custom_service_error(&format!(
+                        "Failed to create collection: {err}."
+                    ))),
                 }
             }
         }
