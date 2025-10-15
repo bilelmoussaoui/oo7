@@ -294,41 +294,20 @@ impl PrompterCallback {
         let exchange = secret_exchange::begin(&self.public_key);
         self.exchange.set(exchange).unwrap();
 
+        let label = prompt.label();
         let (properties, prompt_type) = match prompt.role() {
-            PromptRole::Lock => {
-                let label = self
-                    .object_label(prompt.objects())
-                    .await
-                    .unwrap_or_default();
-                (
-                    Properties::for_lock(&label, self.window_id.as_ref()),
-                    PromptType::Confirm,
-                )
-            }
-            PromptRole::Unlock => {
-                let label = self
-                    .object_label(prompt.objects())
-                    .await
-                    .unwrap_or_default();
-                (
-                    Properties::for_unlock(&label, None, self.window_id.as_ref()),
-                    PromptType::Password,
-                )
-            }
-            PromptRole::CreateCollection => {
-                // Get the collection label from pending collections
-                let label = self
-                    .service
-                    .pending_collection(&self.prompt_path)
-                    .await
-                    .map(|(label, _alias)| label)
-                    .unwrap_or_default();
-
-                (
-                    Properties::for_create_collection(&label, self.window_id.as_ref()),
-                    PromptType::Password,
-                )
-            }
+            PromptRole::Lock => (
+                Properties::for_lock(label, self.window_id.as_ref()),
+                PromptType::Confirm,
+            ),
+            PromptRole::Unlock => (
+                Properties::for_unlock(label, None, self.window_id.as_ref()),
+                PromptType::Password,
+            ),
+            PromptRole::CreateCollection => (
+                Properties::for_create_collection(label, self.window_id.as_ref()),
+                PromptType::Password,
+            ),
         };
 
         let prompter = PrompterProxy::new(connection).await?;
@@ -345,18 +324,29 @@ impl PrompterCallback {
     async fn prompter_done(&self, prompt: &Prompt, exchange: &str) -> Result<(), ServiceError> {
         let prompter = PrompterProxy::new(self.service.connection()).await?;
 
+        // Get the action from the prompt
+        let Some(action) = prompt.take_action().await else {
+            return Err(custom_service_error(
+                "Prompt action was already executed or not set",
+            ));
+        };
+
+        // Handle each role differently based on what validation/preparation is needed
         match prompt.role() {
             PromptRole::Lock => {
-                let label = self
-                    .object_label(prompt.objects())
-                    .await
-                    .unwrap_or_default();
+                // Lock operation doesn't need secret, just execute the action
+                let result_value = action.execute(None).await?;
 
-                let service = self.service.clone();
-                let objects = prompt.objects().to_owned();
+                let path = self.path.clone();
+                let prompt_path = OwnedObjectPath::from(prompt.path().clone());
+                tokio::spawn(async move { prompter.stop_prompting(&path).await });
+
+                let signal_emitter = self.service.signal_emitter(prompt_path)?;
                 tokio::spawn(async move {
-                    let _ = service.set_locked(true, &objects, true).await;
+                    tracing::debug!("Lock prompt completed.");
+                    let _ = Prompt::completed(&signal_emitter, false, result_value).await;
                 });
+                return Ok(());
             }
             PromptRole::Unlock => {
                 let aes_key =
@@ -371,14 +361,12 @@ impl PrompterCallback {
                         "Failed to retrieve keyring secret from SecretExchange.",
                     ));
                 };
-                // Get the collection to validate the secret against the already-open keyring
-                let collection = self
-                    .get_collection(prompt.objects())
-                    .await
-                    .ok_or_else(|| custom_service_error("Failed to find collection for unlock."))?;
-                let label = collection.label().await;
 
-                // Validate the secret using the already-open keyring instead of re-opening
+                // Get the collection to validate the secret
+                let collection = prompt.collection().expect("Unlock requires a collection");
+                let label = prompt.label();
+
+                // Validate the secret using the already-open keyring
                 let is_valid =
                     collection
                         .keyring
@@ -392,16 +380,23 @@ impl PrompterCallback {
 
                 if is_valid {
                     tracing::debug!("Keyring secret matches for {label}.");
-                    // Unlock the collection after successful validation
-                    let service = self.service.clone();
-                    let objects = prompt.objects().to_owned();
+                    // Execute the unlock action after successful validation
+                    let result_value = action.execute(None).await?;
+
+                    let path = self.path.clone();
+                    let prompt_path = OwnedObjectPath::from(prompt.path().clone());
+                    tokio::spawn(async move { prompter.stop_prompting(&path).await });
+
+                    let signal_emitter = self.service.signal_emitter(prompt_path)?;
                     tokio::spawn(async move {
-                        let _ = service.set_locked(false, &objects, true).await;
+                        tracing::debug!("Unlock prompt completed.");
+                        let _ = Prompt::completed(&signal_emitter, false, result_value).await;
                     });
+                    return Ok(());
                 } else {
                     tracing::error!("Keyring {label} failed to unlock, incorrect secret.");
                     let properties = Properties::for_unlock(
-                        &label,
+                        label,
                         Some("The unlock password was incorrect"),
                         self.window_id.as_ref(),
                     );
@@ -441,28 +436,22 @@ impl PrompterCallback {
                     ));
                 };
 
-                // Create the collection with the provided secret
-                let service = self.service.clone();
-
-                match service
-                    .complete_collection_creation(prompt.path(), secret)
-                    .await
-                {
-                    Ok(collection_path) => {
-                        tracing::info!("Collection created at: {}", collection_path);
+                // Execute the collection creation action with the secret
+                match action.execute(Some(secret)).await {
+                    Ok(collection_path_value) => {
+                        tracing::info!("CreateCollection action completed successfully");
 
                         let path = self.path.clone();
                         tokio::spawn(async move { prompter.stop_prompting(&path).await });
 
                         let signal_emitter =
                             self.service.signal_emitter(prompt.path().to_owned())?;
-                        let result = zvariant::Value::new(collection_path)
-                            .try_into_owned()
-                            .unwrap();
 
                         tokio::spawn(async move {
                             tracing::debug!("CreateCollection prompt completed.");
-                            Prompt::completed(&signal_emitter, false, result).await
+                            let _ =
+                                Prompt::completed(&signal_emitter, false, collection_path_value)
+                                    .await;
                         });
                         return Ok(());
                     }
@@ -474,69 +463,6 @@ impl PrompterCallback {
                 }
             }
         }
-
-        let path = self.path.clone();
-        let prompt_path = OwnedObjectPath::from(prompt.path().clone());
-        tokio::spawn(async move { prompter.stop_prompting(&path).await });
-
-        let signal_emitter = self.service.signal_emitter(prompt_path)?;
-        let result = zvariant::Value::new(prompt.objects())
-            .try_into_owned()
-            .unwrap();
-
-        tokio::spawn(async move {
-            tracing::debug!("Prompt completed.");
-            Prompt::completed(&signal_emitter, false, result).await
-        });
-        Ok(())
-    }
-
-    async fn object_label(&self, objects: &[OwnedObjectPath]) -> Option<String> {
-        debug_assert!(!objects.is_empty());
-        // If at least one of the items is a Collection
-        for object in objects {
-            if let Some(collection) = self.service.collection_from_path(object).await {
-                return Some(collection.label().await);
-            }
-        }
-        // Get the collection path from the first item in the keyring as you cannot
-        // unlock items from different collections I guess?
-        let path = objects
-            .first()
-            .unwrap()
-            .as_str()
-            .rsplit_once('/')
-            .map(|(parent, _)| parent)?;
-        let collection = self
-            .service
-            .collection_from_path(&ObjectPath::try_from(path).unwrap())
-            .await?;
-
-        Some(collection.label().await)
-    }
-
-    async fn get_collection(
-        &self,
-        objects: &[OwnedObjectPath],
-    ) -> Option<crate::collection::Collection> {
-        debug_assert!(!objects.is_empty());
-        // If at least one of the items is a Collection
-        for object in objects {
-            if let Some(collection) = self.service.collection_from_path(object).await {
-                return Some(collection);
-            }
-        }
-        // Get the collection path from the first item in the keyring as you cannot
-        // unlock items from different collections I guess?
-        let path = objects
-            .first()
-            .unwrap()
-            .as_str()
-            .rsplit_once('/')
-            .map(|(parent, _)| parent)?;
-        self.service
-            .collection_from_path(&ObjectPath::try_from(path).unwrap())
-            .await
     }
 
     async fn prompter_dismissed(&self, prompt_path: OwnedObjectPath) -> Result<(), ServiceError> {

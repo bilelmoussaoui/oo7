@@ -1,9 +1,9 @@
 // org.freedesktop.Secret.Prompt
 
-use std::{str::FromStr, sync::Arc};
+use std::{future::Future, pin::Pin, str::FromStr, sync::Arc};
 
-use oo7::dbus::ServiceError;
-use tokio::sync::OnceCell;
+use oo7::{Secret, dbus::ServiceError};
+use tokio::sync::{Mutex, OnceCell};
 use zbus::{
     interface,
     object_server::SignalEmitter,
@@ -23,15 +23,50 @@ pub enum PromptRole {
     CreateCollection,
 }
 
+/// A boxed future that represents the action to be taken when a prompt
+/// completes
+pub type PromptActionFuture =
+    Pin<Box<dyn Future<Output = Result<OwnedValue, ServiceError>> + Send + 'static>>;
+
+/// Represents the action to be taken when a prompt completes
+/// The secret is optional because Lock prompts don't require secret validation
+pub struct PromptAction {
+    /// The async function to execute when the prompt is accepted
+    action: Box<dyn FnOnce(Option<Secret>) -> PromptActionFuture + Send>,
+}
+
+impl PromptAction {
+    /// Create a new prompt action from a closure that takes an optional secret
+    /// and returns a future
+    pub fn new<F, Fut>(f: F) -> Self
+    where
+        F: FnOnce(Option<Secret>) -> Fut + Send + 'static,
+        Fut: Future<Output = Result<OwnedValue, ServiceError>> + Send + 'static,
+    {
+        Self {
+            action: Box::new(move |secret| Box::pin(f(secret))),
+        }
+    }
+
+    /// Execute the action with the provided secret (None for Lock operations)
+    pub async fn execute(self, secret: Option<Secret>) -> Result<OwnedValue, ServiceError> {
+        (self.action)(secret).await
+    }
+}
+
 #[derive(Clone)]
 pub struct Prompt {
     service: Service,
-    // Objects to lock/unlock
-    objects: Vec<OwnedObjectPath>,
     role: PromptRole,
     path: OwnedObjectPath,
+    /// The label of the collection/keyring being prompted for
+    label: String,
+    /// The collection for Unlock prompts (needed for secret validation)
+    collection: Option<crate::collection::Collection>,
     /// GNOME Specific
     callback: Arc<OnceCell<PrompterCallback>>,
+    /// The action to execute when the prompt completes
+    action: Arc<Mutex<Option<PromptAction>>>,
 }
 
 // Manual impl because OnceCell doesn't impl Debug
@@ -39,9 +74,10 @@ impl std::fmt::Debug for Prompt {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Prompt")
             .field("service", &self.service)
-            .field("objects", &self.objects)
             .field("role", &self.role)
             .field("path", &self.path)
+            .field("label", &self.label)
+            .field("collection", &self.collection)
             .finish()
     }
 }
@@ -107,15 +143,22 @@ impl Prompt {
 }
 
 impl Prompt {
-    pub async fn new(service: Service, objects: Vec<OwnedObjectPath>, role: PromptRole) -> Self {
+    pub async fn new(
+        service: Service,
+        role: PromptRole,
+        label: String,
+        collection: Option<crate::collection::Collection>,
+    ) -> Self {
         let index = service.prompt_index().await;
         Self {
             path: OwnedObjectPath::try_from(format!("/org/freedesktop/secrets/prompt/p{index}"))
                 .unwrap(),
             service,
-            objects,
             role,
+            label,
+            collection,
             callback: Default::default(),
+            action: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -127,8 +170,22 @@ impl Prompt {
         self.role
     }
 
-    pub fn objects(&self) -> &[OwnedObjectPath] {
-        &self.objects
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+
+    pub fn collection(&self) -> Option<&crate::collection::Collection> {
+        self.collection.as_ref()
+    }
+
+    /// Set the action to execute when the prompt completes
+    pub async fn set_action(&self, action: PromptAction) {
+        *self.action.lock().await = Some(action);
+    }
+
+    /// Take the action, consuming it so it can only be executed once
+    pub async fn take_action(&self) -> Option<PromptAction> {
+        self.action.lock().await.take()
     }
 }
 

@@ -25,7 +25,7 @@ use zbus::{
 use crate::{
     collection::Collection,
     error::{Error, custom_service_error},
-    prompt::{Prompt, PromptRole},
+    prompt::{Prompt, PromptAction, PromptRole},
     session::Session,
 };
 
@@ -126,7 +126,13 @@ impl Service {
         let alias = alias.to_owned();
 
         // Create a prompt to get the password for the new collection
-        let prompt = Prompt::new(self.clone(), vec![], PromptRole::CreateCollection).await;
+        let prompt = Prompt::new(
+            self.clone(),
+            PromptRole::CreateCollection,
+            label.clone(),
+            None,
+        )
+        .await;
         let prompt_path = OwnedObjectPath::from(prompt.path().clone());
 
         // Store the collection metadata for later creation
@@ -134,6 +140,22 @@ impl Service {
             .lock()
             .await
             .insert(prompt_path.clone(), (label, alias));
+
+        // Create the collection creation action
+        let service = self.clone();
+        let creation_prompt_path = prompt_path.clone();
+        let action = PromptAction::new(move |secret: Option<Secret>| async move {
+            let secret = secret
+                .ok_or_else(|| custom_service_error("CreateCollection action requires a secret"))?;
+
+            let collection_path = service
+                .complete_collection_creation(&creation_prompt_path, secret)
+                .await?;
+
+            Ok(Value::new(collection_path).try_into_owned().unwrap())
+        });
+
+        prompt.set_action(action).await;
 
         // Register the prompt
         self.prompts
@@ -188,8 +210,24 @@ impl Service {
     ) -> Result<(Vec<OwnedObjectPath>, OwnedObjectPath), ServiceError> {
         let (unlocked, not_unlocked) = self.set_locked(false, &objects, false).await?;
         if !not_unlocked.is_empty() {
-            let prompt = Prompt::new(self.clone(), not_unlocked, PromptRole::Unlock).await;
+            // Extract the label and collection before creating the prompt
+            let label = self.extract_label_from_objects(&not_unlocked).await;
+            let collection = self.extract_collection_from_objects(&not_unlocked).await;
+
+            let prompt = Prompt::new(self.clone(), PromptRole::Unlock, label, collection).await;
             let path = OwnedObjectPath::from(prompt.path().clone());
+
+            // Create the unlock action
+            let service = self.clone();
+            let action = PromptAction::new(move |_secret: Option<Secret>| async move {
+                // The prompter will handle secret validation
+                // Here we just perform the unlock operation
+                let _ = service.set_locked(false, &not_unlocked, true).await;
+                Ok(Value::new(not_unlocked).try_into_owned().unwrap())
+            });
+
+            prompt.set_action(action).await;
+
             self.prompts
                 .lock()
                 .await
@@ -209,8 +247,22 @@ impl Service {
     ) -> Result<(Vec<OwnedObjectPath>, OwnedObjectPath), ServiceError> {
         let (locked, not_locked) = self.set_locked(true, &objects, false).await?;
         if !not_locked.is_empty() {
-            let prompt = Prompt::new(self.clone(), not_locked, PromptRole::Lock).await;
+            // Extract the label before creating the prompt
+            let label = self.extract_label_from_objects(&not_locked).await;
+
+            let prompt = Prompt::new(self.clone(), PromptRole::Lock, label, None).await;
             let path = OwnedObjectPath::from(prompt.path().clone());
+
+            // Create the lock action
+            let service = self.clone();
+            let action = PromptAction::new(move |_secret: Option<Secret>| async move {
+                // Lock operation doesn't need secret validation
+                let _ = service.set_locked(true, &not_locked, true).await;
+                Ok(Value::new(not_locked).try_into_owned().unwrap())
+            });
+
+            prompt.set_action(action).await;
+
             self.prompts
                 .lock()
                 .await
@@ -660,6 +712,63 @@ impl Service {
         let signal_emitter = zbus::object_server::SignalEmitter::new(self.connection(), path)?;
 
         Ok(signal_emitter)
+    }
+
+    /// Extract the collection label from a list of object paths
+    /// The objects can be either collections or items
+    async fn extract_label_from_objects(&self, objects: &[OwnedObjectPath]) -> String {
+        if objects.is_empty() {
+            return String::new();
+        }
+
+        // Check if at least one of the objects is a Collection
+        for object in objects {
+            if let Some(collection) = self.collection_from_path(object).await {
+                return collection.label().await;
+            }
+        }
+
+        // Get the collection path from the first item
+        // assumes all items are from the same collection
+        if let Some(path_str) = objects.first().and_then(|p| p.as_str().rsplit_once('/')) {
+            let collection_path = path_str.0;
+            if let Ok(obj_path) = ObjectPath::try_from(collection_path) {
+                if let Some(collection) = self.collection_from_path(&obj_path).await {
+                    return collection.label().await;
+                }
+            }
+        }
+
+        String::new()
+    }
+
+    /// Extract the collection from a list of object paths
+    /// The objects can be either collections or items
+    async fn extract_collection_from_objects(
+        &self,
+        objects: &[OwnedObjectPath],
+    ) -> Option<Collection> {
+        if objects.is_empty() {
+            return None;
+        }
+
+        // Check if at least one of the objects is a Collection
+        for object in objects {
+            if let Some(collection) = self.collection_from_path(object).await {
+                return Some(collection);
+            }
+        }
+
+        // Get the collection path from the first item
+        // (assumes all items are from the same collection)
+        let path = objects
+            .first()
+            .unwrap()
+            .as_str()
+            .rsplit_once('/')
+            .map(|(parent, _)| parent)?;
+        self.collection_from_path(&ObjectPath::try_from(path).unwrap())
+            .await
     }
 }
 
