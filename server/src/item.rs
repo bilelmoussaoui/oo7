@@ -106,7 +106,7 @@ impl Item {
     }
 
     pub async fn set_secret(&self, secret: DBusSecretInner) -> Result<(), ServiceError> {
-        let DBusSecretInner(session, iv, secret, _content_type) = secret;
+        let DBusSecretInner(session, iv, secret, content_type) = secret;
 
         let Some(session) = self.service.session(&session).await else {
             tracing::error!("The session `{}` does not exist.", session);
@@ -136,6 +136,20 @@ impl Item {
                 inner.set_secret(secret);
             }
         }
+
+        // Ensure content-type attribute is stored
+        let mut attributes = inner.attributes().clone();
+        if !attributes.contains_key(oo7::CONTENT_TYPE_ATTRIBUTE) {
+            attributes.insert(
+                oo7::CONTENT_TYPE_ATTRIBUTE.to_owned(),
+                content_type.as_str().into(),
+            );
+        } else {
+            attributes
+                .entry(oo7::CONTENT_TYPE_ATTRIBUTE.to_string())
+                .and_modify(|v| *v = content_type.as_str().into());
+        }
+        inner.set_attributes(&attributes);
 
         drop(inner);
 
@@ -418,7 +432,7 @@ mod tests {
     async fn secret_retrieval_plain() -> Result<(), Box<dyn std::error::Error>> {
         let setup = TestServiceSetup::plain_session(true).await?;
 
-        let secret = oo7::Secret::text("my-secret-password");
+        let secret = oo7::Secret::blob(b"my-secret-password");
         let dbus_secret = dbus::api::DBusSecret::new(Arc::clone(&setup.session), secret.clone());
 
         let item = setup.collections[0]
@@ -429,6 +443,12 @@ mod tests {
         let retrieved_secret = item.secret(&setup.session).await?;
         assert_eq!(retrieved_secret.value(), secret.as_bytes());
 
+        // Verify content-type is preserved
+        assert_eq!(
+            retrieved_secret.content_type(),
+            secret.content_type(),
+            "Content-type should be preserved"
+        );
         Ok(())
     }
 
@@ -450,10 +470,17 @@ mod tests {
 
         // Retrieve secret
         let retrieved_secret = item.secret(&setup.session).await?;
-        // TODO: ensure the server implementation stores the content-type attribute
         assert_eq!(
             retrieved_secret.decrypt(Some(&aes_key.clone()))?.as_bytes(),
             secret.as_bytes()
+        );
+        // Verify content-type is preserved
+        assert_eq!(
+            retrieved_secret
+                .decrypt(Some(&aes_key.clone()))?
+                .content_type(),
+            secret.content_type(),
+            "Content-type should be preserved"
         );
 
         Ok(())
@@ -498,6 +525,11 @@ mod tests {
         // Verify original secret
         let retrieved = item.secret(&setup.session).await?;
         assert_eq!(retrieved.value(), original_secret.as_bytes());
+        assert_eq!(
+            retrieved.content_type(),
+            original_secret.content_type(),
+            "Content-type should be preserved"
+        );
 
         // Get initial modified timestamp
         let initial_modified = item.modified().await?;
@@ -506,7 +538,7 @@ mod tests {
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
         // Update the secret
-        let new_secret = oo7::Secret::text("new-password");
+        let new_secret = oo7::Secret::blob(b"new-password");
         let new_dbus_secret =
             dbus::api::DBusSecret::new(Arc::clone(&setup.session), new_secret.clone());
         item.set_secret(&new_dbus_secret).await?;
@@ -514,6 +546,11 @@ mod tests {
         // Verify updated secret
         let retrieved = item.secret(&setup.session).await?;
         assert_eq!(retrieved.value(), new_secret.as_bytes());
+        assert_eq!(
+            retrieved.content_type(),
+            new_secret.content_type(),
+            "Content-type should be preserved"
+        );
 
         // Verify modified timestamp was updated
         let new_modified = item.modified().await?;

@@ -129,10 +129,10 @@ impl Collection {
             )));
         }
 
-        let DBusSecretInner(session, iv, secret, _content_type) = secret;
+        let DBusSecretInner(session, iv, secret, content_type) = secret;
         let label = properties.label();
         // Safe to unwrap as an item always has attributes
-        let attributes = properties.attributes().unwrap();
+        let mut attributes = properties.attributes().unwrap().to_owned();
 
         let Some(session) = self.service.session(&session).await else {
             tracing::error!("The session `{}` does not exist.", session);
@@ -146,6 +146,14 @@ impl Collection {
                 .map_err(|err| custom_service_error(&format!("Failed to decrypt secret {err}.")))?,
             None => zeroize::Zeroizing::new(secret),
         };
+
+        // Ensure content-type attribute is stored
+        if !attributes.contains_key(oo7::CONTENT_TYPE_ATTRIBUTE) {
+            attributes.insert(
+                oo7::CONTENT_TYPE_ATTRIBUTE.to_owned(),
+                content_type.as_str().to_owned(),
+            );
+        }
 
         let item = self
             .keyring
@@ -167,7 +175,7 @@ impl Collection {
 
         // Remove any existing items with the same attributes
         if replace {
-            let existing_items = self.search_inner_items(attributes).await;
+            let existing_items = self.search_inner_items(&attributes).await;
             if !existing_items.is_empty() {
                 let mut items = self.items.lock().await;
                 for existing in &existing_items {
