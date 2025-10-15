@@ -346,7 +346,7 @@ impl PrompterCallback {
                     tracing::debug!("Lock prompt completed.");
                     let _ = Prompt::completed(&signal_emitter, false, result_value).await;
                 });
-                return Ok(());
+                Ok(())
             }
             PromptRole::Unlock => {
                 let aes_key =
@@ -392,7 +392,7 @@ impl PrompterCallback {
                         tracing::debug!("Unlock prompt completed.");
                         let _ = Prompt::completed(&signal_emitter, false, result_value).await;
                     });
-                    return Ok(());
+                    Ok(())
                 } else {
                     tracing::error!("Keyring {label} failed to unlock, incorrect secret.");
                     let properties = Properties::for_unlock(
@@ -418,7 +418,7 @@ impl PrompterCallback {
                             .await
                     });
 
-                    return Ok(());
+                    Ok(())
                 }
             }
             PromptRole::CreateCollection => {
@@ -453,12 +453,12 @@ impl PrompterCallback {
                                 Prompt::completed(&signal_emitter, false, collection_path_value)
                                     .await;
                         });
-                        return Ok(());
+                        Ok(())
                     }
                     Err(err) => {
-                        return Err(custom_service_error(&format!(
+                        Err(custom_service_error(&format!(
                             "Failed to create collection: {err}."
-                        )));
+                        )))
                     }
                 }
             }
