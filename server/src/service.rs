@@ -1358,14 +1358,15 @@ mod tests {
         // Create an item
         let secret = Secret::text("test-password");
         let dbus_secret = dbus::api::DBusSecret::new(Arc::clone(&setup.session), secret);
-        let item = setup.collections[0]
+        let default_collection = setup.service_api.read_alias("default").await?.unwrap();
+        let item = default_collection
             .create_item("Test Item", &[("app", "test")], &dbus_secret, false, None)
             .await?;
 
         // Lock the collection (which locks the item)
         let collection = setup
             .server
-            .collection_from_path(setup.collections[0].inner().path())
+            .collection_from_path(default_collection.inner().path())
             .await
             .expect("Collection should exist");
         collection.set_locked(true).await?;
