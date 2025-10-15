@@ -371,55 +371,59 @@ impl PrompterCallback {
                         "Failed to retrieve keyring secret from SecretExchange.",
                     ));
                 };
-                let label = self
-                    .object_label(prompt.objects())
+                // Get the collection to validate the secret against the already-open keyring
+                let collection = self
+                    .get_collection(prompt.objects())
                     .await
-                    .unwrap_or_default();
+                    .ok_or_else(|| custom_service_error("Failed to find collection for unlock."))?;
+                let label = collection.label().await;
 
-                // TODO: this should check if the service has a keyring, check the secret
-                // without opening it again.
-                match oo7::file::Keyring::open(&label, secret).await {
-                    Ok(_) => {
-                        tracing::debug!("Keyring secret matches for {label}.");
-                        // Unlock the collection after successful validation
-                        let service = self.service.clone();
-                        let objects = prompt.objects().to_owned();
-                        tokio::spawn(async move {
-                            let _ = service.set_locked(false, &objects, true).await;
-                        });
-                    }
-                    Err(oo7::file::Error::IncorrectSecret) => {
-                        tracing::error!("Keyring {label} failed to unlock, incorrect secret.");
-                        let properties = Properties::for_unlock(
-                            &label,
-                            Some("The unlock password was incorrect"),
-                            self.window_id.as_ref(),
-                        );
-                        let server_exchange = self
-                            .exchange
-                            .get()
-                            .expect("Exchange cannot be empty at this stage")
-                            .clone();
-                        let path = self.path.clone();
+                // Validate the secret using the already-open keyring instead of re-opening
+                let is_valid =
+                    collection
+                        .keyring
+                        .validate_secret(&secret)
+                        .await
+                        .map_err(|err| {
+                            custom_service_error(&format!(
+                                "Failed to validate secret for {label} keyring: {err}."
+                            ))
+                        })?;
 
-                        tokio::spawn(async move {
-                            prompter
-                                .perform_prompt(
-                                    &path,
-                                    PromptType::Password,
-                                    properties,
-                                    &server_exchange,
-                                )
-                                .await
-                        });
+                if is_valid {
+                    tracing::debug!("Keyring secret matches for {label}.");
+                    // Unlock the collection after successful validation
+                    let service = self.service.clone();
+                    let objects = prompt.objects().to_owned();
+                    tokio::spawn(async move {
+                        let _ = service.set_locked(false, &objects, true).await;
+                    });
+                } else {
+                    tracing::error!("Keyring {label} failed to unlock, incorrect secret.");
+                    let properties = Properties::for_unlock(
+                        &label,
+                        Some("The unlock password was incorrect"),
+                        self.window_id.as_ref(),
+                    );
+                    let server_exchange = self
+                        .exchange
+                        .get()
+                        .expect("Exchange cannot be empty at this stage")
+                        .clone();
+                    let path = self.path.clone();
 
-                        return Ok(());
-                    }
-                    Err(err) => {
-                        return Err(custom_service_error(&format!(
-                            "Failed to unlock {label} keyring: {err}."
-                        )));
-                    }
+                    tokio::spawn(async move {
+                        prompter
+                            .perform_prompt(
+                                &path,
+                                PromptType::Password,
+                                properties,
+                                &server_exchange,
+                            )
+                            .await
+                    });
+
+                    return Ok(());
                 }
             }
             PromptRole::CreateCollection => {
@@ -509,6 +513,30 @@ impl PrompterCallback {
             .await?;
 
         Some(collection.label().await)
+    }
+
+    async fn get_collection(
+        &self,
+        objects: &[OwnedObjectPath],
+    ) -> Option<crate::collection::Collection> {
+        debug_assert!(!objects.is_empty());
+        // If at least one of the items is a Collection
+        for object in objects {
+            if let Some(collection) = self.service.collection_from_path(object).await {
+                return Some(collection);
+            }
+        }
+        // Get the collection path from the first item in the keyring as you cannot
+        // unlock items from different collections I guess?
+        let path = objects
+            .first()
+            .unwrap()
+            .as_str()
+            .rsplit_once('/')
+            .map(|(parent, _)| parent)?;
+        self.service
+            .collection_from_path(&ObjectPath::try_from(path).unwrap())
+            .await
     }
 
     async fn prompter_dismissed(&self, prompt_path: OwnedObjectPath) -> Result<(), ServiceError> {

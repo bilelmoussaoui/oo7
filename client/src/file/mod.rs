@@ -629,6 +629,20 @@ impl Keyring {
         self.write().await
     }
 
+    /// Validate that a secret can decrypt the items in this keyring.
+    ///
+    /// For empty keyrings, this always returns `true` since there are no items
+    /// to validate against.
+    ///
+    /// # Arguments
+    ///
+    /// * `secret` - The secret to validate.
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, secret)))]
+    pub async fn validate_secret(&self, secret: &Secret) -> Result<bool, Error> {
+        let keyring = self.keyring.read().await;
+        Ok(keyring.validate_secret(secret)?)
+    }
+
     /// Delete any item that cannot be decrypted with the key associated to the
     /// keyring.
     ///

@@ -282,6 +282,24 @@ impl Keyring {
         )
     }
 
+    /// Validate that a secret can decrypt the items in this keyring.
+    ///
+    /// This is useful for checking if a password is correct without having to
+    /// re-open the keyring file.
+    pub fn validate_secret(&self, secret: &Secret) -> Result<bool, crypto::Error> {
+        let key = self.derive_key(secret)?;
+
+        // If there are no items, we can't validate (empty keyrings are valid with any
+        // password)
+        if self.items.is_empty() {
+            return Ok(true);
+        }
+
+        // Check if at least one item can be decrypted with this key
+        // We only need to check one item to validate the password
+        Ok(self.items.iter().any(|item| item.is_valid(&key)))
+    }
+
     // Reset Keyring content
     pub(crate) fn reset(&mut self) {
         let salt = rand::rng().random::<[u8; DEFAULT_SALT_SIZE]>().to_vec();
