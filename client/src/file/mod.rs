@@ -36,3 +36,13 @@ pub use locked_item::LockedItem;
 pub use locked_keyring::LockedKeyring;
 pub use unlocked_item::UnlockedItem;
 pub use unlocked_keyring::UnlockedKeyring;
+
+pub enum Item {
+    Locked(LockedItem),
+    Unlocked(UnlockedItem),
+}
+
+pub enum Keyring {
+    Locked(LockedKeyring),
+    Unlocked(UnlockedKeyring),
+}
