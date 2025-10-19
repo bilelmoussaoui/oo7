@@ -30,6 +30,25 @@ pub struct LockedKeyring {
 }
 
 impl LockedKeyring {
+    /// Validate that a secret can decrypt the items in this keyring.
+    ///
+    /// For empty keyrings, this always returns `true` since there are no items
+    /// to validate against.
+    ///
+    /// # Arguments
+    ///
+    /// * `secret` - The secret to validate.
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, secret)))]
+    pub async fn validate_secret(&self, secret: &Secret) -> Result<bool, Error> {
+        let keyring = self.keyring.read().await;
+        Ok(keyring.validate_secret(secret)?)
+    }
+
+    /// Return the associated file if any.
+    pub fn path(&self) -> Option<&std::path::Path> {
+        self.path.as_deref()
+    }
+
     /// Unlocks a keyring and validates it
     pub async fn unlock(self, secret: Secret) -> Result<UnlockedKeyring, Error> {
         self.unlock_inner(secret, true).await

@@ -11,7 +11,7 @@ use oo7::{
         ServiceError,
         api::{DBusSecretInner, Properties},
     },
-    file::UnlockedKeyring,
+    file::Keyring,
 };
 use tokio::sync::{Mutex, RwLock};
 use zbus::{interface, object_server::SignalEmitter, proxy::Defaults, zvariant};
@@ -33,7 +33,7 @@ pub struct Collection {
     modified: Arc<Mutex<Duration>>,
     // Other attributes
     alias: Arc<Mutex<String>>,
-    pub(crate) keyring: Arc<UnlockedKeyring>,
+    pub(crate) keyring: Arc<Keyring>,
     service: Service,
     item_index: Arc<RwLock<u32>>,
     path: OwnedObjectPath,
@@ -50,6 +50,7 @@ impl Collection {
                 self.path
             )));
         }
+        let keyring = self.keyring.as_unlocked();
         let object_server = self.service.object_server();
 
         // Remove all items from the object server
@@ -60,7 +61,7 @@ impl Collection {
         drop(items);
 
         // Delete the keyring file if it's persistent
-        if let Some(path) = self.keyring.path() {
+        if let Some(path) = keyring.path() {
             tokio::fs::remove_file(&path).await.map_err(|err| {
                 custom_service_error(&format!("Failed to delete keyring file: {err}"))
             })?;
@@ -129,6 +130,7 @@ impl Collection {
             )));
         }
 
+        let keyring = self.keyring.as_unlocked();
         let DBusSecretInner(session, iv, secret, content_type) = secret;
         let label = properties.label();
         // Safe to unwrap as an item always has attributes
@@ -155,8 +157,7 @@ impl Collection {
             );
         }
 
-        let item = self
-            .keyring
+        let item = keyring
             .create_item(label, &attributes, secret, replace)
             .await
             .map_err(|err| custom_service_error(&format!("Failed to create a new item {err}.")))?;
@@ -286,13 +287,7 @@ impl Collection {
 }
 
 impl Collection {
-    pub fn new(
-        label: &str,
-        alias: &str,
-        locked: bool,
-        service: Service,
-        keyring: Arc<UnlockedKeyring>,
-    ) -> Self {
+    pub fn new(label: &str, alias: &str, locked: bool, service: Service, keyring: Keyring) -> Self {
         let created = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap();
@@ -308,7 +303,7 @@ impl Collection {
                 .unwrap(),
             created,
             service,
-            keyring,
+            keyring: Arc::new(keyring),
         }
     }
 
@@ -380,7 +375,11 @@ impl Collection {
     }
 
     pub async fn dispatch_items(&self) -> Result<(), Error> {
-        let keyring_items = self.keyring.items().await?;
+        if self.keyring.is_locked() {
+            return Ok(());
+        }
+
+        let keyring_items = self.keyring.as_unlocked().items().await?;
         let mut items = self.items.lock().await;
         let object_server = self.service.object_server();
         let mut n_items = 1;
@@ -418,8 +417,15 @@ impl Collection {
             )));
         }
 
+        if self.is_locked().await {
+            return Err(ServiceError::IsLocked(format!(
+                "Cannot delete an item `{path}`  in a locked collection "
+            )));
+        }
+
         let attributes = item.attributes().await;
         self.keyring
+            .as_unlocked()
             .delete(&attributes)
             .await
             .map_err(|err| custom_service_error(&format!("Failed to deleted item {err}.")))?;

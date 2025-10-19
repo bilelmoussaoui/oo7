@@ -37,12 +37,53 @@ pub use locked_keyring::LockedKeyring;
 pub use unlocked_item::UnlockedItem;
 pub use unlocked_keyring::UnlockedKeyring;
 
+use crate::Secret;
+
+#[derive(Debug)]
 pub enum Item {
     Locked(LockedItem),
     Unlocked(UnlockedItem),
 }
 
+#[derive(Debug)]
 pub enum Keyring {
     Locked(LockedKeyring),
     Unlocked(UnlockedKeyring),
+}
+
+impl Keyring {
+    /// Validate that a secret can decrypt the items in this keyring.
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, secret)))]
+    pub async fn validate_secret(&self, secret: &Secret) -> Result<bool, Error> {
+        match self {
+            Self::Locked(keyring) => keyring.validate_secret(secret).await,
+            Self::Unlocked(keyring) => keyring.validate_secret(secret).await,
+        }
+    }
+
+    /// Return the associated file if any.
+    pub fn path(&self) -> Option<&std::path::Path> {
+        match self {
+            Self::Locked(keyring) => keyring.path(),
+            Self::Unlocked(keyring) => keyring.path(),
+        }
+    }
+
+    pub fn is_locked(&self) -> bool {
+        matches!(self, Self::Locked(_))
+    }
+
+    pub fn as_unlocked(&self) -> &UnlockedKeyring {
+        match self {
+            Self::Unlocked(unlocked_keyring) => unlocked_keyring,
+            _ => panic!("The keyring is locked"),
+        }
+    }
+
+    pub fn as_locked(&self) -> &LockedKeyring {
+        match self {
+            Self::Locked(locked_keyring) => locked_keyring,
+            _ => panic!("The keyring is unlocked"),
+        }
+    }
 }

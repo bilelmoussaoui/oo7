@@ -11,7 +11,7 @@ use oo7::{
         Algorithm, ServiceError,
         api::{DBusSecretInner, Properties},
     },
-    file::UnlockedKeyring,
+    file::{Keyring, LockedKeyring, UnlockedKeyring},
 };
 use tokio::sync::{Mutex, RwLock};
 use tokio_stream::StreamExt;
@@ -418,12 +418,14 @@ impl Service {
             .await?;
 
         let default_keyring = if let Some(secret) = secret {
-            Some(Arc::new(UnlockedKeyring::open("login", secret).await?))
+            Keyring::Unlocked(UnlockedKeyring::open("login", secret).await?)
         } else {
-            None
+            Keyring::Locked(LockedKeyring::open("login").await?)
         };
 
-        service.initialize(connection, default_keyring).await?;
+        service
+            .initialize(connection, Some(default_keyring))
+            .await?;
         Ok(())
     }
 
@@ -444,7 +446,7 @@ impl Service {
             .await?;
 
         let default_keyring = if let Some(secret) = secret {
-            Some(Arc::new(UnlockedKeyring::temporary(secret).await?))
+            Some(Keyring::Unlocked(UnlockedKeyring::temporary(secret).await?))
         } else {
             None
         };
@@ -458,7 +460,7 @@ impl Service {
     async fn initialize(
         &self,
         connection: zbus::Connection,
-        default_keyring: Option<Arc<UnlockedKeyring>>,
+        default_keyring: Option<Keyring>,
     ) -> Result<(), Error> {
         self.connection.set(connection.clone()).unwrap();
 
@@ -490,7 +492,7 @@ impl Service {
             oo7::dbus::Service::SESSION_COLLECTION,
             false,
             self.clone(),
-            Arc::new(UnlockedKeyring::temporary(Secret::random().unwrap()).await?),
+            Keyring::Unlocked(UnlockedKeyring::temporary(Secret::random().unwrap()).await?),
         );
         object_server
             .at(collection.path(), collection.clone())
@@ -683,7 +685,7 @@ impl Service {
             .await
             .map_err(|err| custom_service_error(&format!("Failed to write keyring file: {err}")))?;
 
-        let keyring = Arc::new(keyring);
+        let keyring = Keyring::Unlocked(keyring);
 
         // Create the collection
         let collection = Collection::new(&label, &alias, false, self.clone(), keyring);
