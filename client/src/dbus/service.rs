@@ -72,7 +72,11 @@ impl<'a> Service<'a> {
 
     /// Create a new instance of the Service.
     async fn with_algorithm(algorithm: Algorithm) -> Result<Service<'a>, Error> {
-        let cnx = zbus::Connection::session().await?;
+        let cnx = zbus::connection::Builder::session()?
+            .method_timeout(std::time::Duration::from_secs(30))
+            .build()
+            .await?;
+
         let service = Arc::new(api::Service::new(&cnx).await?);
 
         let (aes_key, session) = match algorithm {
