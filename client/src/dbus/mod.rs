@@ -24,12 +24,13 @@
 //!
 //! #   Ok(())
 //! # }
+//! ```
 //!
 //! ## Timeout
 //!
-//! If a DBus method call takes longer than 30 seconds (for example, waiting for user input on a prompt),
-//! the call will fail with a `zbus::Error::InputOutput(std::io::Error(kind: ErrorKind::TimedOut))`.
-//! ```
+//! If a DBus method call takes longer than 30 seconds (for example, waiting for
+//! user input on a prompt), the call will fail with a
+//! `zbus::Error::InputOutput(std::io::Error(kind: ErrorKind::TimedOut))`.
 
 /// Barebone DBus API of the Secret Service specifications.
 ///
