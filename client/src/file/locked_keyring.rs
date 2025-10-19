@@ -18,7 +18,7 @@ use tokio::{
     sync::{Mutex, RwLock},
 };
 
-use super::{Error, Keyring, api};
+use super::{Error, UnlockedKeyring, api};
 use crate::Secret;
 
 /// A locked keyring that requires a secret to unlock.
@@ -31,16 +31,25 @@ pub struct LockedKeyring {
 
 impl LockedKeyring {
     /// Unlocks a keyring and validates it
-    pub async fn unlock(self, secret: Secret) -> Result<Keyring, Error> {
+    pub async fn unlock(self, secret: Secret) -> Result<UnlockedKeyring, Error> {
         self.unlock_inner(secret, true).await
     }
 
     /// Unlocks a keyring without validating it
-    pub async unsafe fn unlock_unchecked(self, secret: Secret) -> Result<Keyring, Error> {
+    ///
+    /// # Safety
+    ///
+    /// The method doesn't validate that the secret can decrypt all the items in
+    /// the keyring.
+    pub async unsafe fn unlock_unchecked(self, secret: Secret) -> Result<UnlockedKeyring, Error> {
         self.unlock_inner(secret, false).await
     }
 
-    async fn unlock_inner(self, secret: Secret, validate_items: bool) -> Result<Keyring, Error> {
+    async fn unlock_inner(
+        self,
+        secret: Secret,
+        validate_items: bool,
+    ) -> Result<UnlockedKeyring, Error> {
         let key = if validate_items {
             let inner_keyring = self.keyring.read().await;
 
@@ -69,7 +78,7 @@ impl LockedKeyring {
                         "The file contains {n_broken_items} broken items and {n_valid_items} valid ones."
                     );
                     tracing::info!(
-                        "Please switch to `Keyring::load_unchecked` to load the keyring without the secret validation.
+                        "Please switch to `UnlockedKeyring::load_unchecked` to load the keyring without the secret validation.
                         `Keyring::delete_broken_items` can be used to remove them or alternatively with `oo7-cli --repair`."
                     );
                 }
@@ -83,7 +92,7 @@ impl LockedKeyring {
             None
         };
 
-        Ok(Keyring {
+        Ok(UnlockedKeyring {
             keyring: self.keyring,
             path: self.path,
             mtime: self.mtime,
@@ -126,6 +135,6 @@ impl LockedKeyring {
     /// Open a named keyring.
     pub async fn open(name: &str) -> Result<Self, Error> {
         let v1_path = api::Keyring::path(name, api::MAJOR_VERSION)?;
-        return Self::load(v1_path).await;
+        Self::load(v1_path).await
     }
 }

@@ -11,7 +11,7 @@ use oo7::{
         Algorithm, ServiceError,
         api::{DBusSecretInner, Properties},
     },
-    file::Keyring,
+    file::UnlockedKeyring,
 };
 use tokio::sync::{Mutex, RwLock};
 use tokio_stream::StreamExt;
@@ -418,7 +418,7 @@ impl Service {
             .await?;
 
         let default_keyring = if let Some(secret) = secret {
-            Some(Arc::new(Keyring::open("login", secret).await?))
+            Some(Arc::new(UnlockedKeyring::open("login", secret).await?))
         } else {
             None
         };
@@ -444,7 +444,7 @@ impl Service {
             .await?;
 
         let default_keyring = if let Some(secret) = secret {
-            Some(Arc::new(Keyring::temporary(secret).await?))
+            Some(Arc::new(UnlockedKeyring::temporary(secret).await?))
         } else {
             None
         };
@@ -458,7 +458,7 @@ impl Service {
     async fn initialize(
         &self,
         connection: zbus::Connection,
-        default_keyring: Option<Arc<Keyring>>,
+        default_keyring: Option<Arc<UnlockedKeyring>>,
     ) -> Result<(), Error> {
         self.connection.set(connection.clone()).unwrap();
 
@@ -490,7 +490,7 @@ impl Service {
             oo7::dbus::Service::SESSION_COLLECTION,
             false,
             self.clone(),
-            Arc::new(Keyring::temporary(Secret::random().unwrap()).await?),
+            Arc::new(UnlockedKeyring::temporary(Secret::random().unwrap()).await?),
         );
         object_server
             .at(collection.path(), collection.clone())
@@ -673,7 +673,7 @@ impl Service {
         };
 
         // Create a persistent keyring with the provided secret
-        let keyring = Keyring::open(&label, secret)
+        let keyring = UnlockedKeyring::open(&label, secret)
             .await
             .map_err(|err| custom_service_error(&format!("Failed to create keyring: {err}")))?;
 

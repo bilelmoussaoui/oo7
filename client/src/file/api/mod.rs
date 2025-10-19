@@ -48,10 +48,9 @@ pub use attribute_value::AttributeValue;
 pub(super) use encrypted_item::EncryptedItem;
 pub(super) use legacy_keyring::{Keyring as LegacyKeyring, MAJOR_VERSION as LEGACY_MAJOR_VERSION};
 
-use super::{Secret, UnlockedItem};
 use crate::{
-    AsAttributes, Key, crypto,
-    file::{Error, WeakKeyError},
+    AsAttributes, Key, Secret, crypto,
+    file::{Error, UnlockedItem, WeakKeyError},
 };
 
 pub(crate) fn data_dir() -> Option<PathBuf> {
