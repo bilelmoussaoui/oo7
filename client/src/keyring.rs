@@ -196,13 +196,13 @@ impl Keyring {
 #[derive(Debug)]
 pub enum Item {
     #[doc(hidden)]
-    File(RwLock<file::Item>, Arc<file::Keyring>),
+    File(RwLock<file::UnlockedItem>, Arc<file::Keyring>),
     #[doc(hidden)]
     DBus(dbus::Item<'static>),
 }
 
 impl Item {
-    fn for_file(item: file::Item, backend: Arc<file::Keyring>) -> Self {
+    fn for_file(item: file::UnlockedItem, backend: Arc<file::Keyring>) -> Self {
         Self::File(RwLock::new(item), backend)
     }
 

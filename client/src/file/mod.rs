@@ -49,10 +49,10 @@ mod api;
 pub(crate) use api::AttributeValue;
 
 mod error;
-mod item;
+mod unlocked_item;
 
 pub use error::{Error, InvalidItemError, WeakKeyError};
-pub use item::Item;
+pub use unlocked_item::UnlockedItem;
 
 type ItemDefinition = (String, HashMap<String, String>, Secret, bool);
 
@@ -329,12 +329,12 @@ impl Keyring {
         self.keyring.read().await.items.len()
     }
 
-    /// Retrieve the list of available [`Item`]s.
+    /// Retrieve the list of available [`UnlockedItem`]s.
     ///
     /// If items cannot be decrypted, [`InvalidItemError`]s are returned for
-    /// them instead of [`Item`]s.
+    /// them instead of [`UnlockedItem`]s.
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self)))]
-    pub async fn items(&self) -> Result<Vec<Result<Item, InvalidItemError>>, Error> {
+    pub async fn items(&self) -> Result<Vec<Result<UnlockedItem, InvalidItemError>>, Error> {
         let key = self.derive_key().await?;
         let keyring = self.keyring.read().await;
 
@@ -357,7 +357,10 @@ impl Keyring {
 
     /// Search items matching the attributes.
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, attributes)))]
-    pub async fn search_items(&self, attributes: &impl AsAttributes) -> Result<Vec<Item>, Error> {
+    pub async fn search_items(
+        &self,
+        attributes: &impl AsAttributes,
+    ) -> Result<Vec<UnlockedItem>, Error> {
         let key = self.derive_key().await?;
         let keyring = self.keyring.read().await;
         let results = keyring.search_items(attributes, &key)?;
@@ -370,7 +373,10 @@ impl Keyring {
 
     /// Find the first item matching the attributes.
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, attributes)))]
-    pub async fn lookup_item(&self, attributes: &impl AsAttributes) -> Result<Option<Item>, Error> {
+    pub async fn lookup_item(
+        &self,
+        attributes: &impl AsAttributes,
+    ) -> Result<Option<UnlockedItem>, Error> {
         let key = self.derive_key().await?;
         let keyring = self.keyring.read().await;
 
@@ -431,14 +437,14 @@ impl Keyring {
         attributes: &impl AsAttributes,
         secret: impl Into<Secret>,
         replace: bool,
-    ) -> Result<Item, Error> {
+    ) -> Result<UnlockedItem, Error> {
         let item = {
             let key = self.derive_key().await?;
             let mut keyring = self.keyring.write().await;
             if replace {
                 keyring.remove_items(attributes, &key)?;
             }
-            let item = Item::new(label, attributes, secret);
+            let item = UnlockedItem::new(label, attributes, secret);
             let encrypted_item = item.encrypt(&key)?;
             keyring.items.push(encrypted_item);
             item
@@ -463,7 +469,7 @@ impl Keyring {
     /// [`items()`](Self::items). If the index does not exist, the functions
     /// returns an error.
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, item), fields(index = index)))]
-    pub async fn replace_item_index(&self, index: usize, item: &Item) -> Result<(), Error> {
+    pub async fn replace_item_index(&self, index: usize, item: &UnlockedItem) -> Result<(), Error> {
         {
             let key = self.derive_key().await?;
             let mut keyring = self.keyring.write().await;
@@ -510,7 +516,7 @@ impl Keyring {
             if replace {
                 keyring.remove_items(&attributes, &key)?;
             }
-            let item = Item::new(label, &attributes, secret);
+            let item = UnlockedItem::new(label, &attributes, secret);
             let encrypted_item = item.encrypt(&key)?;
             keyring.items.push(encrypted_item);
         }
@@ -1441,7 +1447,7 @@ mod tests {
         keyring
             .replace_item_index(
                 index,
-                &crate::file::Item::new(
+                &crate::file::UnlockedItem::new(
                     "Attribute Test",
                     &[
                         ("app", "testapp"),
@@ -1623,7 +1629,7 @@ mod tests {
             .await?;
 
         // Try to replace at invalid index
-        let new_item = Item::new("Replacement", &[("app", "test2")], "new_secret");
+        let new_item = UnlockedItem::new("Replacement", &[("app", "test2")], "new_secret");
         let result = keyring.replace_item_index(100, &new_item).await;
 
         assert!(matches!(result, Err(Error::InvalidItemIndex(100))));

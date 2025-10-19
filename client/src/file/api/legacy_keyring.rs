@@ -7,7 +7,7 @@ use std::{
 
 use endi::{Endian, ReadBytes};
 
-use super::{Item, Secret};
+use super::{Secret, UnlockedItem};
 use crate::{
     AsAttributes, crypto,
     file::{AttributeValue, Error, WeakKeyError},
@@ -28,7 +28,7 @@ pub struct Keyring {
 }
 
 impl Keyring {
-    pub fn decrypt_items(self, secret: &Secret) -> Result<Vec<Item>, Error> {
+    pub fn decrypt_items(self, secret: &Secret) -> Result<Vec<UnlockedItem>, Error> {
         let (key, iv) = crypto::legacy_derive_key_and_iv(
             &**secret,
             self.key_strength(secret),
@@ -72,7 +72,7 @@ impl Keyring {
         Ok(result)
     }
 
-    fn read_items(self, decrypted: &[u8]) -> Result<Vec<Item>, Error> {
+    fn read_items(self, decrypted: &[u8]) -> Result<Vec<UnlockedItem>, Error> {
         let mut cursor = Cursor::new(decrypted);
         let mut items = Vec::new();
         for _ in 0..self.item_count {
@@ -88,7 +88,7 @@ impl Keyring {
             }
             let attribute_count = cursor.read_u32(Endian::Big)? as usize;
             let attributes = Self::read_attributes(&mut cursor, attribute_count)?;
-            items.push(Item::new(display_name, &attributes, secret));
+            items.push(UnlockedItem::new(display_name, &attributes, secret));
             let acl_count = cursor.read_u32(Endian::Big)? as usize;
             Self::skip_acls(&mut cursor, acl_count)?;
         }

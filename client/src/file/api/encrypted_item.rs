@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use zbus::zvariant::Type;
 
-use super::{Error, Item};
+use super::{Error, UnlockedItem};
 use crate::{Key, Mac, crypto};
 
 #[derive(Deserialize, Serialize, Type, Debug, Clone)]
@@ -17,7 +17,7 @@ impl EncryptedItem {
         self.hashed_attributes.get(key) == Some(value_mac)
     }
 
-    fn try_decrypt_inner(&self, key: &Key) -> Result<Item, Error> {
+    fn try_decrypt_inner(&self, key: &Key) -> Result<UnlockedItem, Error> {
         let n = self.blob.len();
         let n_mac = crypto::mac_len();
         let n_iv = crypto::iv_len();
@@ -35,7 +35,7 @@ impl EncryptedItem {
         // decrypt item
         let decrypted = crypto::decrypt(encrypted_data, key, iv)?;
 
-        let item = Item::try_from(decrypted.as_slice())?;
+        let item = UnlockedItem::try_from(decrypted.as_slice())?;
 
         Self::validate(&self.hashed_attributes, &item, key)?;
 
@@ -46,13 +46,13 @@ impl EncryptedItem {
         self.try_decrypt_inner(key).is_ok()
     }
 
-    pub fn decrypt(self, key: &Key) -> Result<Item, Error> {
+    pub fn decrypt(self, key: &Key) -> Result<UnlockedItem, Error> {
         self.try_decrypt_inner(key)
     }
 
     fn validate(
         hashed_attributes: &HashMap<String, Mac>,
-        item: &Item,
+        item: &UnlockedItem,
         key: &Key,
     ) -> Result<(), Error> {
         for (attribute_key, hashed_attribute) in hashed_attributes.iter() {

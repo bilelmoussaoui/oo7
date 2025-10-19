@@ -5,10 +5,7 @@ use std::{
     sync::{Arc, atomic::AtomicBool},
 };
 
-use oo7::{
-    dbus::{ServiceError, api::DBusSecretInner},
-    file,
-};
+use oo7::dbus::{ServiceError, api::DBusSecretInner};
 use tokio::sync::Mutex;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath};
 
@@ -18,7 +15,7 @@ use crate::{Service, collection::Collection, error::custom_service_error};
 pub struct Item {
     // Properties
     locked: Arc<AtomicBool>,
-    inner: Arc<Mutex<oo7::file::Item>>,
+    inner: Arc<Mutex<oo7::file::UnlockedItem>>,
     // Other attributes
     service: Service,
     collection_path: OwnedObjectPath,
@@ -257,7 +254,7 @@ impl Item {
 
 impl Item {
     pub fn new(
-        item: file::Item,
+        item: oo7::file::UnlockedItem,
         locked: bool,
         service: Service,
         collection_path: OwnedObjectPath,

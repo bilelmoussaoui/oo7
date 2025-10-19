@@ -504,7 +504,7 @@ fn print_item_common(
 }
 
 fn print_item_keyring(
-    item: &oo7::file::Item,
+    item: &oo7::file::UnlockedItem,
     secret_only: bool,
     as_hex: bool,
 ) -> Result<(), Error> {
