@@ -760,7 +760,9 @@ mod tests {
             .collection_from_path(setup.collections[0].inner().path())
             .await
             .expect("Collection should exist");
-        collection.set_locked(true).await?;
+        collection
+            .set_locked(true, setup.keyring_secret.clone())
+            .await?;
 
         // Verify item is now locked
         assert!(

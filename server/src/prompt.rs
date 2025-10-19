@@ -203,7 +203,9 @@ mod tests {
             .collection_from_path(setup.collections[0].inner().path())
             .await
             .expect("Collection should exist");
-        collection.set_locked(true).await?;
+        collection
+            .set_locked(true, setup.keyring_secret.clone())
+            .await?;
 
         // Get a prompt path by calling unlock (which creates a prompt but doesn't
         // auto-trigger it)
@@ -244,7 +246,9 @@ mod tests {
             .collection_from_path(setup.collections[0].inner().path())
             .await
             .expect("Collection should exist");
-        collection.set_locked(true).await?;
+        collection
+            .set_locked(true, setup.keyring_secret.clone())
+            .await?;
 
         // Create a prompt using server API
         let (_unlocked, prompt_path) = setup
@@ -303,7 +307,9 @@ mod tests {
             .collection_from_path(setup.collections[0].inner().path())
             .await
             .expect("Collection should exist");
-        collection.set_locked(true).await?;
+        collection
+            .set_locked(true, setup.keyring_secret.clone())
+            .await?;
 
         // Get a prompt path by calling unlock
         let (_unlocked, prompt_path) = setup

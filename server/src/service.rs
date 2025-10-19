@@ -219,14 +219,14 @@ impl Service {
 
             // Create the unlock action
             let service = self.clone();
-            let action = PromptAction::new(move |_secret: Option<Secret>| async move {
+            let action = PromptAction::new(move |secret: Option<Secret>| async move {
                 // The prompter will handle secret validation
                 // Here we just perform the unlock operation
                 let collections = service.collections.lock().await;
                 for object in &not_unlocked {
                     // Try to find as collection first
                     if let Some(collection) = collections.get(object) {
-                        let _ = collection.set_locked(false).await;
+                        let _ = collection.set_locked(false, secret.clone()).await;
                     } else {
                         // Try to find as item within collections
                         for (_path, collection) in collections.iter() {
@@ -269,13 +269,13 @@ impl Service {
 
             // Create the lock action
             let service = self.clone();
-            let action = PromptAction::new(move |_secret: Option<Secret>| async move {
+            let action = PromptAction::new(move |secret: Option<Secret>| async move {
                 // Lock operation doesn't need secret validation
                 let collections = service.collections.lock().await;
                 for object in &not_locked {
                     // Try to find as collection first
                     if let Some(collection) = collections.get(object) {
-                        let _ = collection.set_locked(true).await;
+                        let _ = collection.set_locked(true, secret.clone()).await;
                     } else {
                         // Try to find as item within collections
                         for (_path, collection) in collections.iter() {
@@ -472,7 +472,6 @@ impl Service {
             let collection = Collection::new(
                 "Login",
                 oo7::dbus::Service::DEFAULT_COLLECTION,
-                false,
                 self.clone(),
                 keyring,
             );
@@ -490,7 +489,6 @@ impl Service {
         let collection = Collection::new(
             "session",
             oo7::dbus::Service::SESSION_COLLECTION,
-            false,
             self.clone(),
             Keyring::Unlocked(UnlockedKeyring::temporary(Secret::random().unwrap()).await?),
         );
@@ -688,7 +686,7 @@ impl Service {
         let keyring = Keyring::Unlocked(keyring);
 
         // Create the collection
-        let collection = Collection::new(&label, &alias, false, self.clone(), keyring);
+        let collection = Collection::new(&label, &alias, self.clone(), keyring);
         let collection_path: OwnedObjectPath = collection.path().to_owned().into();
 
         // Register with object server
@@ -907,7 +905,9 @@ mod tests {
             .collection_from_path(setup.collections[1].inner().path())
             .await
             .expect("Collection should exist");
-        collection.set_locked(true).await?;
+        collection
+            .set_locked(true, setup.keyring_secret.clone())
+            .await?;
 
         // Search for items with the shared attribute
         let (unlocked, locked) = setup
@@ -1431,7 +1431,9 @@ mod tests {
             .collection_from_path(setup.collections[0].inner().path())
             .await
             .expect("Collection should exist");
-        collection.set_locked(true).await?;
+        collection
+            .set_locked(true, setup.keyring_secret.clone())
+            .await?;
 
         assert!(
             setup.collections[0].is_locked().await?,
@@ -1456,7 +1458,9 @@ mod tests {
         );
 
         // Lock the collection again for dismiss test
-        collection.set_locked(true).await?;
+        collection
+            .set_locked(true, setup.keyring_secret.clone())
+            .await?;
         assert!(
             setup.collections[0].is_locked().await?,
             "Collection should be locked again"
@@ -1499,7 +1503,9 @@ mod tests {
             .collection_from_path(default_collection.inner().path())
             .await
             .expect("Collection should exist");
-        collection.set_locked(true).await?;
+        collection
+            .set_locked(true, setup.keyring_secret.clone())
+            .await?;
 
         assert!(
             item.is_locked().await?,
@@ -1524,7 +1530,9 @@ mod tests {
         );
 
         // Lock the item again for dismiss test
-        collection.set_locked(true).await?;
+        collection
+            .set_locked(true, setup.keyring_secret.clone())
+            .await?;
         assert!(item.is_locked().await?, "Item should be locked again");
 
         // Test 2: Unlock with dismiss
@@ -1576,7 +1584,9 @@ mod tests {
             .collection_from_path(setup.collections[0].inner().path())
             .await
             .expect("Collection should exist");
-        collection.set_locked(false).await?;
+        collection
+            .set_locked(false, setup.keyring_secret.clone())
+            .await?;
         assert!(!item.is_locked().await?, "Item should be unlocked again");
 
         // Test 2: Lock with dismiss
@@ -1628,7 +1638,9 @@ mod tests {
             .collection_from_path(setup.collections[0].inner().path())
             .await
             .expect("Collection should exist");
-        collection.set_locked(false).await?;
+        collection
+            .set_locked(false, setup.keyring_secret.clone())
+            .await?;
         assert!(
             !setup.collections[0].is_locked().await?,
             "Collection should be unlocked again"
@@ -1688,7 +1700,8 @@ mod tests {
             .collection_from_path(collection.inner().path())
             .await
             .expect("Collection should exist on server");
-        let keyring_path = server_collection.keyring.path().unwrap();
+        let keyring_guard = server_collection.keyring.read().await;
+        let keyring_path = keyring_guard.as_ref().unwrap().path().unwrap();
 
         assert!(
             keyring_path.exists(),
@@ -1750,7 +1763,8 @@ mod tests {
             .collection_from_path(collection.inner().path())
             .await
             .expect("Collection should exist on server");
-        let keyring_path = server_collection.keyring.path().unwrap();
+        let keyring_guard = server_collection.keyring.read().await;
+        let keyring_path = keyring_guard.as_ref().unwrap().path().unwrap();
         tokio::fs::remove_file(keyring_path).await?;
         Ok(())
     }
@@ -1807,7 +1821,8 @@ mod tests {
             .collection_from_path(collection.inner().path())
             .await
             .expect("Collection should exist on server");
-        let keyring_path = server_collection.keyring.path().unwrap();
+        let keyring_guard = server_collection.keyring.read().await;
+        let keyring_path = keyring_guard.as_ref().unwrap().path().unwrap();
         tokio::fs::remove_file(&keyring_path).await?;
 
         Ok(())

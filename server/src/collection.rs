@@ -2,11 +2,12 @@
 
 use std::{
     collections::HashMap,
-    sync::{Arc, atomic::AtomicBool},
+    sync::Arc,
     time::{Duration, SystemTime},
 };
 
 use oo7::{
+    Secret,
     dbus::{
         ServiceError,
         api::{DBusSecretInner, Properties},
@@ -28,12 +29,11 @@ pub struct Collection {
     // Properties
     items: Arc<Mutex<Vec<item::Item>>>,
     label: Arc<Mutex<String>>,
-    locked: Arc<AtomicBool>,
     created: Duration,
     modified: Arc<Mutex<Duration>>,
     // Other attributes
     alias: Arc<Mutex<String>>,
-    pub(crate) keyring: Arc<Keyring>,
+    pub(crate) keyring: Arc<RwLock<Option<Keyring>>>,
     service: Service,
     item_index: Arc<RwLock<u32>>,
     path: OwnedObjectPath,
@@ -50,7 +50,10 @@ impl Collection {
                 self.path
             )));
         }
-        let keyring = self.keyring.as_unlocked();
+
+        let keyring = self.keyring.read().await;
+        let keyring = keyring.as_ref().unwrap().as_unlocked();
+
         let object_server = self.service.object_server();
 
         // Remove all items from the object server
@@ -130,7 +133,9 @@ impl Collection {
             )));
         }
 
-        let keyring = self.keyring.as_unlocked();
+        let keyring = self.keyring.read().await;
+        let keyring = keyring.as_ref().unwrap().as_unlocked();
+
         let DBusSecretInner(session, iv, secret, content_type) = secret;
         let label = properties.label();
         // Safe to unwrap as an item always has attributes
@@ -254,7 +259,12 @@ impl Collection {
 
     #[zbus(property, name = "Locked")]
     pub async fn is_locked(&self) -> bool {
-        self.locked.load(std::sync::atomic::Ordering::Acquire)
+        self.keyring
+            .read()
+            .await
+            .as_ref()
+            .map(|k| k.is_locked())
+            .unwrap_or(true)
     }
 
     #[zbus(property, name = "Created")]
@@ -287,7 +297,7 @@ impl Collection {
 }
 
 impl Collection {
-    pub fn new(label: &str, alias: &str, locked: bool, service: Service, keyring: Keyring) -> Self {
+    pub fn new(label: &str, alias: &str, service: Service, keyring: Keyring) -> Self {
         let created = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap();
@@ -295,7 +305,6 @@ impl Collection {
         Self {
             items: Default::default(),
             label: Arc::new(Mutex::new(label.to_owned())),
-            locked: Arc::new(AtomicBool::new(locked)),
             modified: Arc::new(Mutex::new(created)),
             alias: Arc::new(Mutex::new(alias.to_owned())),
             item_index: Arc::new(RwLock::new(0)),
@@ -303,7 +312,7 @@ impl Collection {
                 .unwrap(),
             created,
             service,
-            keyring: Arc::new(keyring),
+            keyring: Arc::new(RwLock::new(Some(keyring))),
         }
     }
 
@@ -349,15 +358,41 @@ impl Collection {
         items.iter().find(|i| i.path() == path).cloned()
     }
 
-    pub async fn set_locked(&self, locked: bool) -> Result<(), ServiceError> {
+    pub async fn set_locked(
+        &self,
+        locked: bool,
+        secret: Option<Secret>,
+    ) -> Result<(), ServiceError> {
         let items = self.items.lock().await;
-
         for item in items.iter() {
             item.set_locked(locked).await?;
         }
+        drop(items);
 
-        self.locked
-            .store(locked, std::sync::atomic::Ordering::Release);
+        let mut keyring_guard = self.keyring.write().await;
+
+        if let Some(old_keyring) = keyring_guard.take() {
+            let new_keyring = match (old_keyring, locked) {
+                (Keyring::Unlocked(unlocked), true) => Keyring::Locked(unlocked.lock()),
+                (Keyring::Locked(locked_kr), false) => {
+                    let secret = secret.ok_or_else(|| {
+                        custom_service_error("Cannot unlock collection without a secret")
+                    })?;
+
+                    let unlocked = locked_kr.unlock(secret).await.map_err(|err| {
+                        custom_service_error(&format!("Failed to unlock keyring: {err}"))
+                    })?;
+
+                    Keyring::Unlocked(unlocked)
+                }
+                (other, _) => other,
+            };
+            *keyring_guard = Some(new_keyring);
+        }
+
+        drop(keyring_guard);
+
+        // Emit signals
         let signal_emitter = self.service.signal_emitter(&self.path)?;
         self.locked_changed(&signal_emitter).await?;
 
@@ -375,11 +410,14 @@ impl Collection {
     }
 
     pub async fn dispatch_items(&self) -> Result<(), Error> {
-        if self.keyring.is_locked() {
+        if self.is_locked().await {
             return Ok(());
         }
 
-        let keyring_items = self.keyring.as_unlocked().items().await?;
+        let keyring = self.keyring.read().await;
+        let keyring = keyring.as_ref().unwrap().as_unlocked();
+
+        let keyring_items = keyring.items().await?;
         let mut items = self.items.lock().await;
         let object_server = self.service.object_server();
         let mut n_items = 1;
@@ -424,8 +462,11 @@ impl Collection {
         }
 
         let attributes = item.attributes().await;
-        self.keyring
-            .as_unlocked()
+
+        let keyring = self.keyring.read().await;
+        let keyring = keyring.as_ref().unwrap().as_unlocked();
+
+        keyring
             .delete(&attributes)
             .await
             .map_err(|err| custom_service_error(&format!("Failed to deleted item {err}.")))?;
@@ -952,7 +993,9 @@ mod tests {
             .collection_from_path(setup.collections[0].inner().path())
             .await
             .expect("Collection should exist");
-        collection.set_locked(true).await?;
+        collection
+            .set_locked(true, setup.keyring_secret.clone())
+            .await?;
 
         // Verify collection is now locked
         assert!(

@@ -38,6 +38,7 @@ pub(crate) struct TestServiceSetup {
     pub session: Arc<dbus::api::Session<'static>>,
     pub collections: Vec<dbus::api::Collection<'static>>,
     pub server_public_key: Option<oo7::Key>,
+    pub keyring_secret: Option<oo7::Secret>,
     pub aes_key: Option<Arc<oo7::Key>>,
     pub mock_prompter: MockPrompterService,
 }
@@ -54,7 +55,7 @@ impl TestServiceSetup {
             None
         };
 
-        let server = Service::run_with_connection(server_conn.clone(), secret).await?;
+        let server = Service::run_with_connection(server_conn.clone(), secret.clone()).await?;
 
         // Create and serve the mock prompter
         let mock_prompter = MockPrompterService::new();
@@ -75,6 +76,7 @@ impl TestServiceSetup {
 
         Ok(TestServiceSetup {
             server,
+            keyring_secret: secret,
             client_conn,
             service_api,
             session,
@@ -96,7 +98,7 @@ impl TestServiceSetup {
             None
         };
 
-        let server = Service::run_with_connection(server_conn.clone(), secret).await?;
+        let server = Service::run_with_connection(server_conn.clone(), secret.clone()).await?;
 
         // Create and serve the mock prompter
         let mock_prompter = MockPrompterService::new();
@@ -125,6 +127,7 @@ impl TestServiceSetup {
 
         Ok(Self {
             server,
+            keyring_secret: secret,
             client_conn,
             service_api,
             session,

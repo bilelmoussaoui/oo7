@@ -436,21 +436,23 @@ impl PrompterCallback {
                 let label = prompt.label();
 
                 // Validate the secret using the already-open keyring
-                let is_valid =
-                    collection
-                        .keyring
-                        .validate_secret(&secret)
-                        .await
-                        .map_err(|err| {
-                            custom_service_error(&format!(
-                                "Failed to validate secret for {label} keyring: {err}."
-                            ))
-                        })?;
+                let keyring_guard = collection.keyring.read().await;
+                let is_valid = keyring_guard
+                    .as_ref()
+                    .unwrap()
+                    .validate_secret(&secret)
+                    .await
+                    .map_err(|err| {
+                        custom_service_error(&format!(
+                            "Failed to validate secret for {label} keyring: {err}."
+                        ))
+                    })?;
+                drop(keyring_guard);
 
                 if is_valid {
                     tracing::debug!("Keyring secret matches for {label}.");
                     // Execute the unlock action after successful validation
-                    let result_value = action.execute(None).await?;
+                    let result_value = action.execute(Some(secret)).await?;
 
                     let path = self.path.clone();
                     let prompt_path = OwnedObjectPath::from(prompt.path().clone());
