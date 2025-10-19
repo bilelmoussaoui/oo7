@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 use super::{
-    Error,
+    Error, LockedItem,
     api::{AttributeValue, EncryptedItem, GVARIANT_ENCODING},
 };
 use crate::{AsAttributes, CONTENT_TYPE_ATTRIBUTE, Key, Secret, crypto, secret::ContentType};
@@ -139,6 +139,12 @@ impl UnlockedItem {
     pub fn modified(&self) -> Duration {
         let secs = self.modified;
         Duration::from_secs(secs)
+    }
+
+    /// Lock the item with the given key.
+    pub fn lock(self, key: &Key) -> Result<LockedItem, Error> {
+        let inner = self.encrypt(key)?;
+        Ok(LockedItem { inner })
     }
 
     pub(crate) fn encrypt(&self, key: &Key) -> Result<EncryptedItem, Error> {

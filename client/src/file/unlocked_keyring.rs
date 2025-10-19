@@ -21,7 +21,7 @@ use tokio::{
 
 use crate::{
     AsAttributes, Key, Secret,
-    file::{Error, InvalidItemError, LockedKeyring, UnlockedItem, api},
+    file::{Error, InvalidItemError, LockedItem, LockedKeyring, UnlockedItem, api},
 };
 
 type ItemDefinition = (String, HashMap<String, String>, Secret, bool);
@@ -225,6 +225,20 @@ impl UnlockedKeyring {
             path: self.path,
             mtime: self.mtime,
         }
+    }
+
+    /// Lock an item using the keyring's key.
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, item)))]
+    pub async fn lock_item(&self, item: UnlockedItem) -> Result<LockedItem, Error> {
+        let key = self.derive_key().await?;
+        item.lock(&key)
+    }
+
+    /// Unlock an item using the keyring's key.
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, item)))]
+    pub async fn unlock_item(&self, item: LockedItem) -> Result<UnlockedItem, Error> {
+        let key = self.derive_key().await?;
+        item.unlock(&key)
     }
 
     /// Return the associated file if any.

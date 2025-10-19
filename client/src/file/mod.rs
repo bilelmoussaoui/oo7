@@ -26,11 +26,13 @@ mod api;
 pub(crate) use api::AttributeValue;
 
 mod error;
+mod locked_item;
 mod locked_keyring;
 mod unlocked_item;
 mod unlocked_keyring;
 
 pub use error::{Error, InvalidItemError, WeakKeyError};
+pub use locked_item::LockedItem;
 pub use locked_keyring::LockedKeyring;
 pub use unlocked_item::UnlockedItem;
 pub use unlocked_keyring::UnlockedKeyring;
