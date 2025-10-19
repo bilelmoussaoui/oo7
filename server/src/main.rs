@@ -3,6 +3,7 @@ mod collection;
 mod error;
 #[allow(unused)]
 mod gnome;
+mod i18n;
 mod item;
 mod prompt;
 mod service;

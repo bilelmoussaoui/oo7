@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use gettextrs::gettext;
 use oo7::{Key, ashpd::WindowIdentifierType, dbus::ServiceError};
 use serde::{Deserialize, Serialize};
 use tokio::sync::OnceCell;
@@ -11,6 +12,7 @@ use zbus::zvariant::{
 use super::secret_exchange;
 use crate::{
     error::custom_service_error,
+    i18n::i18n_f,
     prompt::{Prompt, PromptRole},
     service::Service,
 };
@@ -156,16 +158,16 @@ impl Properties {
     fn for_lock(keyring: &str, window_id: Option<&WindowIdentifierType>) -> Self {
         Self {
             title: None,
-            message: Some("Lock Keyring".to_owned()),
-            description: Some(format!("Confirm locking '{keyring}' Keyring")),
+            message: Some(gettext("Lock Keyring")),
+            description: Some(i18n_f("Confirm locking '{}' Keyring", &[keyring])),
             warning: None,
             password_new: None,
             password_strength: None,
             choice_label: None,
             choice_chosen: None,
             caller_window: window_id.map(ToOwned::to_owned),
-            continue_label: Some("Lock".to_owned()),
-            cancel_label: Some("Cancel".to_owned()),
+            continue_label: Some(gettext("Lock")),
+            cancel_label: Some(gettext("Cancel")),
         }
     }
 
@@ -175,10 +177,11 @@ impl Properties {
         window_id: Option<&WindowIdentifierType>,
     ) -> Self {
         Self {
-            title: Some("Unlock Keyring".to_owned()),
-            message: Some("Authentication required".to_owned()),
-            description: Some(format!(
-                "An application wants access to the keyring '{keyring}', but it is locked"
+            title: Some(gettext("Unlock Keyring")),
+            message: Some(gettext("Authentication required")),
+            description: Some(i18n_f(
+                "An application wants access to the keyring '{}', but it is locked",
+                &[keyring],
             )),
             warning: warning.map(ToOwned::to_owned),
             password_new: None,
@@ -186,17 +189,18 @@ impl Properties {
             choice_label: None,
             choice_chosen: None,
             caller_window: window_id.map(ToOwned::to_owned),
-            continue_label: Some("Unlock".to_owned()),
-            cancel_label: Some("Cancel".to_owned()),
+            continue_label: Some(gettext("Unlock")),
+            cancel_label: Some(gettext("Cancel")),
         }
     }
 
     fn for_create_collection(label: &str, window_id: Option<&WindowIdentifierType>) -> Self {
         Self {
-            title: Some("New Keyring Password".to_owned()),
-            message: Some("Choose password for new keyring".to_owned()),
-            description: Some(format!(
-                "An application wants to create a new keyring called '{label}'. Choose the password you want to use for it."
+            title: Some(gettext("New Keyring Password")),
+            message: Some(gettext("Choose password for new keyring")),
+            description: Some(i18n_f(
+                "An application wants to create a new keyring called '{}'. Choose the password you want to use for it.",
+                &[label],
             )),
             warning: None,
             password_new: Some(true),
@@ -204,8 +208,8 @@ impl Properties {
             choice_label: None,
             choice_chosen: None,
             caller_window: window_id.map(ToOwned::to_owned),
-            continue_label: Some("Create".to_owned()),
-            cancel_label: Some("Cancel".to_owned()),
+            continue_label: Some(gettext("Create")),
+            cancel_label: Some(gettext("Cancel")),
         }
     }
 }

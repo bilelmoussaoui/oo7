@@ -5,9 +5,12 @@ project(
   meson_version: '>= 0.61.0',
 )
 
+i18n = import('i18n')
+
 is_devel = get_option('profile') == 'development'
 dbus_known_name = 'org.freedesktop.secrets'
 service_name = meson.project_name()
+gettext_package = meson.project_name()
 
 prefix = get_option('prefix')
 datadir = get_option('datadir')
@@ -43,3 +46,4 @@ summary({
 
 subdir('data')
 subdir('src')
+subdir('po')
