@@ -516,10 +516,9 @@ impl Service {
             .build();
         let mut stream = zbus::MessageStream::for_match_rule(rule, self.connection(), None).await?;
         while let Some(message) = stream.try_next().await? {
-            let Ok((_name, old_owner, new_owner)) =
-                message
-                    .body()
-                    .deserialize::<(String, OwnedUniqueName, OwnedUniqueName)>()
+            let Ok((_name, old_owner, new_owner)) = message
+                .body()
+                .deserialize::<(String, OwnedUniqueName, String)>()
             else {
                 continue;
             };
