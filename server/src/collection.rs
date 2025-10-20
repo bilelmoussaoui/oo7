@@ -635,6 +635,75 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn search_items_subset_matching() -> Result<(), Box<dyn std::error::Error>> {
+        let setup = TestServiceSetup::plain_session(true).await?;
+
+        // Create an item with multiple attributes (url and username)
+        let secret = oo7::Secret::text("my-password");
+        let dbus_secret = dbus::api::DBusSecret::new(Arc::clone(&setup.session), secret);
+
+        setup.collections[0]
+            .create_item(
+                "Zed Login",
+                &[("url", "https://zed.dev"), ("username", "alice")],
+                &dbus_secret,
+                false,
+                None,
+            )
+            .await?;
+
+        // Search with only the url attribute (subset of stored attributes)
+        let results = setup.collections[0]
+            .search_items(&[("url", "https://zed.dev")])
+            .await?;
+
+        assert_eq!(
+            results.len(),
+            1,
+            "Should find item when searching with subset of its attributes"
+        );
+
+        // Search with only the username attribute (another subset)
+        let results = setup.collections[0]
+            .search_items(&[("username", "alice")])
+            .await?;
+
+        assert_eq!(
+            results.len(),
+            1,
+            "Should find item when searching with different subset of its attributes"
+        );
+
+        // Search with both attributes (exact match)
+        let results = setup.collections[0]
+            .search_items(&[("url", "https://zed.dev"), ("username", "alice")])
+            .await?;
+
+        assert_eq!(
+            results.len(),
+            1,
+            "Should find item when searching with all its attributes"
+        );
+
+        // Search with superset of attributes (should not match)
+        let results = setup.collections[0]
+            .search_items(&[
+                ("url", "https://zed.dev"),
+                ("username", "alice"),
+                ("extra", "attribute"),
+            ])
+            .await?;
+
+        assert_eq!(
+            results.len(),
+            0,
+            "Should not find item when searching with superset of its attributes"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn create_item_with_replace() -> Result<(), Box<dyn std::error::Error>> {
         let setup = TestServiceSetup::plain_session(true).await?;
 
