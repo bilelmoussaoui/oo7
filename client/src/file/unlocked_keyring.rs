@@ -1,5 +1,3 @@
-#[cfg(feature = "async-std")]
-use std::io;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
