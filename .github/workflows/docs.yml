@@ -50,6 +50,10 @@ jobs:
           find ~/.cargo/registry/src -name "lib.rs" -path "*/rand_core-*/src/lib.rs" -exec \
             sed -i 's/doc_auto_cfg/doc_cfg/g' {} \; || true
 
+          # Patch socket2 crate
+          find ~/.cargo/registry/src -name "lib.rs" -path "*/socket2-*/src/lib.rs" -exec \
+            sed -i 's/doc_auto_cfg/doc_cfg/g' {} \; || true
+
       - env:
           RUSTFLAGS: --cfg docsrs
           RUSTDOCFLAGS: --cfg docsrs
