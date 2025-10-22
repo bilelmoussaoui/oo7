@@ -17,9 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain
-        with:
-          toolchain: nightly
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/install@cargo-docs-rs
 
       - name: Fetch dependencies and patch generic-array
         run: |
@@ -50,7 +49,7 @@ jobs:
       - env:
           RUSTFLAGS: --cfg docsrs
           RUSTDOCFLAGS: --cfg docsrs
-        run: cargo doc --package oo7 --features "unstable" --no-deps
+        run: cargo docs-rs --package oo7 --features "unstable" --no-deps
 
       - name: Fix permissions
         run: |
