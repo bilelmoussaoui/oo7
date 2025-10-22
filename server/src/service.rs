@@ -526,7 +526,7 @@ impl Service {
             let old_owner = old_owner
                 .as_ref()
                 .expect("A disconnected client requires an old_owner");
-            if let Some(session) = self.session_from_sender(&old_owner).await {
+            if let Some(session) = self.session_from_sender(old_owner).await {
                 match session.close().await {
                     Ok(_) => tracing::info!(
                         "Client {} disconnected. Session: {} closed.",
