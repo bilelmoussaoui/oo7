@@ -49,7 +49,7 @@ jobs:
       - env:
           RUSTFLAGS: --cfg docsrs
           RUSTDOCFLAGS: --cfg docsrs
-        run: cargo docs-rs --package oo7 --features "unstable" --no-deps
+        run: cargo docs-rs --package oo7
 
       - name: Fix permissions
         run: |
