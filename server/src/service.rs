@@ -16,10 +16,10 @@ use oo7::{
 use tokio::sync::{Mutex, RwLock};
 use tokio_stream::StreamExt;
 use zbus::{
-    names::{OwnedUniqueName, UniqueName},
+    names::UniqueName,
     object_server::SignalEmitter,
     proxy::Defaults,
-    zvariant::{ObjectPath, OwnedObjectPath, OwnedValue, Value},
+    zvariant::{ObjectPath, Optional, OwnedObjectPath, OwnedValue, Value},
 };
 
 use crate::{
@@ -516,14 +516,16 @@ impl Service {
             .build();
         let mut stream = zbus::MessageStream::for_match_rule(rule, self.connection(), None).await?;
         while let Some(message) = stream.try_next().await? {
+            let body = message.body();
             let Ok((_name, old_owner, new_owner)) =
-                message
-                    .body()
-                    .deserialize::<(String, OwnedUniqueName, OwnedUniqueName)>()
+                body.deserialize::<(String, Optional<UniqueName<'_>>, Optional<UniqueName<'_>>)>()
             else {
                 continue;
             };
-            assert_eq!(new_owner, ""); // We enforce that in the matching rule
+            debug_assert!(new_owner.is_none()); // We enforce that in the matching rule
+            let old_owner = old_owner
+                .as_ref()
+                .expect("A disconnected client requires an old_owner");
             if let Some(session) = self.session_from_sender(&old_owner).await {
                 match session.close().await {
                     Ok(_) => tracing::info!(
