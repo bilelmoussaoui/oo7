@@ -123,35 +123,88 @@ impl Collection {
         properties: Properties,
         secret: DBusSecretInner,
         replace: bool,
-        #[zbus(object_server)] object_server: &zbus::ObjectServer,
-        #[zbus(signal_emitter)] signal_emitter: zbus::object_server::SignalEmitter<'_>,
     ) -> Result<(OwnedObjectPath, OwnedObjectPath), ServiceError> {
         if self.is_locked().await {
-            return Err(ServiceError::IsLocked(format!(
-                "Cannot create item in locked collection `{}`",
+            // Create a prompt to unlock the collection and create the item
+            let prompt = crate::prompt::Prompt::new(
+                self.service.clone(),
+                crate::prompt::PromptRole::Unlock,
+                self.label().await,
+                Some(self.clone()),
+            )
+            .await;
+            let prompt_path = OwnedObjectPath::from(prompt.path().clone());
+
+            let collection = self.clone();
+            let action =
+                crate::prompt::PromptAction::new(move |secret_opt: Option<Secret>| async move {
+                    let unlock_secret = secret_opt.ok_or_else(|| {
+                        crate::error::custom_service_error(
+                            "Cannot unlock collection without a secret",
+                        )
+                    })?;
+
+                    collection.set_locked(false, Some(unlock_secret)).await?;
+
+                    let item_path = collection
+                        .create_item_unlocked(properties, secret, replace)
+                        .await?;
+
+                    Ok(zvariant::Value::new(item_path).try_into_owned().unwrap())
+                });
+
+            prompt.set_action(action).await;
+
+            self.service
+                .register_prompt(prompt_path.clone(), prompt.clone())
+                .await;
+
+            self.service
+                .object_server()
+                .at(&prompt_path, prompt)
+                .await?;
+
+            tracing::debug!(
+                "CreateItem prompt created at `{}` for locked collection `{}`",
+                prompt_path,
                 self.path
-            )));
+            );
+
+            return Ok((OwnedObjectPath::default(), prompt_path));
         }
 
+        let item_path = self
+            .create_item_unlocked(properties, secret, replace)
+            .await?;
+
+        Ok((item_path, OwnedObjectPath::default()))
+    }
+
+    async fn create_item_unlocked(
+        &self,
+        properties: Properties,
+        secret: DBusSecretInner,
+        replace: bool,
+    ) -> Result<OwnedObjectPath, ServiceError> {
         let keyring = self.keyring.read().await;
         let keyring = keyring.as_ref().unwrap().as_unlocked();
 
-        let DBusSecretInner(session, iv, secret, content_type) = secret;
+        let DBusSecretInner(session_path, iv, secret_bytes, content_type) = secret;
         let label = properties.label();
         // Safe to unwrap as an item always has attributes
         let mut attributes = properties.attributes().unwrap().to_owned();
 
-        let Some(session) = self.service.session(&session).await else {
-            tracing::error!("The session `{}` does not exist.", session);
+        let Some(session) = self.service.session(&session_path).await else {
+            tracing::error!("The session `{}` does not exist.", session_path);
             return Err(ServiceError::NoSession(format!(
-                "The session `{session}` does not exist."
+                "The session `{session_path}` does not exist."
             )));
         };
 
         let secret = match session.aes_key() {
-            Some(key) => oo7::crypto::decrypt(secret, &key, &iv)
+            Some(key) => oo7::crypto::decrypt(secret_bytes, &key, &iv)
                 .map_err(|err| custom_service_error(&format!("Failed to decrypt secret {err}.")))?,
-            None => zeroize::Zeroizing::new(secret),
+            None => zeroize::Zeroizing::new(secret_bytes),
         };
 
         // Ensure content-type attribute is stored
@@ -178,6 +231,9 @@ impl Collection {
             item_path.clone(),
         );
         *self.item_index.write().await = n_items + 1;
+
+        let object_server = self.service.object_server();
+        let signal_emitter = self.service.signal_emitter(&self.path)?;
 
         // Remove any existing items with the same attributes
         if replace {
@@ -208,7 +264,7 @@ impl Collection {
 
         tracing::info!("Item `{item_path}` created.");
 
-        Ok((item_path, OwnedObjectPath::default()))
+        Ok(item_path)
     }
 
     #[zbus(property, name = "Items")]
@@ -1047,6 +1103,63 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn create_item_in_locked_collection() -> Result<(), Box<dyn std::error::Error>> {
+        let setup = TestServiceSetup::plain_session(true).await?;
+
+        let collection = setup
+            .server
+            .collection_from_path(setup.collections[0].inner().path())
+            .await
+            .expect("Collection should exist");
+        collection
+            .set_locked(true, setup.keyring_secret.clone())
+            .await?;
+
+        assert!(
+            setup.collections[0].is_locked().await?,
+            "Collection should be locked"
+        );
+
+        let secret = oo7::Secret::text("test-password");
+        let dbus_secret = dbus::api::DBusSecret::new(Arc::clone(&setup.session), secret.clone());
+
+        let item = setup.collections[0]
+            .create_item(
+                "Test Item",
+                &[("app", "test"), ("type", "password")],
+                &dbus_secret,
+                false,
+                None,
+            )
+            .await?;
+
+        assert!(
+            !setup.collections[0].is_locked().await?,
+            "Collection should be unlocked after prompt"
+        );
+
+        let items = setup.collections[0].items().await?;
+        assert_eq!(items.len(), 1, "Collection should have one item");
+        assert_eq!(
+            items[0].inner().path(),
+            item.inner().path(),
+            "Created item should be in the collection"
+        );
+
+        let label = item.label().await?;
+        assert_eq!(label, "Test Item", "Item should have correct label");
+
+        let attributes = item.attributes().await?;
+        assert_eq!(attributes.get("app"), Some(&"test".to_string()));
+        assert_eq!(attributes.get("type"), Some(&"password".to_string()));
+
+        let retrieved_secret = item.secret(&setup.session).await?;
+        assert_eq!(retrieved_secret.value(), secret.as_bytes());
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn locked_collection_operations() -> Result<(), Box<dyn std::error::Error>> {
         let setup = TestServiceSetup::plain_session(true).await?;
 
@@ -1085,24 +1198,7 @@ mod tests {
             result
         );
 
-        // Test 2: create_item should fail with IsLocked
-        let secret = oo7::Secret::text("test-password");
-        let dbus_secret = dbus::api::DBusSecret::new(Arc::clone(&setup.session), secret);
-        let result = setup.collections[0]
-            .create_item("Test Item", &[("app", "test")], &dbus_secret, false, None)
-            .await;
-        assert!(
-            matches!(
-                result,
-                Err(oo7::dbus::Error::Service(
-                    oo7::dbus::ServiceError::IsLocked(_)
-                ))
-            ),
-            "create_item should fail with IsLocked error, got: {:?}",
-            result
-        );
-
-        // Test 3: set_label should fail with IsLocked
+        // Test 2: set_label should fail with IsLocked
         let result = setup.collections[0].set_label("New Label").await;
         assert!(
             matches!(result, Err(oo7::dbus::Error::ZBus(zbus::Error::FDO(_)))),

@@ -650,6 +650,10 @@ impl Service {
         self.pending_collections.lock().await.remove(path);
     }
 
+    pub async fn register_prompt(&self, path: OwnedObjectPath, prompt: Prompt) {
+        self.prompts.lock().await.insert(path, prompt);
+    }
+
     pub async fn pending_collection(
         &self,
         prompt_path: &ObjectPath<'_>,
