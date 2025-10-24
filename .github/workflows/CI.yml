@@ -132,3 +132,6 @@ jobs:
       - name: Build (server)
         working-directory: ./server
         run: meson setup ./ _build --prefix /usr && ninja -C _build
+      - name: Build (PAM)
+        working-directory: ./pam
+        run: meson setup ./ _build --prefix /usr && ninja -C _build
