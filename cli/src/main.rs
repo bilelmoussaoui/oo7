@@ -504,10 +504,11 @@ fn print_item_common(
 }
 
 fn print_item_keyring(
-    item: &oo7::file::UnlockedItem,
+    item: &oo7::file::Item,
     secret_only: bool,
     as_hex: bool,
 ) -> Result<(), Error> {
+    let item = item.as_unlocked();
     let secret = item.secret();
     let label = item.label();
     let attributes = item

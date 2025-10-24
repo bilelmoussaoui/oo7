@@ -45,6 +45,33 @@ pub enum Item {
     Unlocked(UnlockedItem),
 }
 
+impl Item {
+    pub fn is_locked(&self) -> bool {
+        matches!(self, Self::Locked(_))
+    }
+
+    pub fn as_unlocked(&self) -> &UnlockedItem {
+        match self {
+            Self::Unlocked(item) => item,
+            _ => panic!("The item is locked"),
+        }
+    }
+
+    pub fn as_mut_unlocked(&mut self) -> &mut UnlockedItem {
+        match self {
+            Self::Unlocked(item) => item,
+            _ => panic!("The item is locked"),
+        }
+    }
+
+    pub fn as_locked(&self) -> &LockedItem {
+        match self {
+            Self::Locked(item) => item,
+            _ => panic!("The item is unlocked"),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum Keyring {
     Locked(LockedKeyring),
@@ -58,6 +85,13 @@ impl Keyring {
         match self {
             Self::Locked(keyring) => keyring.validate_secret(secret).await,
             Self::Unlocked(keyring) => keyring.validate_secret(secret).await,
+        }
+    }
+
+    pub async fn items(&self) -> Result<Vec<Result<Item, InvalidItemError>>, Error> {
+        match self {
+            Self::Locked(keyring) => keyring.items().await,
+            Self::Unlocked(keyring) => keyring.items().await,
         }
     }
 

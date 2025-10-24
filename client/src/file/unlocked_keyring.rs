@@ -19,7 +19,7 @@ use tokio::{
 
 use crate::{
     AsAttributes, Key, Secret,
-    file::{Error, InvalidItemError, LockedItem, LockedKeyring, UnlockedItem, api},
+    file::{Error, InvalidItemError, Item, LockedItem, LockedKeyring, UnlockedItem, api},
 };
 
 type ItemDefinition = (String, HashMap<String, String>, Secret, bool);
@@ -258,7 +258,7 @@ impl UnlockedKeyring {
     /// If items cannot be decrypted, [`InvalidItemError`]s are returned for
     /// them instead of [`UnlockedItem`]s.
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self)))]
-    pub async fn items(&self) -> Result<Vec<Result<UnlockedItem, InvalidItemError>>, Error> {
+    pub async fn items(&self) -> Result<Vec<Result<Item, InvalidItemError>>, Error> {
         let key = self.derive_key().await?;
         let keyring = self.keyring.read().await;
 
@@ -269,25 +269,29 @@ impl UnlockedKeyring {
             .items
             .iter()
             .map(|e| {
-                (*e).clone().decrypt(&key).map_err(|err| {
-                    InvalidItemError::new(
-                        err,
-                        e.hashed_attributes.keys().map(|x| x.to_string()).collect(),
-                    )
-                })
+                (*e).clone()
+                    .decrypt(&key)
+                    .map_err(|err| {
+                        InvalidItemError::new(
+                            err,
+                            e.hashed_attributes.keys().map(|x| x.to_string()).collect(),
+                        )
+                    })
+                    .map(Item::Unlocked)
             })
             .collect())
     }
 
     /// Search items matching the attributes.
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, attributes)))]
-    pub async fn search_items(
-        &self,
-        attributes: &impl AsAttributes,
-    ) -> Result<Vec<UnlockedItem>, Error> {
+    pub async fn search_items(&self, attributes: &impl AsAttributes) -> Result<Vec<Item>, Error> {
         let key = self.derive_key().await?;
         let keyring = self.keyring.read().await;
-        let results = keyring.search_items(attributes, &key)?;
+        let results = keyring
+            .search_items(attributes, &key)?
+            .into_iter()
+            .map(Item::Unlocked)
+            .collect::<Vec<Item>>();
 
         #[cfg(feature = "tracing")]
         tracing::debug!("Found {} matching items", results.len());
@@ -297,14 +301,13 @@ impl UnlockedKeyring {
 
     /// Find the first item matching the attributes.
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, attributes)))]
-    pub async fn lookup_item(
-        &self,
-        attributes: &impl AsAttributes,
-    ) -> Result<Option<UnlockedItem>, Error> {
+    pub async fn lookup_item(&self, attributes: &impl AsAttributes) -> Result<Option<Item>, Error> {
         let key = self.derive_key().await?;
         let keyring = self.keyring.read().await;
 
-        keyring.lookup_item(attributes, &key)
+        keyring
+            .lookup_item(attributes, &key)
+            .map(|maybe_item| maybe_item.map(Item::Unlocked))
     }
 
     /// Find the index in the list of items of the first item matching the
@@ -361,7 +364,7 @@ impl UnlockedKeyring {
         attributes: &impl AsAttributes,
         secret: impl Into<Secret>,
         replace: bool,
-    ) -> Result<UnlockedItem, Error> {
+    ) -> Result<Item, Error> {
         let item = {
             let key = self.derive_key().await?;
             let mut keyring = self.keyring.write().await;
@@ -382,7 +385,7 @@ impl UnlockedKeyring {
             Ok(_) => {
                 #[cfg(feature = "tracing")]
                 tracing::info!("Successfully created item");
-                Ok(item)
+                Ok(Item::Unlocked(item))
             }
         }
     }
@@ -713,9 +716,9 @@ mod tests {
         let items: Result<Vec<_>, _> = keyring.items().await?.into_iter().collect();
         let items = items.expect("unable to retrieve items");
         assert_eq!(items.len(), 1);
-        assert_eq!(items[0].label(), "foo");
-        assert_eq!(items[0].secret(), Secret::blob("foo"));
-        let attributes = items[0].attributes();
+        assert_eq!(items[0].as_unlocked().label(), "foo");
+        assert_eq!(items[0].as_unlocked().secret(), Secret::blob("foo"));
+        let attributes = items[0].as_unlocked().attributes();
         assert_eq!(attributes.len(), 2);
         assert_eq!(
             attributes
@@ -962,6 +965,7 @@ mod tests {
         let item_before = keyring
             .create_item("test", attributes, "password", false)
             .await?;
+        let item_before = item_before.as_unlocked();
 
         let secret = Secret::blob("new_secret");
         keyring.change_secret(secret).await?;
@@ -969,6 +973,7 @@ mod tests {
         let secret = Secret::blob("new_secret");
         let keyring = UnlockedKeyring::load(&keyring_path, secret).await?;
         let item_now = keyring.lookup_item(attributes).await?.unwrap();
+        let item_now = item_now.as_unlocked();
 
         assert_eq!(item_before.label(), item_now.label());
         assert_eq!(item_before.secret(), item_now.secret());
@@ -1009,11 +1014,17 @@ mod tests {
 
         let items = keyring.search_items(&[("type", "text")]).await?;
         assert_eq!(items.len(), 1);
-        assert_eq!(items[0].secret().content_type(), ContentType::Text);
+        assert_eq!(
+            items[0].as_unlocked().secret().content_type(),
+            ContentType::Text
+        );
 
         let items = keyring.search_items(&[("type", "password")]).await?;
         assert_eq!(items.len(), 1);
-        assert_eq!(items[0].secret().content_type(), ContentType::Blob);
+        assert_eq!(
+            items[0].as_unlocked().secret().content_type(),
+            ContentType::Blob
+        );
 
         Ok(())
     }
@@ -1098,7 +1109,7 @@ mod tests {
             ])
             .await?;
         assert_eq!(exact.len(), 1);
-        assert_eq!(exact[0].label(), "Email Password");
+        assert_eq!(exact[0].as_unlocked().label(), "Email Password");
 
         // Test partial match - by app
         let email_items = keyring.search_items(&[("app", "email")]).await?;
@@ -1134,8 +1145,8 @@ mod tests {
         // Verify initial state
         let items = keyring.search_items(attrs).await?;
         assert_eq!(items.len(), 1);
-        assert_eq!(items[0].label(), "Original");
-        assert_eq!(items[0].secret(), Secret::text("secret1"));
+        assert_eq!(items[0].as_unlocked().label(), "Original");
+        assert_eq!(items[0].as_unlocked().secret(), Secret::text("secret1"));
 
         // With replace=false, allows duplicates (discovered behavior)
         keyring
@@ -1147,7 +1158,7 @@ mod tests {
         assert_eq!(items.len(), 2);
 
         // Verify both items exist with different content
-        let labels: Vec<_> = items.iter().map(|i| i.label()).collect();
+        let labels: Vec<_> = items.iter().map(|i| i.as_unlocked().label()).collect();
         assert!(labels.contains(&"Original"));
         assert!(labels.contains(&"Duplicate"));
 
@@ -1160,8 +1171,8 @@ mod tests {
         // After replace=true, should only have the new item
         let items = keyring.search_items(attrs).await?;
         assert_eq!(items.len(), 1);
-        assert_eq!(items[0].label(), "Replacement");
-        assert_eq!(items[0].secret(), Secret::text("secret3"));
+        assert_eq!(items[0].as_unlocked().label(), "Replacement");
+        assert_eq!(items[0].as_unlocked().secret(), Secret::text("secret3"));
 
         // Test replace=true on empty attributes (should just add)
         let unique_attrs = &[("app", "unique"), ("user", "bob")];
@@ -1171,7 +1182,7 @@ mod tests {
 
         let unique_items = keyring.search_items(unique_attrs).await?;
         assert_eq!(unique_items.len(), 1);
-        assert_eq!(unique_items[0].label(), "Unique Item");
+        assert_eq!(unique_items[0].as_unlocked().label(), "Unique Item");
 
         // Test replace=true again on the unique item - should replace it
         keyring
@@ -1180,8 +1191,11 @@ mod tests {
 
         let unique_items = keyring.search_items(unique_attrs).await?;
         assert_eq!(unique_items.len(), 1);
-        assert_eq!(unique_items[0].label(), "Updated Unique");
-        assert_eq!(unique_items[0].secret(), Secret::text("updated_secret"));
+        assert_eq!(unique_items[0].as_unlocked().label(), "Updated Unique");
+        assert_eq!(
+            unique_items[0].as_unlocked().secret(),
+            Secret::text("updated_secret")
+        );
 
         Ok(())
     }
@@ -1262,27 +1276,33 @@ mod tests {
         // Verify all secrets can be retrieved correctly
         let text_items = keyring.search_items(&[("type", "text")]).await?;
         assert_eq!(text_items.len(), 1);
-        assert_eq!(text_items[0].secret(), Secret::text("Hello, World!"));
         assert_eq!(
-            text_items[0].secret().content_type(),
+            text_items[0].as_unlocked().secret(),
+            Secret::text("Hello, World!")
+        );
+        assert_eq!(
+            text_items[0].as_unlocked().secret().content_type(),
             crate::secret::ContentType::Text
         );
 
         let binary_items = keyring.search_items(&[("type", "binary")]).await?;
         assert_eq!(binary_items.len(), 1);
-        assert_eq!(&*binary_items[0].secret(), &[0x00, 0x01, 0x02, 0xFF]);
         assert_eq!(
-            binary_items[0].secret().content_type(),
+            &*binary_items[0].as_unlocked().secret(),
+            &[0x00, 0x01, 0x02, 0xFF]
+        );
+        assert_eq!(
+            binary_items[0].as_unlocked().secret().content_type(),
             crate::secret::ContentType::Blob
         );
 
         let large_items = keyring.search_items(&[("type", "large")]).await?;
         assert_eq!(large_items.len(), 1);
-        assert_eq!(&*large_items[0].secret(), &large_data);
+        assert_eq!(&*large_items[0].as_unlocked().secret(), &large_data);
 
         let empty_items = keyring.search_items(&[("type", "empty")]).await?;
         assert_eq!(empty_items.len(), 1);
-        assert_eq!(empty_items[0].secret(), Secret::text(""));
+        assert_eq!(empty_items[0].as_unlocked().secret(), Secret::text(""));
 
         Ok(())
     }
@@ -1320,8 +1340,11 @@ mod tests {
         // Test searching by user
         let alice_items = keyring.search_items(&[("user", "alice")]).await?;
         assert_eq!(alice_items.len(), 1);
-        assert_eq!(alice_items[0].label(), "Test Item 1");
-        assert_eq!(alice_items[0].secret(), Secret::text("secret1"));
+        assert_eq!(alice_items[0].as_unlocked().label(), "Test Item 1");
+        assert_eq!(
+            alice_items[0].as_unlocked().secret(),
+            Secret::text("secret1")
+        );
 
         // Test searching by app (should find both)
         let app_items = keyring.search_items(&[("app", "myapp")]).await?;
@@ -1332,7 +1355,7 @@ mod tests {
         let remaining_items = keyring.items().await?;
         let valid_remaining: Vec<_> = remaining_items.into_iter().map(|r| r.unwrap()).collect();
         assert_eq!(valid_remaining.len(), 1);
-        assert_eq!(valid_remaining[0].label(), "Test Item 2");
+        assert_eq!(valid_remaining[0].as_unlocked().label(), "Test Item 2");
 
         Ok(())
     }
@@ -1355,7 +1378,7 @@ mod tests {
 
         let items = keyring.search_items(&[("app", "testapp")]).await?;
         assert_eq!(items.len(), 1);
-        let item = &items[0];
+        let item = &items[0].as_unlocked();
 
         // Test reading attributes
         let attrs = item.attributes();
@@ -1387,7 +1410,7 @@ mod tests {
 
         let updated_items = keyring.search_items(&[("app", "testapp")]).await?;
         assert_eq!(updated_items.len(), 1);
-        let updated_attrs = updated_items[0].attributes();
+        let updated_attrs = updated_items[0].as_unlocked().attributes();
         assert_eq!(updated_attrs.get("version").unwrap().to_string(), "2.0");
         assert_eq!(updated_attrs.get("env").unwrap().to_string(), "production");
         assert_eq!(
@@ -1583,6 +1606,7 @@ mod tests {
         let mut items = keyring.items().await?;
         assert_eq!(items.len(), 1);
         let mut item = items.remove(0).unwrap();
+        let item = item.as_mut_unlocked();
         assert_eq!(item.label(), "my item");
         assert_eq!(item.secret(), Secret::text("my_secret"));
         let attrs = item.attributes();
@@ -1599,6 +1623,7 @@ mod tests {
         let mut items = keyring.items().await?;
         assert_eq!(items.len(), 1);
         let item = items.remove(0).unwrap();
+        let item = item.as_unlocked();
         assert_eq!(item.label(), "my item");
         assert_eq!(item.secret(), Secret::text("my_secret"));
         let attrs = item.attributes();

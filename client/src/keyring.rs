@@ -203,8 +203,8 @@ pub enum Item {
 }
 
 impl Item {
-    fn for_file(item: file::UnlockedItem, backend: Arc<file::UnlockedKeyring>) -> Self {
-        Self::File(RwLock::new(item), backend)
+    fn for_file(item: file::Item, backend: Arc<file::UnlockedKeyring>) -> Self {
+        Self::File(RwLock::new(item.as_unlocked().clone()), backend)
     }
 
     fn for_dbus(item: dbus::Item<'static>) -> Self {

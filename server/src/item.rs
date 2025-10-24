@@ -15,7 +15,7 @@ use crate::{Service, collection::Collection, error::custom_service_error};
 pub struct Item {
     // Properties
     locked: Arc<AtomicBool>,
-    inner: Arc<Mutex<oo7::file::UnlockedItem>>,
+    inner: Arc<Mutex<oo7::file::Item>>,
     // Other attributes
     service: Service,
     collection_path: OwnedObjectPath,
@@ -118,7 +118,7 @@ impl Item {
         }
 
         let inner = self.inner.lock().await;
-        let secret = inner.secret();
+        let secret = inner.as_unlocked().secret();
         let content_type = secret.content_type();
 
         tracing::debug!("Secret retrieved from the item: {}.", self.path);
@@ -166,35 +166,35 @@ impl Item {
             )));
         }
 
-        let mut inner = self.inner.lock().await;
+        {
+            let mut inner = self.inner.lock().await;
 
-        match session.aes_key() {
-            Some(key) => {
-                let decrypted = oo7::crypto::decrypt(secret, &key, &iv).map_err(|err| {
-                    custom_service_error(&format!("Failed to decrypt secret {err}."))
-                })?;
-                inner.set_secret(decrypted);
+            match session.aes_key() {
+                Some(key) => {
+                    let decrypted = oo7::crypto::decrypt(secret, &key, &iv).map_err(|err| {
+                        custom_service_error(&format!("Failed to decrypt secret {err}."))
+                    })?;
+                    inner.as_mut_unlocked().set_secret(decrypted);
+                }
+                None => {
+                    inner.as_mut_unlocked().set_secret(secret);
+                }
             }
-            None => {
-                inner.set_secret(secret);
+
+            // Ensure content-type attribute is stored
+            let mut attributes = inner.as_unlocked().attributes().clone();
+            if !attributes.contains_key(oo7::CONTENT_TYPE_ATTRIBUTE) {
+                attributes.insert(
+                    oo7::CONTENT_TYPE_ATTRIBUTE.to_owned(),
+                    content_type.as_str().into(),
+                );
+            } else {
+                attributes
+                    .entry(oo7::CONTENT_TYPE_ATTRIBUTE.to_string())
+                    .and_modify(|v| *v = content_type.as_str().into());
             }
+            inner.as_mut_unlocked().set_attributes(&attributes);
         }
-
-        // Ensure content-type attribute is stored
-        let mut attributes = inner.attributes().clone();
-        if !attributes.contains_key(oo7::CONTENT_TYPE_ATTRIBUTE) {
-            attributes.insert(
-                oo7::CONTENT_TYPE_ATTRIBUTE.to_owned(),
-                content_type.as_str().into(),
-            );
-        } else {
-            attributes
-                .entry(oo7::CONTENT_TYPE_ATTRIBUTE.to_string())
-                .and_modify(|v| *v = content_type.as_str().into());
-        }
-        inner.set_attributes(&attributes);
-
-        drop(inner);
 
         let signal_emitter = self.service.signal_emitter(&self.collection_path)?;
         Collection::item_changed(&signal_emitter, &self.path).await?;
@@ -221,6 +221,7 @@ impl Item {
         self.inner
             .lock()
             .await
+            .as_unlocked()
             .attributes()
             .iter()
             .map(|(k, v)| (k.to_owned(), v.to_string()))
@@ -239,7 +240,10 @@ impl Item {
             ))));
         }
 
-        self.inner.lock().await.set_attributes(&attributes);
+        {
+            let mut inner = self.inner.lock().await;
+            inner.as_mut_unlocked().set_attributes(&attributes);
+        }
 
         let signal_emitter = self
             .service
@@ -258,7 +262,7 @@ impl Item {
 
     #[zbus(property, name = "Label")]
     pub async fn label(&self) -> String {
-        self.inner.lock().await.label().to_owned()
+        self.inner.lock().await.as_unlocked().label().to_owned()
     }
 
     #[zbus(property, name = "Label")]
@@ -269,8 +273,11 @@ impl Item {
                 format!("Cannot set label of a locked object `{}`.", self.path),
             ))));
         }
+        {
+            let mut inner = self.inner.lock().await;
+            inner.as_mut_unlocked().set_label(label);
+        }
 
-        self.inner.lock().await.set_label(label);
         let signal_emitter = self
             .service
             .signal_emitter(&self.collection_path)
@@ -289,18 +296,18 @@ impl Item {
 
     #[zbus(property, name = "Created")]
     pub async fn created_at(&self) -> u64 {
-        self.inner.lock().await.created().as_secs()
+        self.inner.lock().await.as_unlocked().created().as_secs()
     }
 
     #[zbus(property, name = "Modified")]
     pub async fn modified_at(&self) -> u64 {
-        self.inner.lock().await.modified().as_secs()
+        self.inner.lock().await.as_unlocked().modified().as_secs()
     }
 }
 
 impl Item {
     pub fn new(
-        item: oo7::file::UnlockedItem,
+        item: oo7::file::Item,
         locked: bool,
         service: Service,
         collection_path: OwnedObjectPath,
