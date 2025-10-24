@@ -1259,6 +1259,59 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn unlock_retry() -> Result<(), Box<dyn std::error::Error>> {
+        let setup = TestServiceSetup::plain_session(true).await?;
+        let default_collection = setup.default_collection().await?;
+
+        let secret = oo7::Secret::text("test-secret-data");
+        let dbus_secret = dbus::api::DBusSecret::new(Arc::clone(&setup.session), secret);
+        default_collection
+            .create_item("Test Item", &[("app", "test")], &dbus_secret, false, None)
+            .await?;
+
+        let collection = setup
+            .server
+            .collection_from_path(default_collection.inner().path())
+            .await
+            .expect("Collection should exist");
+        collection
+            .set_locked(true, setup.keyring_secret.clone())
+            .await?;
+
+        assert!(
+            default_collection.is_locked().await?,
+            "Collection should be locked"
+        );
+
+        setup
+            .mock_prompter
+            .set_password_queue(vec![
+                oo7::Secret::from("wrong-password"),
+                oo7::Secret::from("wrong-password2"),
+                oo7::Secret::from("test-password-long-enough"),
+            ])
+            .await;
+
+        let unlocked = setup
+            .service_api
+            .unlock(&[default_collection.inner().path()], None)
+            .await?;
+
+        assert_eq!(unlocked.len(), 1, "Should have unlocked 1 collection");
+        assert_eq!(
+            unlocked[0].as_str(),
+            default_collection.inner().path().as_str(),
+            "Should return the collection path"
+        );
+        assert!(
+            !default_collection.is_locked().await?,
+            "Collection should be unlocked after retry with correct password"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn locked_collection_operations() -> Result<(), Box<dyn std::error::Error>> {
         let setup = TestServiceSetup::plain_session(true).await?;
 

@@ -162,6 +162,8 @@ pub(crate) struct MockPrompterService {
     unlock_password: Arc<tokio::sync::Mutex<Option<oo7::Secret>>>,
     /// Whether to accept (true) or dismiss (false) prompts
     should_accept: Arc<tokio::sync::Mutex<bool>>,
+    /// Queue of passwords to use for for testing retry logic
+    password_queue: Arc<tokio::sync::Mutex<Vec<oo7::Secret>>>,
 }
 
 impl MockPrompterService {
@@ -171,12 +173,17 @@ impl MockPrompterService {
                 "test-password-long-enough",
             )))),
             should_accept: Arc::new(tokio::sync::Mutex::new(true)),
+            password_queue: Arc::new(tokio::sync::Mutex::new(Vec::new())),
         }
     }
 
     /// Set whether prompts should be accepted or dismissed
     pub async fn set_accept(&self, accept: bool) {
         *self.should_accept.lock().await = accept;
+    }
+
+    pub async fn set_password_queue(&self, passwords: Vec<oo7::Secret>) {
+        *self.password_queue.lock().await = passwords;
     }
 }
 
@@ -240,6 +247,7 @@ impl MockPrompterService {
         let callback_path = callback.to_owned();
         let unlock_password = self.unlock_password.clone();
         let should_accept = self.should_accept.clone();
+        let password_queue = self.password_queue.clone();
         let exchange = exchange.to_owned();
         let connection = connection.clone();
 
@@ -266,24 +274,29 @@ impl MockPrompterService {
                     .await?;
                 tracing::debug!("MockPrompter: PromptReady(no) completed");
 
-                // Call PromptDone to clean up the callback
-                tracing::debug!("MockPrompter: calling PromptDone");
-                connection
-                    .call_method(
-                        None::<()>,
-                        &callback_path,
-                        Some("org.gnome.keyring.internal.Prompter.Callback"),
-                        "PromptDone",
-                        &(),
-                    )
-                    .await?;
-                tracing::debug!("MockPrompter: PromptDone completed");
-
                 return Ok(());
             } else if type_ == PromptType::Password {
                 tracing::debug!("MockPrompter: performing unlock (password prompt)");
                 // Unlock prompt - perform secret exchange
-                let password = unlock_password.lock().await.clone().unwrap();
+
+                let mut queue = password_queue.lock().await;
+                let password = if !queue.is_empty() {
+                    let pwd = queue.remove(0);
+                    tracing::debug!(
+                        "MockPrompter: using password from queue (length: {}, queue remaining: {})",
+                        std::str::from_utf8(pwd.as_bytes()).unwrap_or("<binary>"),
+                        queue.len()
+                    );
+                    pwd
+                } else {
+                    let pwd = unlock_password.lock().await.clone().unwrap();
+                    tracing::debug!(
+                        "MockPrompter: using default password (length: {})",
+                        std::str::from_utf8(pwd.as_bytes()).unwrap_or("<binary>")
+                    );
+                    pwd
+                };
+                drop(queue);
 
                 // Generate our own key pair
                 let private_key = oo7::Key::generate_private_key().unwrap();
@@ -330,9 +343,24 @@ impl MockPrompterService {
                 tracing::debug!("MockPrompter: PromptReady(yes) completed");
             }
 
-            // Call PromptDone to clean up the callback
-            tracing::debug!("MockPrompter: calling PromptDone");
-            connection
+            Ok::<_, zbus::Error>(())
+        });
+
+        Ok(())
+    }
+
+    async fn stop_prompting(
+        &self,
+        callback: ObjectPath<'_>,
+        #[zbus(connection)] connection: &zbus::Connection,
+    ) -> zbus::fdo::Result<()> {
+        tracing::debug!("MockPrompter: stop_prompting called for {}", callback);
+        let callback_path = callback.to_owned();
+        let connection = connection.clone();
+
+        tokio::spawn(async move {
+            tracing::debug!("MockPrompter: calling PromptDone for {}", callback_path);
+            let result = connection
                 .call_method(
                     None::<()>,
                     &callback_path,
@@ -340,17 +368,15 @@ impl MockPrompterService {
                     "PromptDone",
                     &(),
                 )
-                .await?;
-            tracing::debug!("MockPrompter: PromptDone completed");
+                .await;
 
-            Ok::<_, zbus::Error>(())
+            if let Err(err) = result {
+                tracing::debug!("MockPrompter: PromptDone failed: {}", err);
+            } else {
+                tracing::debug!("MockPrompter: PromptDone completed for {}", callback_path);
+            }
         });
 
-        Ok(())
-    }
-
-    async fn stop_prompting(&self, _callback: ObjectPath<'_>) -> zbus::fdo::Result<()> {
-        // Called when prompting is complete
         Ok(())
     }
 }

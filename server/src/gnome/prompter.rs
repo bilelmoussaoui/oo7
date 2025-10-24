@@ -393,17 +393,15 @@ impl PrompterCallback {
     async fn prompter_done(&self, prompt: &Prompt, exchange: &str) -> Result<(), ServiceError> {
         let prompter = PrompterProxy::new(self.service.connection()).await?;
 
-        // Get the action from the prompt
-        let Some(action) = prompt.take_action().await else {
-            return Err(custom_service_error(
-                "Prompt action was already executed or not set",
-            ));
-        };
-
         // Handle each role differently based on what validation/preparation is needed
         match prompt.role() {
             PromptRole::Lock => {
-                // Lock operation doesn't need secret, just execute the action
+                let Some(action) = prompt.take_action().await else {
+                    return Err(custom_service_error(
+                        "Prompt action was already executed or not set",
+                    ));
+                };
+
                 let result_value = action.execute(None).await?;
 
                 let path = self.path.clone();
@@ -451,6 +449,13 @@ impl PrompterCallback {
 
                 if is_valid {
                     tracing::debug!("Keyring secret matches for {label}.");
+
+                    let Some(action) = prompt.take_action().await else {
+                        return Err(custom_service_error(
+                            "Prompt action was already executed or not set",
+                        ));
+                    };
+
                     // Execute the unlock action after successful validation
                     let result_value = action.execute(Some(secret)).await?;
 
@@ -504,6 +509,12 @@ impl PrompterCallback {
                 let Some(secret) = secret_exchange::retrieve(exchange, &aes_key) else {
                     return Err(custom_service_error(
                         "Failed to retrieve keyring secret from SecretExchange.",
+                    ));
+                };
+
+                let Some(action) = prompt.take_action().await else {
+                    return Err(custom_service_error(
+                        "Prompt action was already executed or not set",
                     ));
                 };
 
