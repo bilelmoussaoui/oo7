@@ -25,10 +25,12 @@ systemduserunitdir = get_option('systemduserunitdir')
 if systemduserunitdir == ''
   systemd = dependency('systemd', version: '>= 242', required: build_systemd_service)
   if build_systemd_service.allowed() and systemd.found()
-    systemduserunitdir = systemd.get_variable(
-      pkgconfig: 'systemduserunitdir',
-      pkgconfig_define: ['prefix', prefix]
-    )
+    if systemduserunitdir == ''
+      systemduserunitdir = systemd.get_variable(
+        pkgconfig: 'systemduserunitdir',
+        pkgconfig_define: ['prefix', prefix]
+      )
+    endif
   endif
 endif
 
