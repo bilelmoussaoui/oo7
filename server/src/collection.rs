@@ -42,15 +42,63 @@ pub struct Collection {
 #[interface(name = "org.freedesktop.Secret.Collection")]
 impl Collection {
     #[zbus(out_args("prompt"))]
-    pub async fn delete(&self) -> Result<ObjectPath<'_>, ServiceError> {
+    pub async fn delete(&self) -> Result<OwnedObjectPath, ServiceError> {
         // Check if collection is locked
         if self.is_locked().await {
-            return Err(ServiceError::IsLocked(format!(
-                "Cannot delete locked collection `{}`",
+            // Create a prompt to unlock and delete the collection
+            let prompt = crate::prompt::Prompt::new(
+                self.service.clone(),
+                crate::prompt::PromptRole::Unlock,
+                self.label().await,
+                Some(self.clone()),
+            )
+            .await;
+            let prompt_path = OwnedObjectPath::from(prompt.path().clone());
+
+            let collection = self.clone();
+            let action =
+                crate::prompt::PromptAction::new(move |secret_opt: Option<Secret>| async move {
+                    let unlock_secret = secret_opt.ok_or_else(|| {
+                        crate::error::custom_service_error(
+                            "Cannot unlock collection without a secret",
+                        )
+                    })?;
+
+                    // Unlock the collection
+                    collection.set_locked(false, Some(unlock_secret)).await?;
+
+                    collection.delete_unlocked().await?;
+
+                    Ok(zvariant::Value::new(OwnedObjectPath::default())
+                        .try_into_owned()
+                        .unwrap())
+                });
+
+            prompt.set_action(action).await;
+
+            self.service
+                .register_prompt(prompt_path.clone(), prompt.clone())
+                .await;
+
+            self.service
+                .object_server()
+                .at(&prompt_path, prompt)
+                .await?;
+
+            tracing::debug!(
+                "Delete prompt created at `{}` for locked collection `{}`",
+                prompt_path,
                 self.path
-            )));
+            );
+
+            return Ok(prompt_path);
         }
 
+        self.delete_unlocked().await?;
+        Ok(OwnedObjectPath::default())
+    }
+
+    async fn delete_unlocked(&self) -> Result<(), ServiceError> {
         let keyring = self.keyring.read().await;
         let keyring = keyring.as_ref().unwrap().as_unlocked();
 
@@ -84,8 +132,7 @@ impl Collection {
 
         tracing::info!("Collection `{}` deleted.", self.path);
 
-        // Return empty prompt path (no prompt needed, per gnome-keyring behaviour)
-        Ok(ObjectPath::default())
+        Ok(())
     }
 
     #[zbus(out_args("results"))]
@@ -1160,6 +1207,58 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn delete_locked_collection_with_prompt() -> Result<(), Box<dyn std::error::Error>> {
+        let setup = TestServiceSetup::plain_session(true).await?;
+        let default_collection = setup.default_collection().await?;
+
+        let collection = setup
+            .server
+            .collection_from_path(default_collection.inner().path())
+            .await
+            .expect("Collection should exist");
+        collection
+            .set_locked(true, setup.keyring_secret.clone())
+            .await?;
+
+        assert!(
+            default_collection.is_locked().await?,
+            "Collection should be locked"
+        );
+
+        let collection_path = default_collection.inner().path().to_owned();
+
+        // Get initial collection count
+        let collections_before = setup.service_api.collections().await?;
+        let initial_count = collections_before.len();
+
+        // Delete the locked collection
+        default_collection.delete(None).await?;
+
+        // Give the system a moment to process the deletion
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        // Verify collection was deleted
+        let collections_after = setup.service_api.collections().await?;
+        assert_eq!(
+            collections_after.len(),
+            initial_count - 1,
+            "Collection should be deleted after prompt"
+        );
+
+        // Verify the specific collection is not in the list
+        let collection_paths: Vec<_> = collections_after
+            .iter()
+            .map(|c| c.inner().path().as_str())
+            .collect();
+        assert!(
+            !collection_paths.contains(&collection_path.as_str()),
+            "Deleted collection should not be in service collections list"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn locked_collection_operations() -> Result<(), Box<dyn std::error::Error>> {
         let setup = TestServiceSetup::plain_session(true).await?;
 
@@ -1185,20 +1284,7 @@ mod tests {
             "Collection should be locked"
         );
 
-        // Test 1: delete should fail with IsLocked
-        let result = setup.collections[0].delete(None).await;
-        assert!(
-            matches!(
-                result,
-                Err(oo7::dbus::Error::Service(
-                    oo7::dbus::ServiceError::IsLocked(_)
-                ))
-            ),
-            "delete should fail with IsLocked error, got: {:?}",
-            result
-        );
-
-        // Test 2: set_label should fail with IsLocked
+        // Test 1: set_label should fail with IsLocked
         let result = setup.collections[0].set_label("New Label").await;
         assert!(
             matches!(result, Err(oo7::dbus::Error::ZBus(zbus::Error::FDO(_)))),

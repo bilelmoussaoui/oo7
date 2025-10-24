@@ -25,10 +25,7 @@ pub struct Item {
 #[zbus::interface(name = "org.freedesktop.Secret.Item")]
 impl Item {
     #[zbus(out_args("Prompt"))]
-    pub async fn delete(
-        &self,
-        #[zbus(object_server)] object_server: &zbus::ObjectServer,
-    ) -> Result<OwnedObjectPath, ServiceError> {
+    pub async fn delete(&self) -> Result<OwnedObjectPath, ServiceError> {
         let Some(collection) = self
             .service
             .collection_from_path(&self.collection_path)
@@ -40,14 +37,63 @@ impl Item {
             )));
         };
 
-        collection.delete_item(&self.path).await?;
-        object_server.remove::<Self, _>(&self.path).await?;
+        // Check if item or collection is locked
+        if self.is_locked().await || collection.is_locked().await {
+            // Create a prompt to unlock and delete the item
+            let prompt = crate::prompt::Prompt::new(
+                self.service.clone(),
+                crate::prompt::PromptRole::Unlock,
+                collection.label().await,
+                Some(collection.clone()),
+            )
+            .await;
+            let prompt_path = OwnedObjectPath::from(prompt.path().clone());
 
-        let signal_emitter = self.service.signal_emitter(&self.collection_path)?;
-        Collection::item_deleted(&signal_emitter, &self.path).await?;
+            let item_self = self.clone();
+            let coll = collection.clone();
+            let action = crate::prompt::PromptAction::new(
+                move |secret_opt: Option<oo7::Secret>| async move {
+                    let unlock_secret = secret_opt.ok_or_else(|| {
+                        crate::error::custom_service_error(
+                            "Cannot unlock collection without a secret",
+                        )
+                    })?;
 
-        tracing::info!("Item `{}` deleted.", &self.path);
+                    // Unlock the collection
+                    coll.set_locked(false, Some(unlock_secret)).await?;
 
+                    // Now delete the item
+                    item_self.delete_unlocked(&coll).await?;
+
+                    Ok(zbus::zvariant::Value::new(OwnedObjectPath::default())
+                        .try_into_owned()
+                        .unwrap())
+                },
+            );
+
+            prompt.set_action(action).await;
+
+            // Register the prompt
+            self.service
+                .register_prompt(prompt_path.clone(), prompt.clone())
+                .await;
+
+            self.service
+                .object_server()
+                .at(&prompt_path, prompt)
+                .await?;
+
+            tracing::debug!(
+                "Delete prompt created at `{}` for locked item `{}`",
+                prompt_path,
+                self.path
+            );
+
+            return Ok(prompt_path);
+        }
+
+        // Item and collection are unlocked, proceed directly
+        self.delete_unlocked(&collection).await?;
         Ok(OwnedObjectPath::default())
     }
 
@@ -287,6 +333,25 @@ impl Item {
             self.path,
             if locked { "locked" } else { "unlocked" }
         );
+
+        Ok(())
+    }
+
+    async fn delete_unlocked(&self, collection: &Collection) -> Result<(), ServiceError> {
+        // Delete from keyring and collection's items list
+        collection.delete_item(&self.path).await?;
+
+        // Remove from object server
+        self.service
+            .object_server()
+            .remove::<Item, _>(&self.path)
+            .await?;
+
+        // Emit ItemDeleted signal
+        let signal_emitter = self.service.signal_emitter(&self.collection_path)?;
+        Collection::item_deleted(&signal_emitter, &self.path).await?;
+
+        tracing::info!("Item `{}` deleted.", &self.path);
 
         Ok(())
     }
@@ -735,6 +800,40 @@ mod tests {
             signal_result.is_ok(),
             "Should receive ItemChanged signal after secret change"
         );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn delete_locked_item_with_prompt() -> Result<(), Box<dyn std::error::Error>> {
+        let setup = TestServiceSetup::plain_session(true).await?;
+        let default_collection = setup.default_collection().await?;
+
+        let secret = oo7::Secret::text("test-password");
+        let dbus_secret = dbus::api::DBusSecret::new(Arc::clone(&setup.session), secret.clone());
+
+        let item = default_collection
+            .create_item("Test Item", &[("app", "test")], &dbus_secret, false, None)
+            .await?;
+
+        let items = default_collection.items().await?;
+        assert_eq!(items.len(), 1, "Should have one item");
+
+        let collection = setup
+            .server
+            .collection_from_path(default_collection.inner().path())
+            .await
+            .expect("Collection should exist");
+        collection
+            .set_locked(true, setup.keyring_secret.clone())
+            .await?;
+
+        assert!(item.is_locked().await?, "Item should be locked");
+
+        item.delete(None).await?;
+
+        let items = default_collection.items().await?;
+        assert_eq!(items.len(), 0, "Item should be deleted after prompt");
 
         Ok(())
     }

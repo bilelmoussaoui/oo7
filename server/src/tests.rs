@@ -44,6 +44,19 @@ pub(crate) struct TestServiceSetup {
 }
 
 impl TestServiceSetup {
+    /// Get the default/Login collection
+    pub(crate) async fn default_collection(
+        &self,
+    ) -> Result<&dbus::api::Collection<'static>, Box<dyn std::error::Error>> {
+        for collection in &self.collections {
+            let label = collection.label().await?;
+            if label == "Login" {
+                return Ok(collection);
+            }
+        }
+        Err("Default collection not found".into())
+    }
+
     pub(crate) async fn plain_session(
         with_default_collection: bool,
     ) -> Result<TestServiceSetup, Box<dyn std::error::Error>> {
