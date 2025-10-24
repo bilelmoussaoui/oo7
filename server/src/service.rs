@@ -35,7 +35,7 @@ const DEFAULT_COLLECTION_ALIAS_PATH: ObjectPath<'static> =
 #[derive(Debug, Default, Clone)]
 pub struct Service {
     // Properties
-    collections: Arc<Mutex<HashMap<OwnedObjectPath, Collection>>>,
+    pub(crate) collections: Arc<Mutex<HashMap<OwnedObjectPath, Collection>>>,
     // Other attributes
     connection: Arc<OnceLock<zbus::Connection>>,
     // sessions mapped to their corresponding object path on the bus
@@ -426,6 +426,16 @@ impl Service {
         service
             .initialize(connection, Some(default_keyring))
             .await?;
+
+        // Start PAM listener
+        tracing::info!("Starting PAM listener");
+        let pam_listener = crate::pam_listener::PamListener::new(service.clone());
+        tokio::spawn(async move {
+            if let Err(e) = pam_listener.start().await {
+                tracing::error!("PAM listener error: {}", e);
+            }
+        });
+
         Ok(())
     }
 

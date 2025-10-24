@@ -64,6 +64,7 @@ grcov coverage-raw/combined.info \
   --ignore-not-existing \
   --ignore "**/portal/*" \
   --ignore "**/cli/*" \
+  --ignore "**/pam/*" \
   --ignore "**/tests/*" \
   --ignore "**/examples/*" \
   --ignore "**/target/*"
@@ -78,6 +79,7 @@ grcov coverage-raw/combined.info \
   --ignore-not-existing \
   --ignore "**/portal/*" \
   --ignore "**/cli/*" \
+  --ignore "**/pam/*" \
   --ignore "**/tests/*" \
   --ignore "**/examples/*" \
   --ignore "**/target/*"

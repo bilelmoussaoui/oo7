@@ -1434,6 +1434,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "pam_oo7"
+version = "0.6.0"
+dependencies = [
+ "serde",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "zeroize",
+ "zvariant",
+]
+
+[[package]]
 name = "parking"
 version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -1,0 +1,26 @@
+[package]
+name = "pam_oo7"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+description = "PAM module for oo7 Secret Service integration"
+
+[lib]
+name = "pam_oo7"
+crate-type = ["cdylib"]
+
+[dependencies]
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "net", "io-util", "sync", "time"] }
+serde = { workspace = true }
+zvariant = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+zeroize = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "net", "io-util", "sync", "time", "macros"] }

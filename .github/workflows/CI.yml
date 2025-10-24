@@ -46,6 +46,10 @@ jobs:
         run: |
           cargo build --manifest-path ./server/Cargo.toml --no-default-features --features openssl_crypto
 
+      - name: Build PAM
+        run: |
+          cargo build --manifest-path ./pam/Cargo.toml
+
       - name: Build Portal
         run: |
           cargo build --manifest-path ./portal/Cargo.toml
@@ -127,4 +131,7 @@ jobs:
         run: meson setup ./ _build --prefix /usr && ninja -C _build
       - name: Build (server)
         working-directory: ./server
+        run: meson setup ./ _build --prefix /usr && ninja -C _build
+      - name: Build (PAM)
+        working-directory: ./pam
         run: meson setup ./ _build --prefix /usr && ninja -C _build
