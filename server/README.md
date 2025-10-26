@@ -28,6 +28,31 @@ encrypted home with [systemd-homed](https://systemd.io/HOME_DIRECTORY/).
 
 See the manual page `systemd.exec(5)` for more details.
 
+## Debugging and Logs
+
+When running `oo7-daemon` as a systemd user service, logs can be viewed using `journalctl`:
+
+```sh
+journalctl -b -u oo7-daemon --user
+```
+
+The daemon supports verbose logging via the `--verbose` flag, which enables debug-level logs:
+
+```sh
+# Edit the service file to add --verbose
+systemctl --user edit oo7-daemon.service
+```
+
+PAM module logs are also available in the system journal and can be filtered:
+
+```sh
+# View all logs from the current session (includes PAM module)
+journalctl -b --user
+
+# Search for PAM-related entries
+journalctl -b --user | grep pam_oo7
+```
+
 ## License
 
 The project is released under the MIT license.
