@@ -529,12 +529,8 @@ impl Collection {
     }
 
     pub async fn dispatch_items(&self) -> Result<(), Error> {
-        if self.is_locked().await {
-            return Ok(());
-        }
-
-        let keyring = self.keyring.read().await;
-        let keyring = keyring.as_ref().unwrap().as_unlocked();
+        let keyring_guard = self.keyring.read().await;
+        let keyring = keyring_guard.as_ref().unwrap();
 
         let keyring_items = keyring.items().await?;
         let mut items = self.items.lock().await;

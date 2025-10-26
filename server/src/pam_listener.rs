@@ -143,7 +143,6 @@ impl PamListener {
 
                 // Try to unlock with the provided secret
                 if let Err(e) = collection.set_locked(false, Some(secret.clone())).await {
-                    collection.dispatch_items().await?;
                     tracing::debug!("Failed to unlock collection {}: {}", collection.path(), e);
                 } else {
                     tracing::info!("Unlocked collection: {}", collection.path());
