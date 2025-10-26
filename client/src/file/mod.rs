@@ -10,7 +10,10 @@
 //!     .await?;
 //!
 //! let items = keyring.search_items(&[("account", "alice")]).await?;
-//! assert_eq!(items[0].secret(), oo7::Secret::blob("My Password"));
+//! assert_eq!(
+//!     items[0].as_unlocked().secret(),
+//!     oo7::Secret::blob("My Password")
+//! );
 //!
 //! keyring.delete(&[("account", "alice")]).await?;
 //! #   Ok(())
