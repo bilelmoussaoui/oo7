@@ -492,9 +492,22 @@ impl Collection {
                         custom_service_error("Cannot unlock collection without a secret")
                     })?;
 
-                    let unlocked = locked_kr.unlock(secret).await.map_err(|err| {
-                        custom_service_error(&format!("Failed to unlock keyring: {err}"))
-                    })?;
+                    let keyring_path = locked_kr.path().map(|p| p.to_path_buf());
+
+                    let unlocked = match locked_kr.unlock(secret).await {
+                        Ok(unlocked) => unlocked,
+                        Err(err) => {
+                            // Reload the locked keyring from disk before returning error
+                            if let Some(path) = keyring_path {
+                                if let Ok(reloaded) = oo7::file::LockedKeyring::load(&path).await {
+                                    *keyring_guard = Some(Keyring::Locked(reloaded));
+                                }
+                            }
+                            return Err(custom_service_error(&format!(
+                                "Failed to unlock keyring: {err}"
+                            )));
+                        }
+                    };
 
                     let items = self.items.lock().await;
                     for item in items.iter() {
