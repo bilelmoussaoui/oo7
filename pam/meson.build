@@ -10,6 +10,8 @@ is_devel = get_option('profile') == 'development'
 prefix = get_option('prefix')
 libdir = get_option('libdir')
 
+dependency('pam')
+
 # PAM modules directory
 pam_moduledir = get_option('pam_moduledir')
 if pam_moduledir == ''
