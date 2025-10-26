@@ -1,6 +1,6 @@
 [package]
 name = "oo7-daemon"
-authors = ["Dhanuka Warusadura"]
+authors = ["Bilal Elmoussaoui", "Dhanuka Warusadura"]
 edition.workspace = true
 exclude.workspace = true
 homepage.workspace = true
