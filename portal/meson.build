@@ -2,7 +2,7 @@ project(
   'oo7-portal',
   'rust',
   version: '0.1.0',
-  meson_version: '>= 0.61.0',
+  meson_version: '>= 1.7',
 )
 
 dbus_name = 'org.freedesktop.impl.portal.desktop.oo7'
