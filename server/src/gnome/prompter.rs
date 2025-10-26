@@ -22,38 +22,49 @@ use crate::{
 /// See: https://gitlab.gnome.org/GNOME/gcr/-/merge_requests/169
 mod double_value_optional {
     use serde::ser::SerializeStruct;
+    use zvariant::DynamicType;
 
     use super::*;
 
-    struct DoubleValueSerialize<'a, T: Type + serde::Serialize>(pub &'a Option<T>);
+    struct DoubleValueSerialize<'a, T: Type + serde::Serialize + DynamicType>(pub &'a Option<T>);
 
-    impl<T: Type + serde::Serialize> serde::Serialize for DoubleValueSerialize<'_, T> {
+    impl<T: Type + serde::Serialize + DynamicType> serde::Serialize for DoubleValueSerialize<'_, T> {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
         {
-            struct InnerVariant<'a, U: Type + serde::Serialize>(&'a Option<U>);
+            match self.0 {
+                Some(v) => {
+                    struct InnerVariant<'a, U: Type + serde::Serialize + DynamicType>(&'a U);
 
-            impl<U: Type + serde::Serialize> serde::Serialize for InnerVariant<'_, U> {
-                fn serialize<S2>(&self, serializer: S2) -> Result<S2::Ok, S2::Error>
-                where
-                    S2: serde::Serializer,
-                {
-                    as_value::optional::serialize(self.0, serializer)
+                    impl<U: Type + serde::Serialize + DynamicType> serde::Serialize for InnerVariant<'_, U> {
+                        fn serialize<S2>(&self, serializer: S2) -> Result<S2::Ok, S2::Error>
+                        where
+                            S2: serde::Serializer,
+                        {
+                            // Serialize as a Variant containing the value
+                            let mut inner_structure = serializer.serialize_struct("Variant", 2)?;
+                            let sig = self.0.signature().to_string();
+                            inner_structure.serialize_field("signature", &sig)?;
+                            inner_structure.serialize_field("value", self.0)?;
+                            inner_structure.end()
+                        }
+                    }
+
+                    let mut outer_structure = serializer.serialize_struct("Variant", 2)?;
+                    outer_structure.serialize_field("signature", "v")?;
+                    outer_structure.serialize_field("value", &InnerVariant(v))?;
+                    outer_structure.end()
                 }
+                None => serializer.serialize_none(),
             }
-
-            let mut outer_structure = serializer.serialize_struct("Variant", 2)?;
-            outer_structure.serialize_field("signature", "v")?;
-            outer_structure.serialize_field("value", &InnerVariant(self.0))?;
-            outer_structure.end()
         }
     }
 
     pub fn serialize<S, T>(value: &Option<T>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
-        T: serde::Serialize + zvariant::Type,
+        T: serde::Serialize + zvariant::Type + DynamicType,
     {
         DoubleValueSerialize(value).serialize(serializer)
     }
