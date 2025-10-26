@@ -21,53 +21,7 @@ use crate::{
 ///
 /// See: https://gitlab.gnome.org/GNOME/gcr/-/merge_requests/169
 mod double_value_optional {
-    use serde::ser::SerializeStruct;
-    use zvariant::DynamicType;
-
     use super::*;
-
-    struct DoubleValueSerialize<'a, T: Type + serde::Serialize + DynamicType>(pub &'a Option<T>);
-
-    impl<T: Type + serde::Serialize + DynamicType> serde::Serialize for DoubleValueSerialize<'_, T> {
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer,
-        {
-            match self.0 {
-                Some(v) => {
-                    struct InnerVariant<'a, U: Type + serde::Serialize + DynamicType>(&'a U);
-
-                    impl<U: Type + serde::Serialize + DynamicType> serde::Serialize for InnerVariant<'_, U> {
-                        fn serialize<S2>(&self, serializer: S2) -> Result<S2::Ok, S2::Error>
-                        where
-                            S2: serde::Serializer,
-                        {
-                            // Serialize as a Variant containing the value
-                            let mut inner_structure = serializer.serialize_struct("Variant", 2)?;
-                            let sig = self.0.signature().to_string();
-                            inner_structure.serialize_field("signature", &sig)?;
-                            inner_structure.serialize_field("value", self.0)?;
-                            inner_structure.end()
-                        }
-                    }
-
-                    let mut outer_structure = serializer.serialize_struct("Variant", 2)?;
-                    outer_structure.serialize_field("signature", "v")?;
-                    outer_structure.serialize_field("value", &InnerVariant(v))?;
-                    outer_structure.end()
-                }
-                None => serializer.serialize_none(),
-            }
-        }
-    }
-
-    pub fn serialize<S, T>(value: &Option<T>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-        T: serde::Serialize + zvariant::Type + DynamicType,
-    {
-        DoubleValueSerialize(value).serialize(serializer)
-    }
 
     pub fn deserialize<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
     where
@@ -98,49 +52,57 @@ mod double_value_optional {
 // GcrPrompt properties <https://gitlab.gnome.org/GNOME/gcr/-/blob/main/gcr/gcr-prompt.c#L95>
 pub struct Properties {
     #[serde(
-        with = "double_value_optional",
+        serialize_with = "as_value::optional::serialize",
+        deserialize_with = "double_value_optional::deserialize",
         skip_serializing_if = "Option::is_none",
         default
     )]
     title: Option<String>,
     #[serde(
-        with = "double_value_optional",
+        serialize_with = "as_value::optional::serialize",
+        deserialize_with = "double_value_optional::deserialize",
         skip_serializing_if = "Option::is_none",
         default
     )]
     message: Option<String>,
     #[serde(
-        with = "double_value_optional",
+        serialize_with = "as_value::optional::serialize",
+        deserialize_with = "double_value_optional::deserialize",
         skip_serializing_if = "Option::is_none",
         default
     )]
     description: Option<String>,
     #[serde(
-        with = "double_value_optional",
+        serialize_with = "as_value::optional::serialize",
+        deserialize_with = "double_value_optional::deserialize",
         skip_serializing_if = "Option::is_none",
         default
     )]
     warning: Option<String>,
     #[serde(
-        with = "double_value_optional",
+        serialize_with = "as_value::optional::serialize",
+        deserialize_with = "double_value_optional::deserialize",
         skip_serializing_if = "Option::is_none",
         default
     )]
     password_new: Option<bool>,
     #[serde(
-        with = "double_value_optional",
+        serialize_with = "as_value::optional::serialize",
+        deserialize_with = "double_value_optional::deserialize",
         skip_serializing_if = "Option::is_none",
         default
     )]
     password_strength: Option<i32>,
     #[serde(
-        with = "double_value_optional",
+        serialize_with = "as_value::optional::serialize",
+        deserialize_with = "double_value_optional::deserialize",
         skip_serializing_if = "Option::is_none",
         default
     )]
     choice_label: Option<String>,
     #[serde(
-        with = "double_value_optional",
+        serialize_with = "as_value::optional::serialize",
+        deserialize_with = "double_value_optional::deserialize",
         skip_serializing_if = "Option::is_none",
         default
     )]
@@ -152,13 +114,15 @@ pub struct Properties {
     )]
     caller_window: Option<WindowIdentifierType>,
     #[serde(
-        with = "double_value_optional",
+        serialize_with = "as_value::optional::serialize",
+        deserialize_with = "double_value_optional::deserialize",
         skip_serializing_if = "Option::is_none",
         default
     )]
     continue_label: Option<String>,
     #[serde(
-        with = "double_value_optional",
+        serialize_with = "as_value::optional::serialize",
+        deserialize_with = "double_value_optional::deserialize",
         skip_serializing_if = "Option::is_none",
         default
     )]
