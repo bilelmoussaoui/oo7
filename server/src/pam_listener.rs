@@ -135,6 +135,12 @@ impl PamListener {
     }
 
     async fn try_unlock_collections(&self, secret: &Secret) -> Result<(), Error> {
+        // First, try to migrate any pending v0 keyrings
+        let migrated = self.service.migrate_pending_keyrings(secret).await;
+        if !migrated.is_empty() {
+            tracing::info!("Migrated {} v0 keyring(s): {:?}", migrated.len(), migrated);
+        }
+
         let collections = self.service.collections.lock().await;
 
         for (_path, collection) in collections.iter() {

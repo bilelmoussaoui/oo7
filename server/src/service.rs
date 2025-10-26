@@ -46,6 +46,10 @@ pub struct Service {
     prompt_index: Arc<RwLock<u32>>,
     // pending collection creations: prompt_path -> (label, alias)
     pending_collections: Arc<Mutex<HashMap<OwnedObjectPath, (String, String)>>>,
+    // pending v0 keyring migrations: name -> (path, label, alias)
+    #[allow(clippy::type_complexity)]
+    pub(crate) pending_migrations:
+        Arc<Mutex<HashMap<String, (std::path::PathBuf, String, String)>>>,
 }
 
 #[zbus::interface(name = "org.freedesktop.Secret.Service")]
@@ -554,10 +558,16 @@ impl Service {
             }
         }
 
-        if discovered.is_empty() {
+        let pending_count = self.pending_migrations.lock().await.len();
+
+        if discovered.is_empty() && pending_count == 0 {
             tracing::info!("No keyrings discovered in data directory");
         } else {
-            tracing::info!("Discovered {} keyring(s)", discovered.len());
+            tracing::info!(
+                "Discovered {} keyring(s), {} pending v0 migration(s)",
+                discovered.len(),
+                pending_count
+            );
         }
 
         Ok(discovered)
@@ -578,29 +588,6 @@ impl Service {
             name.to_owned()
         };
 
-        // Try to unlock with the provided secret, if any
-        let keyring = if let Some(secret) = secret {
-            let locked_keyring = LockedKeyring::load(path).await?;
-            match locked_keyring.unlock(secret.clone()).await {
-                Ok(unlocked) => {
-                    tracing::info!("Unlocked keyring '{}' from {:?}", name, path);
-                    Keyring::Unlocked(unlocked)
-                }
-                Err(e) => {
-                    tracing::warn!(
-                        "Failed to unlock keyring '{}' with provided secret: {}. Keeping it locked.",
-                        name,
-                        e
-                    );
-                    // Reload as locked since unlock consumed it
-                    Keyring::Locked(LockedKeyring::load(path).await?)
-                }
-            }
-        } else {
-            tracing::debug!("No secret provided, keeping keyring '{}' locked", name);
-            Keyring::Locked(LockedKeyring::load(path).await?)
-        };
-
         // Use name as label (capitalized for consistency with Login)
         let label = if name == "login" {
             "Login".to_owned()
@@ -610,6 +597,81 @@ impl Service {
             match chars.next() {
                 None => String::new(),
                 Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+            }
+        };
+
+        // Try to load the keyring
+        let keyring = match LockedKeyring::load(path).await {
+            Ok(locked_keyring) => {
+                // Successfully loaded as v1 keyring
+                if let Some(secret) = secret {
+                    match locked_keyring.unlock(secret.clone()).await {
+                        Ok(unlocked) => {
+                            tracing::info!("Unlocked keyring '{}' from {:?}", name, path);
+                            Keyring::Unlocked(unlocked)
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                "Failed to unlock keyring '{}' with provided secret: {}. Keeping it locked.",
+                                name,
+                                e
+                            );
+                            // Reload as locked since unlock consumed it
+                            Keyring::Locked(LockedKeyring::load(path).await?)
+                        }
+                    }
+                } else {
+                    tracing::debug!("No secret provided, keeping keyring '{}' locked", name);
+                    Keyring::Locked(locked_keyring)
+                }
+            }
+            Err(oo7::file::Error::VersionMismatch(Some(version)))
+                if version.first() == Some(&0) =>
+            // v0 is the legacy version
+            {
+                // This is a v0 keyring that needs migration
+                tracing::info!(
+                    "Found legacy v0 keyring '{}' at {:?}, registering for migration",
+                    name,
+                    path
+                );
+
+                if let Some(secret) = secret {
+                    tracing::debug!("Attempting immediate migration of v0 keyring '{}'", name);
+                    match UnlockedKeyring::open(name, secret.clone()).await {
+                        Ok(unlocked) => {
+                            tracing::info!("Successfully migrated v0 keyring '{}' to v1", name);
+                            Keyring::Unlocked(unlocked)
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                "Failed to migrate v0 keyring '{}': {}. Will retry when secret is available.",
+                                name,
+                                e
+                            );
+                            self.pending_migrations.lock().await.insert(
+                                name.to_owned(),
+                                (path.to_path_buf(), label.clone(), alias.clone()),
+                            );
+                            return Err(e.into());
+                        }
+                    }
+                } else {
+                    tracing::debug!(
+                        "No secret available for v0 keyring '{}', registering for pending migration",
+                        name
+                    );
+                    self.pending_migrations.lock().await.insert(
+                        name.to_owned(),
+                        (path.to_path_buf(), label.clone(), alias.clone()),
+                    );
+                    return Err(Error::IO(std::io::Error::other(
+                        "v0 keyring requires migration, no secret available",
+                    )));
+                }
+            }
+            Err(e) => {
+                return Err(e.into());
             }
         };
 
@@ -955,6 +1017,118 @@ impl Service {
             .map(|(parent, _)| parent)?;
         self.collection_from_path(&ObjectPath::try_from(path).unwrap())
             .await
+    }
+
+    /// Attempt to migrate pending v0 keyrings with the provided secret
+    /// Returns a list of successfully migrated keyring names
+    pub async fn migrate_pending_keyrings(&self, secret: &Secret) -> Vec<String> {
+        let mut migrated = Vec::new();
+        let mut pending = self.pending_migrations.lock().await;
+        let mut to_remove = Vec::new();
+
+        for (name, (path, label, alias)) in pending.iter() {
+            tracing::debug!("Attempting to migrate pending v0 keyring: {}", name);
+
+            match UnlockedKeyring::open(name, secret.clone()).await {
+                Ok(unlocked) => {
+                    tracing::info!("Successfully migrated v0 keyring '{}' to v1", name);
+
+                    // Write the migrated keyring to disk
+                    match unlocked.write().await {
+                        Ok(_) => {
+                            tracing::info!("Wrote migrated keyring '{}' to disk", name);
+
+                            // Remove the v0 keyring file after successful migration
+                            if let Err(e) = tokio::fs::remove_file(path).await {
+                                tracing::warn!("Failed to remove v0 keyring at {:?}: {}", path, e);
+                            } else {
+                                tracing::info!("Removed v0 keyring file at {:?}", path);
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                "Failed to write migrated keyring '{}' to disk: {}",
+                                name,
+                                e
+                            );
+                            continue;
+                        }
+                    }
+
+                    // Create a collection for this migrated keyring
+                    let keyring = Keyring::Unlocked(unlocked);
+                    let collection = Collection::new(label, alias, self.clone(), keyring);
+                    let collection_path: OwnedObjectPath = collection.path().to_owned().into();
+
+                    // Dispatch items
+                    if let Err(e) = collection.dispatch_items().await {
+                        tracing::error!(
+                            "Failed to dispatch items for migrated keyring '{}': {}",
+                            name,
+                            e
+                        );
+                        continue;
+                    }
+
+                    if let Err(e) = self
+                        .object_server()
+                        .at(collection.path(), collection.clone())
+                        .await
+                    {
+                        tracing::error!(
+                            "Failed to register migrated collection '{}' with object server: {}",
+                            name,
+                            e
+                        );
+                        continue;
+                    }
+
+                    self.collections
+                        .lock()
+                        .await
+                        .insert(collection_path.clone(), collection.clone());
+
+                    if alias == oo7::dbus::Service::DEFAULT_COLLECTION {
+                        if let Err(e) = self
+                            .object_server()
+                            .at(DEFAULT_COLLECTION_ALIAS_PATH, collection)
+                            .await
+                        {
+                            tracing::error!(
+                                "Failed to register default alias for migrated collection '{}': {}",
+                                name,
+                                e
+                            );
+                        }
+                    }
+
+                    if let Ok(signal_emitter) =
+                        self.signal_emitter(oo7::dbus::api::Service::PATH.as_ref().unwrap())
+                    {
+                        let _ =
+                            Service::collection_created(&signal_emitter, &collection_path).await;
+                        let _ = self.collections_changed(&signal_emitter).await;
+                    }
+
+                    tracing::info!("Migrated keyring '{}' added as collection", name);
+                    migrated.push(name.clone());
+                    to_remove.push(name.clone());
+                }
+                Err(e) => {
+                    tracing::debug!(
+                        "Failed to migrate v0 keyring '{}' with provided secret: {}",
+                        name,
+                        e
+                    );
+                }
+            }
+        }
+
+        for name in &to_remove {
+            pending.remove(name);
+        }
+
+        migrated
     }
 }
 
