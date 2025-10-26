@@ -239,6 +239,12 @@ impl UnlockedKeyring {
         item.unlock(&key)
     }
 
+    /// Get the encryption key for this keyring.
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self)))]
+    pub async fn key(&self) -> Result<Arc<Key>, crate::crypto::Error> {
+        self.derive_key().await
+    }
+
     /// Return the associated file if any.
     pub fn path(&self) -> Option<&std::path::Path> {
         self.path.as_deref()
