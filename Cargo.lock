@@ -1364,6 +1364,7 @@ dependencies = [
  "openssl",
  "rpassword",
  "serde",
+ "serde_repr",
  "sha2",
  "tokio",
  "tokio-stream",
@@ -1379,6 +1380,7 @@ version = "0.6.0"
 dependencies = [
  "libc",
  "serde",
+ "serde_repr",
  "tempfile",
  "tokio",
  "tracing",

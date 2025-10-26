@@ -4,9 +4,15 @@ use std::os::raw::{c_char, c_int, c_void};
 pub const PAM_SUCCESS: c_int = 0;
 pub const PAM_SYSTEM_ERR: c_int = 4;
 pub const PAM_AUTHTOK_RECOVER_ERR: c_int = 20;
+pub const PAM_IGNORE: c_int = 25;
 
 // PAM item types
 pub const PAM_AUTHTOK: c_int = 6;
+pub const PAM_OLDAUTHTOK: c_int = 7;
+
+// PAM chauthtok flags
+pub const PAM_PRELIM_CHECK: c_int = 0x1;
+pub const PAM_UPDATE_AUTHTOK: c_int = 0x2;
 
 // Opaque PAM handle type
 #[repr(C)]

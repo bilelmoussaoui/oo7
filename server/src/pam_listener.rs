@@ -4,6 +4,7 @@ use std::{os::unix::fs::PermissionsExt, path::PathBuf, sync::Arc};
 
 use oo7::Secret;
 use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use tokio::{
     io::AsyncReadExt,
     net::{UnixListener, UnixStream},
@@ -17,10 +18,20 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{Service, error::Error};
 
+#[derive(Debug, Clone, Copy, Serialize_repr, Deserialize_repr, Type, PartialEq, Eq)]
+#[repr(u8)]
+enum PamOperation {
+    Unlock = 0,
+    ChangePassword = 1,
+}
+
 #[derive(Debug, Serialize, Deserialize, Type, Zeroize, ZeroizeOnDrop)]
 struct PamMessage {
+    #[zeroize(skip)]
+    operation: PamOperation,
     username: String,
-    secret: Vec<u8>,
+    old_secret: Vec<u8>,
+    new_secret: Vec<u8>,
 }
 
 impl PamMessage {
@@ -105,29 +116,74 @@ impl PamListener {
         let message = PamMessage::from_bytes(&message_bytes)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
 
-        tracing::info!("Received PAM authentication for user: {}", message.username);
-        tracing::debug!("Received secret of length {} bytes", message.secret.len());
+        match message.operation {
+            PamOperation::Unlock => {
+                tracing::info!("Received unlock request for user: {}", message.username);
+                tracing::debug!(
+                    "Received secret of length {} bytes",
+                    message.new_secret.len()
+                );
 
-        let secret = Secret::from(message.secret.to_vec());
-        self.user_secrets
-            .write()
-            .await
-            .insert(message.username.clone(), secret.clone());
+                let secret = Secret::from(message.new_secret.to_vec());
+                self.user_secrets
+                    .write()
+                    .await
+                    .insert(message.username.clone(), secret.clone());
 
-        // Try to unlock the default collection with this secret
-        match self.try_unlock_collections(&secret).await {
-            Ok(_) => {
+                match self.try_unlock_collections(&secret).await {
+                    Ok(_) => {
+                        tracing::info!(
+                            "Successfully unlocked collections for user: {}",
+                            message.username
+                        );
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Failed to unlock collections for user {}: {}",
+                            message.username,
+                            e
+                        );
+                    }
+                }
+            }
+            PamOperation::ChangePassword => {
                 tracing::info!(
-                    "Successfully unlocked collections for user: {}",
+                    "Received password change request for user: {}",
                     message.username
                 );
-            }
-            Err(e) => {
-                tracing::warn!(
-                    "Failed to unlock collections for user {}: {}",
-                    message.username,
-                    e
+                tracing::debug!(
+                    "Old secret: {} bytes, new secret: {} bytes",
+                    message.old_secret.len(),
+                    message.new_secret.len()
                 );
+
+                let old_secret = Secret::from(message.old_secret.to_vec());
+                let new_secret = Secret::from(message.new_secret.to_vec());
+
+                match self
+                    .change_collection_passwords(&old_secret, &new_secret)
+                    .await
+                {
+                    Ok(changed_count) => {
+                        tracing::info!(
+                            "Successfully changed password for {} collection(s) for user: {}",
+                            changed_count,
+                            message.username
+                        );
+                        // Update stored secret
+                        self.user_secrets
+                            .write()
+                            .await
+                            .insert(message.username.clone(), new_secret);
+                    }
+                    Err(e) => {
+                        tracing::error!(
+                            "Failed to change password for user {}: {}",
+                            message.username,
+                            e
+                        );
+                    }
+                }
             }
         }
 
@@ -157,6 +213,110 @@ impl PamListener {
         }
 
         Ok(())
+    }
+
+    /// Change password for all collections that match the old password
+    async fn change_collection_passwords(
+        &self,
+        old_secret: &Secret,
+        new_secret: &Secret,
+    ) -> Result<usize, Error> {
+        let collections = self.service.collections.lock().await;
+        let mut changed_count = 0;
+
+        for (path, collection) in collections.iter() {
+            // Skip session collection (it's temporary and doesn't persist)
+            if collection.alias().await == oo7::dbus::Service::SESSION_COLLECTION {
+                tracing::debug!("Skipping session collection: {}", path);
+                continue;
+            }
+
+            // Get the keyring from the collection
+            let keyring_guard = collection.keyring.read().await;
+            let Some(keyring) = keyring_guard.as_ref() else {
+                tracing::debug!("Collection {} has no keyring", path);
+                continue;
+            };
+
+            // Track if we unlocked the collection (so we can re-lock it after)
+            let was_locked = matches!(keyring, oo7::file::Keyring::Locked(_));
+
+            // Check if the keyring is locked and unlock if needed
+            if was_locked {
+                // Try to unlock with old password first
+                tracing::debug!(
+                    "Collection {} is locked, attempting to unlock with old password",
+                    path
+                );
+                drop(keyring_guard);
+
+                if let Err(e) = collection.set_locked(false, Some(old_secret.clone())).await {
+                    tracing::warn!(
+                        "Failed to unlock collection {} with old password: {}",
+                        path,
+                        e
+                    );
+                    continue;
+                }
+            } else {
+                drop(keyring_guard);
+            }
+
+            // Re-acquire the lock to get the unlocked keyring
+            let keyring_guard = collection.keyring.read().await;
+            let Some(oo7::file::Keyring::Unlocked(uk)) = keyring_guard.as_ref() else {
+                tracing::warn!("Collection {} is not unlocked", path);
+                continue;
+            };
+
+            // Validate that the old password can decrypt items in the keyring
+            let can_decrypt = match uk.validate_secret(old_secret).await {
+                Ok(valid) => valid,
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to validate old password for collection {}: {}",
+                        path,
+                        e
+                    );
+                    continue;
+                }
+            };
+
+            if !can_decrypt {
+                tracing::debug!(
+                    "Old password does not match keyring {} password, skipping",
+                    path
+                );
+                continue;
+            }
+
+            // Change the keyring password
+            match uk.change_secret(new_secret.clone()).await {
+                Ok(_) => {
+                    tracing::info!("Successfully changed password for collection: {}", path);
+                    changed_count += 1;
+
+                    // Re-lock the collection if it was locked before we unlocked it
+                    drop(keyring_guard);
+                    if was_locked {
+                        if let Err(e) = collection.set_locked(true, None).await {
+                            tracing::warn!(
+                                "Failed to re-lock collection {} after password change: {}",
+                                path,
+                                e
+                            );
+                        } else {
+                            tracing::debug!("Re-locked collection: {}", path);
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Failed to change password for collection {}: {}", path, e);
+                }
+            }
+        }
+
+        Ok(changed_count)
     }
 }
 

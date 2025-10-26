@@ -156,11 +156,7 @@ async fn send_secret_to_daemon_async(
 
     tracing::debug!("Connected to daemon socket");
 
-    tracing::debug!(
-        "Sending secret of length {} bytes for user {}",
-        message.secret.len(),
-        message.username
-    );
+    tracing::debug!("Sending message for user {}", message.username);
     let message_bytes = Zeroizing::new(message.to_bytes().map_err(SocketError::Serialize)?);
 
     let length = message_bytes.len() as u32;
@@ -212,15 +208,12 @@ mod tests {
 
             let message = PamMessage::from_bytes(&message_bytes).unwrap();
             assert_eq!(message.username, "testuser");
-            assert_eq!(message.secret, b"testpassword");
+            assert_eq!(message.new_secret, b"testpassword");
         });
 
         tokio::time::sleep(Duration::from_millis(100)).await;
 
-        let message = PamMessage {
-            username: "testuser".to_string(),
-            secret: b"testpassword".to_vec(),
-        };
+        let message = PamMessage::unlock("testuser".to_string(), b"testpassword".to_vec());
 
         let result = send_secret_to_daemon_async(message, 1000, false).await;
         assert!(result.is_ok());
