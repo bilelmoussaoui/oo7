@@ -125,7 +125,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - name: Install dependencies
-        run: dnf install -y git meson gcc systemd
+        run: dnf install -y git meson gcc systemd pam-devel
       - name: Build (portal)
         working-directory: ./portal
         run: meson setup ./ _build --prefix /usr && ninja -C _build
