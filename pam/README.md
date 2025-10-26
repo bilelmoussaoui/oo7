@@ -59,14 +59,25 @@ auth       required     pam_unix.so
 auth       optional     pam_oo7.so
 account    required     pam_unix.so
 password   required     pam_unix.so
+password   optional     pam_oo7.so
 session    required     pam_unix.so
 session    optional     pam_oo7.so auto_start
 session    optional     pam_systemd.so
 ```
 
-**Important**: The module must be added to both `auth` and `session` stacks:
-- `auth` stack: Captures and stashes the password
-- `session` stack: Retrieves the password and sends it to the daemon
+**Important**: The module should be added to three PAM stacks:
+- `auth` stack: Captures and stashes the password during authentication
+- `session` stack: Retrieves the stashed password and sends it to the daemon for keyring unlocking
+- `password` stack: Intercepts password changes and updates the keyring password to match
+
+#### Password Change Support
+
+When added to the `password` stack, the module will automatically update your keyring passwords when you change your user password (e.g., using `passwd` command). This ensures your keyrings remain accessible after password changes.
+
+The module intercepts the password change operation:
+1. Captures both the old and new passwords
+2. Sends them to the daemon
+3. The daemon validates the old password and re-encrypts all matching keyrings with the new password
 
 ## Configuration
 

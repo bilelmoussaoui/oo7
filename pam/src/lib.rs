@@ -15,7 +15,10 @@ use std::{
 use zeroize::Zeroizing;
 
 use crate::{
-    ffi::{PAM_AUTHTOK, PAM_AUTHTOK_RECOVER_ERR, PAM_SUCCESS, PAM_SYSTEM_ERR, pam_handle_t},
+    ffi::{
+        PAM_AUTHTOK, PAM_AUTHTOK_RECOVER_ERR, PAM_IGNORE, PAM_OLDAUTHTOK, PAM_PRELIM_CHECK,
+        PAM_SUCCESS, PAM_SYSTEM_ERR, PAM_UPDATE_AUTHTOK, pam_handle_t,
+    },
     protocol::PamMessage,
     socket::send_secret_to_daemon,
 };
@@ -42,18 +45,30 @@ unsafe fn get_user(pamh: *mut pam_handle_t) -> Result<String, c_int> {
 
 /// Get the authentication token from PAM
 unsafe fn get_auth_token(pamh: *mut pam_handle_t) -> Result<Zeroizing<Vec<u8>>, c_int> {
+    unsafe { get_auth_token_internal(pamh, PAM_AUTHTOK, "PAM_AUTHTOK") }
+}
+
+/// Get the old authentication token from PAM (for password changes)
+unsafe fn get_old_auth_token(pamh: *mut pam_handle_t) -> Result<Zeroizing<Vec<u8>>, c_int> {
+    unsafe { get_auth_token_internal(pamh, PAM_OLDAUTHTOK, "PAM_OLDAUTHTOK") }
+}
+
+unsafe fn get_auth_token_internal(
+    pamh: *mut pam_handle_t,
+    item_type: c_int,
+    item_name: &str,
+) -> Result<Zeroizing<Vec<u8>>, c_int> {
     let mut authtok_ptr: *const std::os::raw::c_void = std::ptr::null();
 
-    // Use pam_get_item to get PAM_AUTHTOK (just like pam_gnome_keyring does)
-    let ret = unsafe { ffi::pam_get_item(pamh, PAM_AUTHTOK, &mut authtok_ptr) };
+    let ret = unsafe { ffi::pam_get_item(pamh, item_type, &mut authtok_ptr) };
 
     if ret != PAM_SUCCESS {
-        tracing::debug!("pam_get_item returned error: {}", ret);
+        tracing::debug!("pam_get_item({}) returned error: {}", item_name, ret);
         return Err(ret);
     }
 
     if authtok_ptr.is_null() {
-        tracing::debug!("PAM_AUTHTOK is null (password not available)");
+        tracing::debug!("{} is null (password not available)", item_name);
         return Err(PAM_SYSTEM_ERR);
     }
 
@@ -62,7 +77,8 @@ unsafe fn get_auth_token(pamh: *mut pam_handle_t) -> Result<Zeroizing<Vec<u8>>, 
     let password_bytes = password_cstr.to_bytes().to_vec();
 
     tracing::debug!(
-        "Captured auth token of length {} bytes",
+        "Captured {} of length {} bytes",
+        item_name,
         password_bytes.len()
     );
 
@@ -258,10 +274,7 @@ pub unsafe extern "C" fn pam_sm_open_session(
         }
     };
 
-    let message = PamMessage {
-        username: username.clone(),
-        secret: password.to_vec(),
-    };
+    let message = PamMessage::unlock(username.clone(), password.to_vec());
 
     // Send the secret to the oo7 daemon
     std::thread::spawn(
@@ -294,11 +307,100 @@ pub extern "C" fn pam_sm_close_session(
 
 /// PAM password change entry point
 #[unsafe(no_mangle)]
-pub extern "C" fn pam_sm_chauthtok(
-    _pamh: *mut pam_handle_t,
-    _flags: c_int,
+#[allow(clippy::missing_safety_doc)]
+pub unsafe extern "C" fn pam_sm_chauthtok(
+    pamh: *mut pam_handle_t,
+    flags: c_int,
     _argc: c_int,
     _argv: *mut *const c_char,
 ) -> c_int {
-    PAM_SUCCESS
+    if let Ok(layer) = tracing_journald::layer() {
+        use tracing_subscriber::layer::SubscriberExt;
+        let subscriber = tracing_subscriber::registry().with(layer);
+        let _ = tracing::subscriber::set_global_default(subscriber);
+    }
+
+    if flags & PAM_PRELIM_CHECK != 0 {
+        tracing::debug!("PAM_PRELIM_CHECK phase for password change");
+        return PAM_IGNORE;
+    }
+
+    if flags & PAM_UPDATE_AUTHTOK != 0 {
+        tracing::debug!("PAM_UPDATE_AUTHTOK phase for password change");
+
+        let username = match unsafe { get_user(pamh) } {
+            Ok(user) => user,
+            Err(ret) => {
+                tracing::error!("Failed to get username during password change");
+                return ret;
+            }
+        };
+
+        let user_uid = match get_user_uid(&username) {
+            Some(uid) => uid,
+            None => {
+                tracing::error!("Failed to get UID for user: {}", username);
+                return PAM_SYSTEM_ERR;
+            }
+        };
+
+        let old_password = match unsafe { get_old_auth_token(pamh) } {
+            Ok(pass) => pass,
+            Err(_) => {
+                tracing::warn!(
+                    "No old password available for user {}, cannot update keyring password",
+                    username
+                );
+                return PAM_SUCCESS;
+            }
+        };
+
+        let new_password = match unsafe { get_auth_token(pamh) } {
+            Ok(pass) => pass,
+            Err(_) => {
+                tracing::warn!(
+                    "No new password available for user {}, cannot update keyring password",
+                    username
+                );
+                return PAM_SUCCESS;
+            }
+        };
+
+        if old_password.is_empty() || new_password.is_empty() {
+            tracing::debug!("Old or new password is empty, skipping keyring password change");
+            return PAM_SUCCESS;
+        }
+
+        tracing::info!(
+            "Password change for user {}: old={} bytes, new={} bytes",
+            username,
+            old_password.len(),
+            new_password.len()
+        );
+
+        let message = PamMessage::change_password(
+            username.clone(),
+            old_password.to_vec(),
+            new_password.to_vec(),
+        );
+
+        std::thread::spawn(
+            move || match send_secret_to_daemon(message, user_uid, false) {
+                Ok(_) => {
+                    tracing::info!(
+                        "Successfully sent password change request to oo7 daemon for user: {}",
+                        username
+                    );
+                }
+                Err(e) => {
+                    tracing::error!("Failed to send password change to oo7 daemon: {}", e);
+                }
+            },
+        );
+
+        return PAM_SUCCESS;
+    }
+
+    tracing::warn!("pam_sm_chauthtok called with unknown flags: {}", flags);
+    PAM_IGNORE
 }
