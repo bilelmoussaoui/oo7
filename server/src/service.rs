@@ -181,7 +181,7 @@ impl Service {
         let collections = self.collections.lock().await;
 
         for (_path, collection) in collections.iter() {
-            let items = collection.search_inner_items(&attributes).await;
+            let items = collection.search_inner_items(&attributes).await?;
             for item in items {
                 if item.is_locked().await {
                     locked.push(item.path().clone().into());
@@ -231,7 +231,16 @@ impl Service {
                         // Try to find as item within collections
                         for (_path, collection) in collections.iter() {
                             if let Some(item) = collection.item_from_path(object).await {
-                                let _ = item.set_locked(false).await;
+                                // If the collection is locked, unlock it
+                                if collection.is_locked().await {
+                                    let _ = collection.set_locked(false, secret.clone()).await;
+                                } else {
+                                    // Collection is already unlocked, just unlock the item
+                                    let keyring = collection.keyring.read().await;
+                                    let _ = item
+                                        .set_locked(false, keyring.as_ref().unwrap().as_unlocked())
+                                        .await;
+                                }
                                 break;
                             }
                         }
@@ -280,7 +289,10 @@ impl Service {
                         // Try to find as item within collections
                         for (_path, collection) in collections.iter() {
                             if let Some(item) = collection.item_from_path(object).await {
-                                let _ = item.set_locked(true).await;
+                                let keyring = collection.keyring.read().await;
+                                let _ = item
+                                    .set_locked(true, keyring.as_ref().unwrap().as_unlocked())
+                                    .await;
                                 break;
                             }
                         }
@@ -582,10 +594,11 @@ impl Service {
                             if locked { "locked" } else { "unlocked" }
                         );
                         without_prompt.push(object.clone());
-                    // If the collection is in a similar state, update the Item
-                    // without a prompt.
-                    } else if collection_locked == locked {
-                        item.set_locked(locked).await?;
+                    // If the collection is unlocked, we can unlock the item
+                    } else if !collection_locked {
+                        let keyring = collection.keyring.read().await;
+                        item.set_locked(locked, keyring.as_ref().unwrap().as_unlocked())
+                            .await?;
                         without_prompt.push(object.clone());
                     } else {
                         with_prompt.push(object.clone());
@@ -901,11 +914,11 @@ mod tests {
             )
             .await?;
 
-        // Create item in session collection
+        // Create item in default collection and lock it
         let secret2 = Secret::text("password2");
         let dbus_secret2 = dbus::api::DBusSecret::new(Arc::clone(&setup.session), secret2);
 
-        setup.collections[1]
+        let locked_item = setup.collections[0]
             .create_item(
                 "Locked Item",
                 &[("app", "testapp")],
@@ -915,15 +928,21 @@ mod tests {
             )
             .await?;
 
-        // Lock the session collection (which locks its items)
+        // Lock just this item (not the whole collection)
         let collection = setup
             .server
-            .collection_from_path(setup.collections[1].inner().path())
+            .collection_from_path(setup.collections[0].inner().path())
             .await
             .expect("Collection should exist");
-        collection
-            .set_locked(true, setup.keyring_secret.clone())
-            .await?;
+
+        let keyring = collection.keyring.read().await;
+        let unlocked_keyring = keyring.as_ref().unwrap().as_unlocked();
+
+        let locked_item = collection
+            .item_from_path(locked_item.inner().path())
+            .await
+            .unwrap();
+        locked_item.set_locked(true, unlocked_keyring).await?;
 
         // Search for items with the shared attribute
         let (unlocked, locked) = setup
@@ -1568,7 +1587,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn lock_item_prompt() -> Result<(), Box<dyn std::error::Error>> {
+    async fn lock_item_in_unlocked_collection() -> Result<(), Box<dyn std::error::Error>> {
         let setup = TestServiceSetup::plain_session(true).await?;
 
         // Create an item (starts unlocked)
@@ -1579,8 +1598,13 @@ mod tests {
             .await?;
 
         assert!(!item.is_locked().await?, "Item should start unlocked");
+        assert!(
+            !setup.collections[0].is_locked().await?,
+            "Collection should be unlocked"
+        );
 
-        // Test 1: Lock with accept
+        // When collection is unlocked, locking an item should happen directly without a
+        // prompt
         let locked = setup.service_api.lock(&[item.inner().path()], None).await?;
 
         assert_eq!(locked.len(), 1, "Should have locked 1 item");
@@ -1589,34 +1613,20 @@ mod tests {
             item.inner().path().as_str(),
             "Should return the item path"
         );
-        assert!(
-            item.is_locked().await?,
-            "Item should be locked after accepting prompt"
-        );
+        assert!(item.is_locked().await?, "Item should be locked directly");
 
-        // Unlock the item for dismiss test
-        let collection = setup
-            .server
-            .collection_from_path(setup.collections[0].inner().path())
-            .await
-            .expect("Collection should exist");
-        collection
-            .set_locked(false, setup.keyring_secret.clone())
+        // Unlock the item again (using service API to unlock just the item)
+        let unlocked = setup
+            .service_api
+            .unlock(&[item.inner().path()], None)
             .await?;
+        assert_eq!(unlocked.len(), 1, "Should have unlocked 1 item");
         assert!(!item.is_locked().await?, "Item should be unlocked again");
 
-        // Test 2: Lock with dismiss
-        setup.mock_prompter.set_accept(false).await;
-        let result = setup.service_api.lock(&[item.inner().path()], None).await;
-
-        assert!(
-            matches!(result, Err(oo7::dbus::Error::Dismissed)),
-            "Should return Dismissed error when prompt dismissed"
-        );
-        assert!(
-            !item.is_locked().await?,
-            "Item should still be unlocked after dismissing prompt"
-        );
+        // Locking again should work the same way (no prompt)
+        let locked = setup.service_api.lock(&[item.inner().path()], None).await?;
+        assert_eq!(locked.len(), 1, "Should have locked 1 item again");
+        assert!(item.is_locked().await?, "Item should be locked again");
 
         Ok(())
     }

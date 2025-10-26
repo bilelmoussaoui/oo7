@@ -1,9 +1,6 @@
 // org.freedesktop.Secret.Item
 
-use std::{
-    collections::HashMap,
-    sync::{Arc, atomic::AtomicBool},
-};
+use std::{collections::HashMap, sync::Arc};
 
 use oo7::dbus::{ServiceError, api::DBusSecretInner};
 use tokio::sync::Mutex;
@@ -14,8 +11,7 @@ use crate::{Service, collection::Collection, error::custom_service_error};
 #[derive(Debug, Clone)]
 pub struct Item {
     // Properties
-    locked: Arc<AtomicBool>,
-    inner: Arc<Mutex<oo7::file::Item>>,
+    pub(super) inner: Arc<Mutex<Option<oo7::file::Item>>>,
     // Other attributes
     service: Service,
     collection_path: OwnedObjectPath,
@@ -118,6 +114,7 @@ impl Item {
         }
 
         let inner = self.inner.lock().await;
+        let inner = inner.as_ref().unwrap();
         let secret = inner.as_unlocked().secret();
         let content_type = secret.content_type();
 
@@ -168,6 +165,7 @@ impl Item {
 
         {
             let mut inner = self.inner.lock().await;
+            let inner = inner.as_mut().unwrap();
 
             match session.aes_key() {
                 Some(key) => {
@@ -213,19 +211,29 @@ impl Item {
 
     #[zbus(property, name = "Locked")]
     pub async fn is_locked(&self) -> bool {
-        self.locked.load(std::sync::atomic::Ordering::Acquire)
+        self.inner.lock().await.as_ref().unwrap().is_locked()
     }
 
     #[zbus(property, name = "Attributes")]
-    pub async fn attributes(&self) -> HashMap<String, String> {
-        self.inner
+    pub async fn attributes(&self) -> zbus::fdo::Result<HashMap<String, String>> {
+        if self.is_locked().await {
+            return Err(zbus::fdo::Error::Failed(format!(
+                "Cannot get attributes of a locked object `{}`.",
+                self.path
+            )));
+        }
+
+        Ok(self
+            .inner
             .lock()
             .await
+            .as_ref()
+            .unwrap()
             .as_unlocked()
             .attributes()
             .iter()
             .map(|(k, v)| (k.to_owned(), v.to_string()))
-            .collect()
+            .collect())
     }
 
     #[zbus(property, name = "Attributes")]
@@ -242,7 +250,11 @@ impl Item {
 
         {
             let mut inner = self.inner.lock().await;
-            inner.as_mut_unlocked().set_attributes(&attributes);
+            inner
+                .as_mut()
+                .unwrap()
+                .as_mut_unlocked()
+                .set_attributes(&attributes);
         }
 
         let signal_emitter = self
@@ -261,8 +273,23 @@ impl Item {
     }
 
     #[zbus(property, name = "Label")]
-    pub async fn label(&self) -> String {
-        self.inner.lock().await.as_unlocked().label().to_owned()
+    pub async fn label(&self) -> zbus::fdo::Result<String> {
+        if self.is_locked().await {
+            return Err(zbus::fdo::Error::Failed(format!(
+                "Cannot get label of a locked object `{}`.",
+                self.path
+            )));
+        }
+
+        Ok(self
+            .inner
+            .lock()
+            .await
+            .as_ref()
+            .unwrap()
+            .as_unlocked()
+            .label()
+            .to_owned())
     }
 
     #[zbus(property, name = "Label")]
@@ -275,7 +302,7 @@ impl Item {
         }
         {
             let mut inner = self.inner.lock().await;
-            inner.as_mut_unlocked().set_label(label);
+            inner.as_mut().unwrap().as_mut_unlocked().set_label(label);
         }
 
         let signal_emitter = self
@@ -295,27 +322,55 @@ impl Item {
     }
 
     #[zbus(property, name = "Created")]
-    pub async fn created_at(&self) -> u64 {
-        self.inner.lock().await.as_unlocked().created().as_secs()
+    pub async fn created_at(&self) -> zbus::fdo::Result<u64> {
+        if self.is_locked().await {
+            return Err(zbus::fdo::Error::Failed(format!(
+                "Cannot get created timestamp of a locked object `{}`.",
+                self.path
+            )));
+        }
+
+        Ok(self
+            .inner
+            .lock()
+            .await
+            .as_ref()
+            .unwrap()
+            .as_unlocked()
+            .created()
+            .as_secs())
     }
 
     #[zbus(property, name = "Modified")]
-    pub async fn modified_at(&self) -> u64 {
-        self.inner.lock().await.as_unlocked().modified().as_secs()
+    pub async fn modified_at(&self) -> zbus::fdo::Result<u64> {
+        if self.is_locked().await {
+            return Err(zbus::fdo::Error::Failed(format!(
+                "Cannot get modified timestamp of a locked object `{}`.",
+                self.path
+            )));
+        }
+
+        Ok(self
+            .inner
+            .lock()
+            .await
+            .as_ref()
+            .unwrap()
+            .as_unlocked()
+            .modified()
+            .as_secs())
     }
 }
 
 impl Item {
     pub fn new(
         item: oo7::file::Item,
-        locked: bool,
         service: Service,
         collection_path: OwnedObjectPath,
         path: OwnedObjectPath,
     ) -> Self {
         Self {
-            locked: Arc::new(AtomicBool::new(locked)),
-            inner: Arc::new(Mutex::new(item)),
+            inner: Arc::new(Mutex::new(Some(item))),
             path,
             collection_path,
             service,
@@ -326,9 +381,34 @@ impl Item {
         &self.path
     }
 
-    pub async fn set_locked(&self, locked: bool) -> Result<(), ServiceError> {
-        self.locked
-            .store(locked, std::sync::atomic::Ordering::Release);
+    pub(crate) async fn set_locked(
+        &self,
+        locked: bool,
+        keyring: &oo7::file::UnlockedKeyring,
+    ) -> Result<(), ServiceError> {
+        let mut inner_guard = self.inner.lock().await;
+
+        if let Some(old_item) = inner_guard.take() {
+            let new_item = match (old_item, locked) {
+                (oo7::file::Item::Unlocked(unlocked), true) => {
+                    let locked_item = keyring.lock_item(unlocked).await.map_err(|err| {
+                        custom_service_error(&format!("Failed to lock item: {err}"))
+                    })?;
+                    oo7::file::Item::Locked(locked_item)
+                }
+                (oo7::file::Item::Locked(locked_item), false) => {
+                    let unlocked = keyring.unlock_item(locked_item).await.map_err(|err| {
+                        custom_service_error(&format!("Failed to unlock item: {err}"))
+                    })?;
+                    oo7::file::Item::Unlocked(unlocked)
+                }
+                (other, _) => other,
+            };
+            *inner_guard = Some(new_item);
+        }
+
+        drop(inner_guard);
+
         let signal_emitter = self.service.signal_emitter(&self.path)?;
         self.locked_changed(&signal_emitter).await?;
 
@@ -920,18 +1000,33 @@ mod tests {
             result
         );
 
-        // Verify read-only operations still work on locked items
-        let label = item.label().await?;
-        assert_eq!(
-            label, "Test Item",
-            "Should be able to read label of locked item"
+        // Test 5: Reading properties should also fail on locked items
+        let result = item.label().await;
+        assert!(
+            matches!(result, Err(oo7::dbus::Error::ZBus(zbus::Error::FDO(_)))),
+            "label should fail on locked item, got: {:?}",
+            result
         );
 
-        let attrs = item.attributes().await?;
-        assert_eq!(
-            attrs.get("app").unwrap(),
-            "test",
-            "Should be able to read attributes of locked item"
+        let result = item.attributes().await;
+        assert!(
+            matches!(result, Err(oo7::dbus::Error::ZBus(zbus::Error::FDO(_)))),
+            "attributes should fail on locked item, got: {:?}",
+            result
+        );
+
+        let result = item.created().await;
+        assert!(
+            matches!(result, Err(oo7::dbus::Error::ZBus(zbus::Error::FDO(_)))),
+            "created should fail on locked item, got: {:?}",
+            result
+        );
+
+        let result = item.modified().await;
+        assert!(
+            matches!(result, Err(oo7::dbus::Error::ZBus(zbus::Error::FDO(_)))),
+            "modified should fail on locked item, got: {:?}",
+            result
         );
 
         Ok(())

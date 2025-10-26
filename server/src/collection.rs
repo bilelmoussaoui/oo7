@@ -142,7 +142,7 @@ impl Collection {
     ) -> Result<Vec<OwnedObjectPath>, ServiceError> {
         let results = self
             .search_inner_items(&attributes)
-            .await
+            .await?
             .iter()
             .map(|item| item.path().clone().into())
             .collect::<Vec<OwnedObjectPath>>();
@@ -272,7 +272,6 @@ impl Collection {
 
         let item = item::Item::new(
             item,
-            false,
             self.service.clone(),
             self.path.clone(),
             item_path.clone(),
@@ -284,7 +283,7 @@ impl Collection {
 
         // Remove any existing items with the same attributes
         if replace {
-            let existing_items = self.search_inner_items(&attributes).await;
+            let existing_items = self.search_inner_items(&attributes).await?;
             if !existing_items.is_empty() {
                 let mut items = self.items.lock().await;
                 for existing in &existing_items {
@@ -434,25 +433,34 @@ impl Collection {
     pub async fn search_inner_items(
         &self,
         attributes: &HashMap<String, String>,
-    ) -> Vec<item::Item> {
-        let mut items = Vec::new();
+    ) -> Result<Vec<item::Item>, ServiceError> {
+        // If collection is locked, we can't search
+        if self.is_locked().await {
+            return Ok(Vec::new());
+        }
 
-        for item in self.items.lock().await.iter() {
-            let item_attributes = item.attributes().await;
+        let keyring_guard = self.keyring.read().await;
+        let keyring = keyring_guard.as_ref().unwrap().as_unlocked();
 
-            // Check if the (key, value) pairs in the requested attributes are
-            // a subset of the attributes in the item being checked for in the
-            // collection.
-            let attributes_are_subset = attributes
-                .iter()
-                .all(|(key, value)| item_attributes.get(key) == Some(value));
+        let key = keyring
+            .key()
+            .await
+            .map_err(|err| custom_service_error(&format!("Failed to derive key: {err}")))?;
 
-            if attributes_are_subset {
-                items.push(item.clone());
+        let mut matching_items = Vec::new();
+        let items = self.items.lock().await;
+
+        for item_wrapper in items.iter() {
+            let inner = item_wrapper.inner.lock().await;
+            let file_item = inner.as_ref().unwrap();
+
+            // Use the oo7::file::Item's matches_attributes method
+            if file_item.matches_attributes(attributes, &key) {
+                matching_items.push(item_wrapper.clone());
             }
         }
 
-        items
+        Ok(matching_items)
     }
 
     pub async fn item_from_path(&self, path: &ObjectPath<'_>) -> Option<item::Item> {
@@ -466,17 +474,19 @@ impl Collection {
         locked: bool,
         secret: Option<Secret>,
     ) -> Result<(), ServiceError> {
-        let items = self.items.lock().await;
-        for item in items.iter() {
-            item.set_locked(locked).await?;
-        }
-        drop(items);
-
         let mut keyring_guard = self.keyring.write().await;
 
         if let Some(old_keyring) = keyring_guard.take() {
             let new_keyring = match (old_keyring, locked) {
-                (Keyring::Unlocked(unlocked), true) => Keyring::Locked(unlocked.lock()),
+                (Keyring::Unlocked(unlocked), true) => {
+                    let items = self.items.lock().await;
+                    for item in items.iter() {
+                        item.set_locked(locked, &unlocked).await?;
+                    }
+                    drop(items);
+
+                    Keyring::Locked(unlocked.lock())
+                }
                 (Keyring::Locked(locked_kr), false) => {
                     let secret = secret.ok_or_else(|| {
                         custom_service_error("Cannot unlock collection without a secret")
@@ -485,6 +495,12 @@ impl Collection {
                     let unlocked = locked_kr.unlock(secret).await.map_err(|err| {
                         custom_service_error(&format!("Failed to unlock keyring: {err}"))
                     })?;
+
+                    let items = self.items.lock().await;
+                    for item in items.iter() {
+                        item.set_locked(locked, &unlocked).await?;
+                    }
+                    drop(items);
 
                     Keyring::Unlocked(unlocked)
                 }
@@ -529,7 +545,6 @@ impl Collection {
             let item_path = OwnedObjectPath::try_from(format!("{}/{n_items}", self.path)).unwrap();
             let item = item::Item::new(
                 keyring_item.map_err(Error::InvalidItem)?,
-                self.is_locked().await,
                 self.service.clone(),
                 self.path.clone(),
                 item_path.clone(),
@@ -564,7 +579,9 @@ impl Collection {
             )));
         }
 
-        let attributes = item.attributes().await;
+        let attributes = item.attributes().await.map_err(|err| {
+            custom_service_error(&format!("Failed to read item attributes {err}"))
+        })?;
 
         let keyring = self.keyring.read().await;
         let keyring = keyring.as_ref().unwrap().as_unlocked();
