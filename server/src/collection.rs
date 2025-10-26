@@ -404,14 +404,27 @@ impl Collection {
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap();
 
+        let sanitized_label = label
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() || c == '_' {
+                    c
+                } else {
+                    '_'
+                }
+            })
+            .collect::<String>();
+
         Self {
             items: Default::default(),
             label: Arc::new(Mutex::new(label.to_owned())),
             modified: Arc::new(Mutex::new(created)),
             alias: Arc::new(Mutex::new(alias.to_owned())),
             item_index: Arc::new(RwLock::new(0)),
-            path: OwnedObjectPath::try_from(format!("/org/freedesktop/secrets/collection/{label}"))
-                .unwrap(),
+            path: OwnedObjectPath::try_from(format!(
+                "/org/freedesktop/secrets/collection/{sanitized_label}"
+            ))
+            .expect("Sanitized label should always produce valid object path"),
             created,
             service,
             keyring: Arc::new(RwLock::new(Some(keyring))),
