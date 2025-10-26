@@ -37,7 +37,7 @@ pub use locked_keyring::LockedKeyring;
 pub use unlocked_item::UnlockedItem;
 pub use unlocked_keyring::UnlockedKeyring;
 
-use crate::Secret;
+use crate::{AsAttributes, Key, Secret};
 
 #[derive(Debug)]
 pub enum Item {
@@ -68,6 +68,29 @@ impl Item {
         match self {
             Self::Locked(item) => item,
             _ => panic!("The item is unlocked"),
+        }
+    }
+
+    /// Check if this item matches the given attributes
+    pub fn matches_attributes(&self, attributes: &impl AsAttributes, key: &Key) -> bool {
+        match self {
+            Self::Unlocked(unlocked) => {
+                let item_attrs = unlocked.attributes();
+                attributes.as_attributes().iter().all(|(k, value)| {
+                    item_attrs.get(&k.to_string()).map(|v| v.as_ref()) == Some(value)
+                })
+            }
+            Self::Locked(locked) => {
+                let hashed_attrs = attributes.hash(key);
+
+                hashed_attrs.iter().all(|(attr_key, mac_result)| {
+                    mac_result
+                        .as_ref()
+                        .ok()
+                        .map(|mac| locked.inner.has_attribute(attr_key, mac))
+                        .unwrap_or(false)
+                })
+            }
         }
     }
 }
