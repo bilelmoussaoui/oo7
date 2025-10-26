@@ -429,15 +429,10 @@ impl Service {
             .build()
             .await?;
 
-        let default_keyring = if let Some(secret) = secret {
-            Keyring::Unlocked(UnlockedKeyring::open("login", secret).await?)
-        } else {
-            Keyring::Locked(LockedKeyring::open("login").await?)
-        };
+        // Discover existing keyrings
+        let discovered_keyrings = service.discover_keyrings(secret).await?;
 
-        service
-            .initialize(connection, Some(default_keyring))
-            .await?;
+        service.initialize(connection, discovered_keyrings).await?;
 
         // Start PAM listener
         tracing::info!("Starting PAM listener");
@@ -468,13 +463,157 @@ impl Service {
             .await?;
 
         let default_keyring = if let Some(secret) = secret {
-            Some(Keyring::Unlocked(UnlockedKeyring::temporary(secret).await?))
+            vec![(
+                "Login".to_owned(),
+                oo7::dbus::Service::DEFAULT_COLLECTION.to_owned(),
+                Keyring::Unlocked(UnlockedKeyring::temporary(secret).await?),
+            )]
         } else {
-            None
+            vec![]
         };
 
         service.initialize(connection, default_keyring).await?;
         Ok(service)
+    }
+
+    /// Discover existing keyrings in the data directory
+    /// Returns a vector of (label, alias, keyring) tuples
+    async fn discover_keyrings(
+        &self,
+        secret: Option<Secret>,
+    ) -> Result<Vec<(String, String, Keyring)>, Error> {
+        let mut discovered = Vec::new();
+
+        // Get data directory using the same logic as oo7::file::api::data_dir()
+        let data_dir = std::env::var_os("XDG_DATA_HOME")
+            .and_then(|h| if h.is_empty() { None } else { Some(h) })
+            .map(std::path::PathBuf::from)
+            .and_then(|p| if p.is_absolute() { Some(p) } else { None })
+            .or_else(|| {
+                std::env::var_os("HOME")
+                    .and_then(|h| if h.is_empty() { None } else { Some(h) })
+                    .map(std::path::PathBuf::from)
+                    .map(|p| p.join(".local/share"))
+            });
+
+        let Some(data_dir) = data_dir else {
+            tracing::warn!("No data directory found, skipping keyring discovery");
+            return Ok(discovered);
+        };
+
+        let keyrings_dir = data_dir.join("keyrings");
+
+        // Scan for v0 keyrings (in keyrings/*.keyring)
+        if keyrings_dir.exists() {
+            tracing::debug!("Scanning for v0 keyrings in {:?}", keyrings_dir);
+            if let Ok(mut entries) = tokio::fs::read_dir(&keyrings_dir).await {
+                while let Ok(Some(entry)) = entries.next_entry().await {
+                    let path = entry.path();
+
+                    // Skip directories and non-.keyring files
+                    if path.is_dir() || path.extension() != Some(std::ffi::OsStr::new("keyring")) {
+                        continue;
+                    }
+
+                    if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
+                        tracing::debug!("Found v0 keyring: {}", name);
+
+                        // Try to load the keyring
+                        match self.load_keyring(&path, name, secret.as_ref()).await {
+                            Ok((label, alias, keyring)) => discovered.push((label, alias, keyring)),
+                            Err(e) => tracing::warn!("Failed to load keyring {:?}: {}", path, e),
+                        }
+                    }
+                }
+            }
+        }
+
+        // Scan for v1 keyrings (in keyrings/v1/*.keyring)
+        let v1_dir = keyrings_dir.join("v1");
+        if v1_dir.exists() {
+            tracing::debug!("Scanning for v1 keyrings in {:?}", v1_dir);
+            if let Ok(mut entries) = tokio::fs::read_dir(&v1_dir).await {
+                while let Ok(Some(entry)) = entries.next_entry().await {
+                    let path = entry.path();
+
+                    // Skip directories and non-.keyring files
+                    if path.is_dir() || path.extension() != Some(std::ffi::OsStr::new("keyring")) {
+                        continue;
+                    }
+
+                    if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
+                        tracing::debug!("Found v1 keyring: {}", name);
+
+                        // Try to load the keyring
+                        match self.load_keyring(&path, name, secret.as_ref()).await {
+                            Ok((label, alias, keyring)) => discovered.push((label, alias, keyring)),
+                            Err(e) => tracing::warn!("Failed to load keyring {:?}: {}", path, e),
+                        }
+                    }
+                }
+            }
+        }
+
+        if discovered.is_empty() {
+            tracing::info!("No keyrings discovered in data directory");
+        } else {
+            tracing::info!("Discovered {} keyring(s)", discovered.len());
+        }
+
+        Ok(discovered)
+    }
+
+    /// Load a single keyring from a file path
+    /// Returns (label, alias, keyring)
+    async fn load_keyring(
+        &self,
+        path: &std::path::Path,
+        name: &str,
+        secret: Option<&Secret>,
+    ) -> Result<(String, String, Keyring), Error> {
+        // "login" gets "default" alias, others use their own name
+        let alias = if name == "login" {
+            oo7::dbus::Service::DEFAULT_COLLECTION.to_owned()
+        } else {
+            name.to_owned()
+        };
+
+        // Try to unlock with the provided secret, if any
+        let keyring = if let Some(secret) = secret {
+            let locked_keyring = LockedKeyring::load(path).await?;
+            match locked_keyring.unlock(secret.clone()).await {
+                Ok(unlocked) => {
+                    tracing::info!("Unlocked keyring '{}' from {:?}", name, path);
+                    Keyring::Unlocked(unlocked)
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to unlock keyring '{}' with provided secret: {}. Keeping it locked.",
+                        name,
+                        e
+                    );
+                    // Reload as locked since unlock consumed it
+                    Keyring::Locked(LockedKeyring::load(path).await?)
+                }
+            }
+        } else {
+            tracing::debug!("No secret provided, keeping keyring '{}' locked", name);
+            Keyring::Locked(LockedKeyring::load(path).await?)
+        };
+
+        // Use name as label (capitalized for consistency with Login)
+        let label = if name == "login" {
+            "Login".to_owned()
+        } else {
+            // Capitalize first letter
+            let mut chars = name.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+            }
+        };
+
+        Ok((label, alias, keyring))
     }
 
     /// Initialize the service with collections and start client disconnect
@@ -482,29 +621,28 @@ impl Service {
     async fn initialize(
         &self,
         connection: zbus::Connection,
-        default_keyring: Option<Keyring>,
+        discovered_keyrings: Vec<(String, String, Keyring)>, // (name, alias, keyring)
     ) -> Result<(), Error> {
         self.connection.set(connection.clone()).unwrap();
 
         let object_server = connection.object_server();
         let mut collections = self.collections.lock().await;
 
-        // Set up default/login collection if keyring is provided
-        if let Some(keyring) = default_keyring {
-            let collection = Collection::new(
-                "Login",
-                oo7::dbus::Service::DEFAULT_COLLECTION,
-                self.clone(),
-                keyring,
-            );
+        // Set up discovered collections
+        for (label, alias, keyring) in discovered_keyrings {
+            let collection = Collection::new(&label, &alias, self.clone(), keyring);
             collections.insert(collection.path().to_owned().into(), collection.clone());
             collection.dispatch_items().await?;
             object_server
                 .at(collection.path(), collection.clone())
                 .await?;
-            object_server
-                .at(DEFAULT_COLLECTION_ALIAS_PATH, collection)
-                .await?;
+
+            // If this is the default collection, also register it at the alias path
+            if alias == oo7::dbus::Service::DEFAULT_COLLECTION {
+                object_server
+                    .at(DEFAULT_COLLECTION_ALIAS_PATH, collection)
+                    .await?;
+            }
         }
 
         // Always create session collection (always temporary)
