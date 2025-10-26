@@ -896,8 +896,7 @@ impl Service {
         // Retrieve the pending collection metadata
         let Some((label, alias)) = self.pending_collection(prompt_path).await else {
             return Err(ServiceError::NoSuchObject(format!(
-                "No pending collection for prompt `{}`",
-                prompt_path
+                "No pending collection for prompt `{prompt_path}`"
             )));
         };
 

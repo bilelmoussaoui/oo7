@@ -120,8 +120,7 @@ impl std::fmt::Display for Error {
                 broken_items,
             } => write!(
                 f,
-                "Keyring partially corrupted: {} valid items, {} broken items",
-                valid_items, broken_items
+                "Keyring partially corrupted: {valid_items} valid items, {broken_items} broken items",
             ),
             Self::Crypto(e) => write!(f, "Failed to do a cryptography operation, {e}"),
         }

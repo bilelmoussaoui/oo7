@@ -20,9 +20,9 @@ pub enum SocketError {
 impl std::fmt::Display for SocketError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Connect(e) => write!(f, "Failed to connect to daemon socket: {}", e),
-            Self::Send(e) => write!(f, "Failed to send message: {}", e),
-            Self::Serialize(e) => write!(f, "Failed to serialize message: {}", e),
+            Self::Connect(e) => write!(f, "Failed to connect to daemon socket: {e}"),
+            Self::Send(e) => write!(f, "Failed to send message: {e}"),
+            Self::Serialize(e) => write!(f, "Failed to serialize message: {e}"),
             Self::Timeout => write!(f, "Operation timed out"),
         }
     }
@@ -98,7 +98,7 @@ async fn send_secret_to_daemon_async(
 ) -> Result<(), SocketError> {
     let socket_path = std::env::var("OO7_PAM_SOCKET")
         .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from(format!("/run/user/{}/oo7-pam.sock", uid)));
+        .unwrap_or_else(|_| PathBuf::from(format!("/run/user/{uid}/oo7-pam.sock")));
 
     tracing::debug!("Connecting to daemon socket at: {}", socket_path.display());
 
