@@ -80,7 +80,7 @@ mod double_value_optional {
         // Try to downcast to check if it's double-wrapped
         let value_to_deserialize = match outer_value.downcast_ref::<Value>() {
             Ok(_) => outer_value.downcast::<Value>().map_err(|e| {
-                serde::de::Error::custom(format!("Failed to unwrap double-wrapped Value: {}", e))
+                serde::de::Error::custom(format!("Failed to unwrap double-wrapped Value: {e}"))
             })?,
             Err(_) => outer_value,
         };

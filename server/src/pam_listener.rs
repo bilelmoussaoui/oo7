@@ -56,7 +56,7 @@ impl PamListener {
         let uid = unsafe { libc::getuid() };
         let socket_path = std::env::var("OO7_PAM_SOCKET")
             .map(PathBuf::from)
-            .unwrap_or_else(|_| PathBuf::from(format!("/run/user/{}/oo7-pam.sock", uid)));
+            .unwrap_or_else(|_| PathBuf::from(format!("/run/user/{uid}/oo7-pam.sock")));
 
         Self {
             socket_path,
