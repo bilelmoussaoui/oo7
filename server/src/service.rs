@@ -683,12 +683,33 @@ impl Service {
     async fn initialize(
         &self,
         connection: zbus::Connection,
-        discovered_keyrings: Vec<(String, String, Keyring)>, // (name, alias, keyring)
+        mut discovered_keyrings: Vec<(String, String, Keyring)>, // (name, alias, keyring)
     ) -> Result<(), Error> {
         self.connection.set(connection.clone()).unwrap();
 
         let object_server = connection.object_server();
         let mut collections = self.collections.lock().await;
+
+        // Check if we have a default collection
+        let has_default = discovered_keyrings
+            .iter()
+            .any(|(_, alias, _)| alias == oo7::dbus::Service::DEFAULT_COLLECTION);
+
+        if !has_default {
+            tracing::info!("No default collection found, creating 'Login' keyring");
+
+            let locked_keyring = LockedKeyring::open("login").await.inspect_err(|e| {
+                tracing::error!("Failed to create default Login keyring: {}", e);
+            })?;
+
+            discovered_keyrings.push((
+                "Login".to_owned(),
+                oo7::dbus::Service::DEFAULT_COLLECTION.to_owned(),
+                Keyring::Locked(locked_keyring),
+            ));
+
+            tracing::info!("Created default 'Login' collection (locked)");
+        }
 
         // Set up discovered collections
         for (label, alias, keyring) in discovered_keyrings {
