@@ -41,11 +41,105 @@ impl std::error::Error for SocketError {
 pub fn send_secret_to_daemon(
     message: PamMessage,
     uid: u32,
+    gid: u32,
     auto_start: bool,
 ) -> Result<(), SocketError> {
-    let runtime = tokio::runtime::Runtime::new().map_err(SocketError::Connect)?;
+    // Check if we're already running as the target user
+    let current_uid = unsafe { libc::getuid() };
+    let current_gid = unsafe { libc::getgid() };
+    let current_euid = unsafe { libc::geteuid() };
+    let current_egid = unsafe { libc::getegid() };
 
-    runtime.block_on(async { send_secret_to_daemon_async(message, uid, auto_start).await })
+    if uid == current_uid && gid == current_gid && uid == current_euid && gid == current_egid {
+        tracing::debug!("Already running as target user (UID={uid}, GID={gid})",);
+        let runtime = tokio::runtime::Runtime::new().map_err(SocketError::Connect)?;
+        return runtime
+            .block_on(async { send_secret_to_daemon_async(message, uid, auto_start).await });
+    }
+
+    // Need to fork and switch credentials
+    tracing::debug!(
+        "Running as different user (current UID={current_uid}, target UID={uid}), forking to switch credentials"
+    );
+
+    match unsafe { libc::fork() } {
+        -1 => {
+            tracing::error!("Failed to fork process for credential switch");
+            Err(SocketError::Connect(io::Error::last_os_error()))
+        }
+        0 => {
+            unsafe {
+                if libc::setgid(gid) < 0
+                    || libc::setuid(uid) < 0
+                    || libc::setegid(gid) < 0
+                    || libc::seteuid(uid) < 0
+                {
+                    tracing::error!(
+                        "Failed to switch to user credentials (UID={uid}, GID={gid}): {}",
+                        io::Error::last_os_error()
+                    );
+                    libc::_exit(1);
+                }
+            }
+
+            tracing::debug!("Child process switched to UID={uid}, GID={gid}");
+
+            let runtime = match tokio::runtime::Runtime::new() {
+                Ok(rt) => rt,
+                Err(e) => {
+                    tracing::error!("Failed to create tokio runtime in child: {e}",);
+                    unsafe { libc::_exit(1) };
+                }
+            };
+
+            let result = runtime
+                .block_on(async { send_secret_to_daemon_async(message, uid, auto_start).await });
+
+            match result {
+                Ok(_) => unsafe { libc::_exit(0) },
+                Err(e) => {
+                    tracing::error!("Failed to send message in child process: {e}",);
+                    unsafe { libc::_exit(1) }
+                }
+            }
+        }
+        child_pid => {
+            // Parent process - wait for child to complete
+            tracing::debug!("Forked child process with PID {child_pid}",);
+            let mut status: libc::c_int = 0;
+
+            loop {
+                let wait_result = unsafe { libc::waitpid(child_pid, &mut status, 0) };
+                if wait_result == child_pid {
+                    break;
+                } else if wait_result == -1 {
+                    let err = io::Error::last_os_error();
+                    if err.kind() != io::ErrorKind::Interrupted {
+                        tracing::error!("Failed to wait for child process: {err}",);
+                        return Err(SocketError::Connect(err));
+                    }
+                }
+            }
+
+            if libc::WIFEXITED(status) {
+                let exit_code = libc::WEXITSTATUS(status);
+                if exit_code == 0 {
+                    tracing::debug!("Child process completed successfully");
+                    Ok(())
+                } else {
+                    tracing::error!("Child process exited with code {exit_code}");
+                    Err(SocketError::Connect(io::Error::other(format!(
+                        "Child process failed with exit code {exit_code}"
+                    ))))
+                }
+            } else {
+                tracing::error!("Child process terminated abnormally");
+                Err(SocketError::Connect(io::Error::other(
+                    "Child process terminated abnormally",
+                )))
+            }
+        }
+    }
 }
 
 /// Start the oo7-daemon for the current user

@@ -85,8 +85,8 @@ unsafe fn get_auth_token_internal(
     Ok(Zeroizing::new(password_bytes))
 }
 
-/// Get the UID for a username using getpwnam (handles NSS/LDAP/etc)
-fn get_user_uid(username: &str) -> Option<u32> {
+/// Get the UID and GID for a username using getpwnam (handles NSS/LDAP/etc)
+fn get_user_credentials(username: &str) -> Option<(u32, u32)> {
     use std::ffi::CString;
 
     let username_c = CString::new(username).ok()?;
@@ -95,7 +95,7 @@ fn get_user_uid(username: &str) -> Option<u32> {
     if pwd.is_null() {
         None
     } else {
-        Some(unsafe { (*pwd).pw_uid })
+        Some(unsafe { ((*pwd).pw_uid, (*pwd).pw_gid) })
     }
 }
 
@@ -266,10 +266,10 @@ pub unsafe extern "C" fn pam_sm_open_session(
         }
     };
 
-    let user_uid = match get_user_uid(&username) {
-        Some(uid) => uid,
+    let (user_uid, user_gid) = match get_user_credentials(&username) {
+        Some(creds) => creds,
         None => {
-            tracing::error!("Failed to get UID for user: {}", username);
+            tracing::error!("Failed to get credentials for user: {}", username);
             return PAM_SUCCESS;
         }
     };
@@ -277,8 +277,8 @@ pub unsafe extern "C" fn pam_sm_open_session(
     let message = PamMessage::unlock(username.clone(), password.to_vec());
 
     // Send the secret to the oo7 daemon
-    std::thread::spawn(
-        move || match send_secret_to_daemon(message, user_uid, auto_start) {
+    std::thread::spawn(move || {
+        match send_secret_to_daemon(message, user_uid, user_gid, auto_start) {
             Ok(_) => {
                 tracing::info!(
                     "Successfully sent secret to oo7 daemon for user: {}",
@@ -288,8 +288,8 @@ pub unsafe extern "C" fn pam_sm_open_session(
             Err(e) => {
                 tracing::error!("Failed to send secret to oo7 daemon: {}", e);
             }
-        },
-    );
+        }
+    });
 
     PAM_SUCCESS
 }
@@ -336,10 +336,10 @@ pub unsafe extern "C" fn pam_sm_chauthtok(
             }
         };
 
-        let user_uid = match get_user_uid(&username) {
-            Some(uid) => uid,
+        let (user_uid, user_gid) = match get_user_credentials(&username) {
+            Some(creds) => creds,
             None => {
-                tracing::error!("Failed to get UID for user: {}", username);
+                tracing::error!("Failed to get credentials for user: {}", username);
                 return PAM_SYSTEM_ERR;
             }
         };
@@ -384,8 +384,8 @@ pub unsafe extern "C" fn pam_sm_chauthtok(
             new_password.to_vec(),
         );
 
-        std::thread::spawn(
-            move || match send_secret_to_daemon(message, user_uid, false) {
+        std::thread::spawn(move || {
+            match send_secret_to_daemon(message, user_uid, user_gid, false) {
                 Ok(_) => {
                     tracing::info!(
                         "Successfully sent password change request to oo7 daemon for user: {}",
@@ -395,8 +395,8 @@ pub unsafe extern "C" fn pam_sm_chauthtok(
                 Err(e) => {
                     tracing::error!("Failed to send password change to oo7 daemon: {}", e);
                 }
-            },
-        );
+            }
+        });
 
         return PAM_SUCCESS;
     }

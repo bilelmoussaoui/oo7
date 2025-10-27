@@ -103,8 +103,6 @@ impl PamListener {
 
     /// Handle a single PAM connection
     async fn handle_connection(&self, mut stream: UnixStream) -> Result<(), Error> {
-        tracing::debug!("Accepted PAM connection");
-
         // Accept connections from:
         // 1. Root (UID 0) as PAM modules run as root during authentication
         // 2. Same UID as us
@@ -114,8 +112,9 @@ impl PamListener {
 
         if peer_uid != 0 && peer_uid != our_uid {
             tracing::warn!(
-                "Rejected PAM connection from UID {} (expected 0 or {})",
+                "Rejected PAM connection from UID {} PID {} (expected UID 0 or {})",
                 peer_uid,
+                peer_cred.pid().unwrap_or(0),
                 our_uid
             );
             return Err(Error::IO(std::io::Error::new(
