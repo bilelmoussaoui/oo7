@@ -436,7 +436,9 @@ impl Service {
         // Discover existing keyrings
         let discovered_keyrings = service.discover_keyrings(secret).await?;
 
-        service.initialize(connection, discovered_keyrings).await?;
+        service
+            .initialize(connection, discovered_keyrings, true)
+            .await?;
 
         // Start PAM listener
         tracing::info!("Starting PAM listener");
@@ -476,7 +478,9 @@ impl Service {
             vec![]
         };
 
-        service.initialize(connection, default_keyring).await?;
+        service
+            .initialize(connection, default_keyring, false)
+            .await?;
         Ok(service)
     }
 
@@ -684,6 +688,7 @@ impl Service {
         &self,
         connection: zbus::Connection,
         mut discovered_keyrings: Vec<(String, String, Keyring)>, // (name, alias, keyring)
+        auto_create_default: bool,
     ) -> Result<(), Error> {
         self.connection.set(connection.clone()).unwrap();
 
@@ -695,7 +700,7 @@ impl Service {
             .iter()
             .any(|(_, alias, _)| alias == oo7::dbus::Service::DEFAULT_COLLECTION);
 
-        if !has_default {
+        if !has_default && auto_create_default {
             tracing::info!("No default collection found, creating 'Login' keyring");
 
             let locked_keyring = LockedKeyring::open("login").await.inspect_err(|e| {
