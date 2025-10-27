@@ -105,6 +105,39 @@ impl PamListener {
     async fn handle_connection(&self, mut stream: UnixStream) -> Result<(), Error> {
         tracing::debug!("Accepted PAM connection");
 
+        // Accept connections from:
+        // 1. Root (UID 0) as PAM modules run as root during authentication
+        // 2. Same UID as us
+        let peer_cred = stream.peer_cred()?;
+        let our_uid = unsafe { libc::getuid() };
+        let peer_uid = peer_cred.uid();
+
+        if peer_uid != 0 && peer_uid != our_uid {
+            tracing::warn!(
+                "Rejected PAM connection from UID {} (expected 0 or {})",
+                peer_uid,
+                our_uid
+            );
+            return Err(Error::IO(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                format!(
+                    "Connection rejected: unauthorized UID (peer={}, daemon={}, root=0)",
+                    peer_uid, our_uid
+                ),
+            )));
+        }
+
+        tracing::debug!(
+            "Accepted PAM connection from {} (UID {}, PID {})",
+            if peer_uid == 0 {
+                "root/PAM"
+            } else {
+                "same user"
+            },
+            peer_uid,
+            peer_cred.pid().unwrap_or(0)
+        );
+
         // Read the message length prefix (4 bytes, little-endian)
         let mut length_bytes = [0u8; 4];
         stream.read_exact(&mut length_bytes).await?;
