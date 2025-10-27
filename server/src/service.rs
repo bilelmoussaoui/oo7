@@ -357,10 +357,17 @@ impl Service {
 
     #[zbus(out_args("collection"))]
     pub async fn read_alias(&self, name: &str) -> Result<OwnedObjectPath, ServiceError> {
+        // Map "login" alias to "default" for compatibility with gnome-keyring
+        let alias_to_find = if name == Self::LOGIN_ALIAS {
+            oo7::dbus::Service::DEFAULT_COLLECTION
+        } else {
+            name
+        };
+
         let collections = self.collections.lock().await;
 
         for (path, collection) in collections.iter() {
-            if collection.alias().await == name {
+            if collection.alias().await == alias_to_find {
                 tracing::debug!("Collection: {} found for alias: {}.", path, name);
                 return Ok(path.to_owned());
             }
@@ -419,6 +426,8 @@ impl Service {
 }
 
 impl Service {
+    const LOGIN_ALIAS: &str = "login";
+
     pub async fn run(secret: Option<Secret>, request_replacement: bool) -> Result<(), Error> {
         let service = Self::default();
 
@@ -585,18 +594,14 @@ impl Service {
         name: &str,
         secret: Option<&Secret>,
     ) -> Result<(String, String, Keyring), Error> {
-        // "login" gets "default" alias, others use their own name
-        let alias = if name == "login" {
+        let alias = if name.eq_ignore_ascii_case(Self::LOGIN_ALIAS) {
             oo7::dbus::Service::DEFAULT_COLLECTION.to_owned()
         } else {
-            name.to_owned()
+            name.to_owned().to_lowercase()
         };
 
         // Use name as label (capitalized for consistency with Login)
-        let label = if name == "login" {
-            "Login".to_owned()
-        } else {
-            // Capitalize first letter
+        let label = {
             let mut chars = name.chars();
             match chars.next() {
                 None => String::new(),
@@ -696,16 +701,18 @@ impl Service {
         let mut collections = self.collections.lock().await;
 
         // Check if we have a default collection
-        let has_default = discovered_keyrings
-            .iter()
-            .any(|(_, alias, _)| alias == oo7::dbus::Service::DEFAULT_COLLECTION);
+        let has_default = discovered_keyrings.iter().any(|(_, alias, _)| {
+            alias == oo7::dbus::Service::DEFAULT_COLLECTION || alias == Self::LOGIN_ALIAS
+        });
 
         if !has_default && auto_create_default {
             tracing::info!("No default collection found, creating 'Login' keyring");
 
-            let locked_keyring = LockedKeyring::open("login").await.inspect_err(|e| {
-                tracing::error!("Failed to create default Login keyring: {}", e);
-            })?;
+            let locked_keyring = LockedKeyring::open(Self::LOGIN_ALIAS)
+                .await
+                .inspect_err(|e| {
+                    tracing::error!("Failed to create default Login keyring: {}", e);
+                })?;
 
             discovered_keyrings.push((
                 "Login".to_owned(),
@@ -927,7 +934,7 @@ impl Service {
         };
 
         // Create a persistent keyring with the provided secret
-        let keyring = UnlockedKeyring::open(&label, secret)
+        let keyring = UnlockedKeyring::open(&label.to_lowercase(), secret)
             .await
             .map_err(|err| custom_service_error(&format!("Failed to create keyring: {err}")))?;
 
