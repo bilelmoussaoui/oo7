@@ -57,13 +57,7 @@ impl Collection {
 
             let collection = self.clone();
             let action =
-                crate::prompt::PromptAction::new(move |secret_opt: Option<Secret>| async move {
-                    let unlock_secret = secret_opt.ok_or_else(|| {
-                        crate::error::custom_service_error(
-                            "Cannot unlock collection without a secret",
-                        )
-                    })?;
-
+                crate::prompt::PromptAction::new(move |unlock_secret: Secret| async move {
                     // Unlock the collection
                     collection.set_locked(false, Some(unlock_secret)).await?;
 
@@ -184,13 +178,7 @@ impl Collection {
 
             let collection = self.clone();
             let action =
-                crate::prompt::PromptAction::new(move |secret_opt: Option<Secret>| async move {
-                    let unlock_secret = secret_opt.ok_or_else(|| {
-                        crate::error::custom_service_error(
-                            "Cannot unlock collection without a secret",
-                        )
-                    })?;
-
+                crate::prompt::PromptAction::new(move |unlock_secret: Secret| async move {
                     collection.set_locked(false, Some(unlock_secret)).await?;
 
                     let item_path = collection

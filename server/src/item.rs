@@ -47,14 +47,8 @@ impl Item {
 
             let item_self = self.clone();
             let coll = collection.clone();
-            let action = crate::prompt::PromptAction::new(
-                move |secret_opt: Option<oo7::Secret>| async move {
-                    let unlock_secret = secret_opt.ok_or_else(|| {
-                        crate::error::custom_service_error(
-                            "Cannot unlock collection without a secret",
-                        )
-                    })?;
-
+            let action =
+                crate::prompt::PromptAction::new(move |unlock_secret: oo7::Secret| async move {
                     // Unlock the collection
                     coll.set_locked(false, Some(unlock_secret)).await?;
 
@@ -64,8 +58,7 @@ impl Item {
                     Ok(zbus::zvariant::Value::new(OwnedObjectPath::default())
                         .try_into_owned()
                         .unwrap())
-                },
-            );
+                });
 
             prompt.set_action(action).await;
 

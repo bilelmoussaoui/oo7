@@ -18,7 +18,6 @@ use crate::{
 
 #[derive(Debug, Clone, Copy)]
 pub enum PromptRole {
-    Lock,
     Unlock,
     CreateCollection,
 }
@@ -29,10 +28,9 @@ pub type PromptActionFuture =
     Pin<Box<dyn Future<Output = Result<OwnedValue, ServiceError>> + Send + 'static>>;
 
 /// Represents the action to be taken when a prompt completes
-/// The secret is optional because Lock prompts don't require secret validation
 pub struct PromptAction {
     /// The async function to execute when the prompt is accepted
-    action: Box<dyn FnOnce(Option<Secret>) -> PromptActionFuture + Send>,
+    action: Box<dyn FnOnce(Secret) -> PromptActionFuture + Send>,
 }
 
 impl PromptAction {
@@ -40,7 +38,7 @@ impl PromptAction {
     /// and returns a future
     pub fn new<F, Fut>(f: F) -> Self
     where
-        F: FnOnce(Option<Secret>) -> Fut + Send + 'static,
+        F: FnOnce(Secret) -> Fut + Send + 'static,
         Fut: Future<Output = Result<OwnedValue, ServiceError>> + Send + 'static,
     {
         Self {
@@ -48,8 +46,8 @@ impl PromptAction {
         }
     }
 
-    /// Execute the action with the provided secret (None for Lock operations)
-    pub async fn execute(self, secret: Option<Secret>) -> Result<OwnedValue, ServiceError> {
+    /// Execute the action with the provided secret
+    pub async fn execute(self, secret: Secret) -> Result<OwnedValue, ServiceError> {
         (self.action)(secret).await
     }
 }

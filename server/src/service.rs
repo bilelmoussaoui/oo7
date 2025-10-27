@@ -148,10 +148,7 @@ impl Service {
         // Create the collection creation action
         let service = self.clone();
         let creation_prompt_path = prompt_path.clone();
-        let action = PromptAction::new(move |secret: Option<Secret>| async move {
-            let secret = secret
-                .ok_or_else(|| custom_service_error("CreateCollection action requires a secret"))?;
-
+        let action = PromptAction::new(move |secret: Secret| async move {
             let collection_path = service
                 .complete_collection_creation(&creation_prompt_path, secret)
                 .await?;
@@ -223,21 +220,22 @@ impl Service {
 
             // Create the unlock action
             let service = self.clone();
-            let action = PromptAction::new(move |secret: Option<Secret>| async move {
+            let action = PromptAction::new(move |secret: Secret| async move {
                 // The prompter will handle secret validation
                 // Here we just perform the unlock operation
                 let collections = service.collections.lock().await;
                 for object in &not_unlocked {
                     // Try to find as collection first
                     if let Some(collection) = collections.get(object) {
-                        let _ = collection.set_locked(false, secret.clone()).await;
+                        let _ = collection.set_locked(false, Some(secret.clone())).await;
                     } else {
                         // Try to find as item within collections
                         for (_path, collection) in collections.iter() {
                             if let Some(item) = collection.item_from_path(object).await {
                                 // If the collection is locked, unlock it
                                 if collection.is_locked().await {
-                                    let _ = collection.set_locked(false, secret.clone()).await;
+                                    let _ =
+                                        collection.set_locked(false, Some(secret.clone())).await;
                                 } else {
                                     // Collection is already unlocked, just unlock the item
                                     let keyring = collection.keyring.read().await;
@@ -272,50 +270,13 @@ impl Service {
         &self,
         objects: Vec<OwnedObjectPath>,
     ) -> Result<(Vec<OwnedObjectPath>, OwnedObjectPath), ServiceError> {
+        // set_locked now handles locking directly (without prompts)
         let (locked, not_locked) = self.set_locked(true, &objects).await?;
-        if !not_locked.is_empty() {
-            // Extract the label before creating the prompt
-            let label = self.extract_label_from_objects(&not_locked).await;
-
-            let prompt = Prompt::new(self.clone(), PromptRole::Lock, label, None).await;
-            let path = OwnedObjectPath::from(prompt.path().clone());
-
-            // Create the lock action
-            let service = self.clone();
-            let action = PromptAction::new(move |secret: Option<Secret>| async move {
-                // Lock operation doesn't need secret validation
-                let collections = service.collections.lock().await;
-                for object in &not_locked {
-                    // Try to find as collection first
-                    if let Some(collection) = collections.get(object) {
-                        let _ = collection.set_locked(true, secret.clone()).await;
-                    } else {
-                        // Try to find as item within collections
-                        for (_path, collection) in collections.iter() {
-                            if let Some(item) = collection.item_from_path(object).await {
-                                let keyring = collection.keyring.read().await;
-                                let _ = item
-                                    .set_locked(true, keyring.as_ref().unwrap().as_unlocked())
-                                    .await;
-                                break;
-                            }
-                        }
-                    }
-                }
-                Ok(Value::new(not_locked).try_into_owned().unwrap())
-            });
-
-            prompt.set_action(action).await;
-
-            self.prompts
-                .lock()
-                .await
-                .insert(path.clone(), prompt.clone());
-
-            self.object_server().at(&path, prompt).await?;
-            return Ok((locked, path));
-        }
-
+        // Locking never requires prompts, so not_locked should always be empty
+        debug_assert!(
+            not_locked.is_empty(),
+            "Lock operation should never require prompts"
+        );
         Ok((locked, OwnedObjectPath::default()))
     }
 
@@ -815,7 +776,12 @@ impl Service {
                             if locked { "locked" } else { "unlocked" }
                         );
                         without_prompt.push(object.clone());
+                    } else if locked {
+                        // Locking never requires a prompt
+                        collection.set_locked(true, None).await?;
+                        without_prompt.push(object.clone());
                     } else {
+                        // Unlocking may require a prompt
                         with_prompt.push(object.clone());
                     }
                     break;
@@ -827,13 +793,16 @@ impl Service {
                             if locked { "locked" } else { "unlocked" }
                         );
                         without_prompt.push(object.clone());
-                    // If the collection is unlocked, we can unlock the item
+                    // If the collection is unlocked, we can lock/unlock the
+                    // item directly
                     } else if !collection_locked {
                         let keyring = collection.keyring.read().await;
                         item.set_locked(locked, keyring.as_ref().unwrap().as_unlocked())
                             .await?;
                         without_prompt.push(object.clone());
                     } else {
+                        // Collection is locked, unlocking the item requires unlocking the
+                        // collection
                         with_prompt.push(object.clone());
                     }
                     break;
@@ -1976,7 +1945,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn lock_collection_prompt() -> Result<(), Box<dyn std::error::Error>> {
+    async fn lock_collection_no_prompt() -> Result<(), Box<dyn std::error::Error>> {
         let setup = TestServiceSetup::plain_session(true).await?;
 
         // Collection starts unlocked
@@ -1985,7 +1954,7 @@ mod tests {
             "Collection should start unlocked"
         );
 
-        // Test 1: Lock with accept
+        // Lock the collection
         let locked = setup
             .service_api
             .lock(&[setup.collections[0].inner().path()], None)
@@ -1999,10 +1968,10 @@ mod tests {
         );
         assert!(
             setup.collections[0].is_locked().await?,
-            "Collection should be locked after accepting prompt"
+            "Collection should be locked instantly"
         );
 
-        // Unlock the collection again for dismiss test
+        // Unlock the collection
         let collection = setup
             .server
             .collection_from_path(setup.collections[0].inner().path())
@@ -2013,23 +1982,19 @@ mod tests {
             .await?;
         assert!(
             !setup.collections[0].is_locked().await?,
-            "Collection should be unlocked again"
+            "Collection should be unlocked"
         );
 
-        // Test 2: Lock with dismiss
-        setup.mock_prompter.set_accept(false).await;
-        let result = setup
+        // Lock again to verify it works multiple times
+        let locked = setup
             .service_api
             .lock(&[setup.collections[0].inner().path()], None)
-            .await;
+            .await?;
 
+        assert_eq!(locked.len(), 1, "Should have locked 1 collection again");
         assert!(
-            matches!(result, Err(oo7::dbus::Error::Dismissed)),
-            "Should return Dismissed error when prompt dismissed"
-        );
-        assert!(
-            !setup.collections[0].is_locked().await?,
-            "Collection should still be unlocked after dismissing prompt"
+            setup.collections[0].is_locked().await?,
+            "Collection should be locked again"
         );
 
         Ok(())

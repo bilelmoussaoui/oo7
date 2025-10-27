@@ -130,22 +130,6 @@ pub struct Properties {
 }
 
 impl Properties {
-    fn for_lock(keyring: &str, window_id: Option<&WindowIdentifierType>) -> Self {
-        Self {
-            title: None,
-            message: Some(gettext("Lock Keyring")),
-            description: Some(i18n_f("Confirm locking '{}' Keyring", &[keyring])),
-            warning: None,
-            password_new: None,
-            password_strength: None,
-            choice_label: None,
-            choice_chosen: None,
-            caller_window: window_id.map(ToOwned::to_owned),
-            continue_label: Some(gettext("Lock")),
-            cancel_label: Some(gettext("Cancel")),
-        }
-    }
-
     fn for_unlock(
         keyring: &str,
         warning: Option<&str>,
@@ -340,10 +324,6 @@ impl PrompterCallback {
 
         let label = prompt.label();
         let (properties, prompt_type) = match prompt.role() {
-            PromptRole::Lock => (
-                Properties::for_lock(label, self.window_id.as_ref()),
-                PromptType::Confirm,
-            ),
             PromptRole::Unlock => (
                 Properties::for_unlock(label, None, self.window_id.as_ref()),
                 PromptType::Password,
@@ -370,26 +350,6 @@ impl PrompterCallback {
 
         // Handle each role differently based on what validation/preparation is needed
         match prompt.role() {
-            PromptRole::Lock => {
-                let Some(action) = prompt.take_action().await else {
-                    return Err(custom_service_error(
-                        "Prompt action was already executed or not set",
-                    ));
-                };
-
-                let result_value = action.execute(None).await?;
-
-                let path = self.path.clone();
-                let prompt_path = OwnedObjectPath::from(prompt.path().clone());
-                tokio::spawn(async move { prompter.stop_prompting(&path).await });
-
-                let signal_emitter = self.service.signal_emitter(prompt_path)?;
-                tokio::spawn(async move {
-                    tracing::debug!("Lock prompt completed.");
-                    let _ = Prompt::completed(&signal_emitter, false, result_value).await;
-                });
-                Ok(())
-            }
             PromptRole::Unlock => {
                 let aes_key =
                     secret_exchange::handshake(&self.private_key, exchange).map_err(|err| {
@@ -432,7 +392,7 @@ impl PrompterCallback {
                     };
 
                     // Execute the unlock action after successful validation
-                    let result_value = action.execute(Some(secret)).await?;
+                    let result_value = action.execute(secret).await?;
 
                     let path = self.path.clone();
                     let prompt_path = OwnedObjectPath::from(prompt.path().clone());
@@ -494,7 +454,7 @@ impl PrompterCallback {
                 };
 
                 // Execute the collection creation action with the secret
-                match action.execute(Some(secret)).await {
+                match action.execute(secret).await {
                     Ok(collection_path_value) => {
                         tracing::info!("CreateCollection action completed successfully");
 
