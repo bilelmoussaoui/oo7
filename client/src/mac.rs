@@ -21,7 +21,7 @@ impl Mac {
     }
 
     /// Constant-time comparison against a slice of bytes.
-    pub fn verify_slice(&self, other: &[u8]) -> bool {
+    fn verify_slice(&self, other: &[u8]) -> bool {
         #[cfg(feature = "native_crypto")]
         {
             self.0.ct_eq(other).into()
