@@ -25,22 +25,8 @@ pub enum Keyring {
 }
 
 impl Keyring {
-    /// Create a new instance of the Keyring that automatically removes the
-    /// broken items from the file backend keyring.
-    ///
-    /// This method will probably be removed in future versions if the
-    /// misbehaviour is tracked and fixed.
-    #[deprecated = "The method is no longer useful as the user can fix the keyring using oo7-cli"]
-    pub async fn with_broken_item_cleanup() -> Result<Self> {
-        Self::new_inner(true).await
-    }
-
     /// Create a new instance of the Keyring.
     pub async fn new() -> Result<Self> {
-        Self::new_inner(false).await
-    }
-
-    async fn new_inner(auto_delete_broken_items: bool) -> Result<Self> {
         let is_sandboxed = ashpd::is_sandboxed().await;
         if is_sandboxed {
             #[cfg(feature = "tracing")]
@@ -70,20 +56,6 @@ impl Keyring {
                     );
                 }
                 Err(e) => {
-                    if matches!(e, file::Error::IncorrectSecret) && auto_delete_broken_items {
-                        let keyring = unsafe {
-                            file::UnlockedKeyring::load_unchecked(
-                                crate::file::api::Keyring::default_path()?,
-                                secret,
-                            )
-                            .await?
-                        };
-                        let deleted_items = keyring.delete_broken_items().await?;
-                        debug_assert!(deleted_items > 0);
-                        return Ok(Self::File(Arc::new(RwLock::new(Some(
-                            file::Keyring::Unlocked(keyring),
-                        )))));
-                    }
                     return Err(crate::Error::File(e));
                 }
             };
