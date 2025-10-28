@@ -67,7 +67,8 @@ grcov coverage-raw/combined.info \
   --ignore "**/pam/*" \
   --ignore "**/tests/*" \
   --ignore "**/examples/*" \
-  --ignore "**/target/*"
+  --ignore "**/target/*" \
+  --ignore "**/error.rs"
 
 # Generate HTML report with grcov
 grcov coverage-raw/combined.info \
@@ -82,7 +83,8 @@ grcov coverage-raw/combined.info \
   --ignore "**/pam/*" \
   --ignore "**/tests/*" \
   --ignore "**/examples/*" \
-  --ignore "**/target/*"
+  --ignore "**/target/*" \
+  --ignore "**/error.rs"
 
 # Extract and display coverage percentage
 if [ -f coverage/html/coverage.json ]; then
