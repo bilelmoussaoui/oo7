@@ -76,7 +76,8 @@ impl Keyring {
             Self::DBus(backend) => backend.unlock(None).await?,
             Self::File(keyring) => {
                 let mut kg = keyring.write().await;
-                if let Some(file::Keyring::Locked(locked)) = kg.take() {
+                let kg_value = kg.take();
+                if let Some(file::Keyring::Locked(locked)) = kg_value {
                     #[cfg(feature = "tracing")]
                     tracing::debug!("Unlocking file backend keyring");
 
@@ -90,7 +91,7 @@ impl Keyring {
                     let unlocked = locked.unlock(secret).await.map_err(crate::Error::File)?;
                     *kg = Some(file::Keyring::Unlocked(unlocked));
                 } else {
-                    *kg = kg.take();
+                    *kg = kg_value;
                 }
             }
         };
@@ -103,14 +104,15 @@ impl Keyring {
             Self::DBus(backend) => backend.lock(None).await?,
             Self::File(keyring) => {
                 let mut kg = keyring.write().await;
-                if let Some(file::Keyring::Unlocked(unlocked)) = kg.take() {
+                let kg_value = kg.take();
+                if let Some(file::Keyring::Unlocked(unlocked)) = kg_value {
                     #[cfg(feature = "tracing")]
                     tracing::debug!("Locking file backend keyring");
 
                     let locked = unlocked.lock();
                     *kg = Some(file::Keyring::Locked(locked));
                 } else {
-                    *kg = kg.take();
+                    *kg = kg_value;
                 }
             }
         };
@@ -123,7 +125,7 @@ impl Keyring {
             Self::DBus(collection) => collection.is_locked().await.map_err(From::from),
             Self::File(keyring) => {
                 let keyring_guard = keyring.read().await;
-                Ok(keyring_guard.as_ref().expect("Item must exist").is_locked())
+                Ok(keyring_guard.as_ref().expect("Keyring must exist").is_locked())
             }
         }
     }
@@ -473,7 +475,8 @@ impl Item {
             Self::DBus(item) => item.lock(None).await?,
             Self::File(item, keyring) => {
                 let mut item_guard = item.write().await;
-                if let Some(file::Item::Unlocked(unlocked)) = item_guard.take() {
+                let item_value = item_guard.take();
+                if let Some(file::Item::Unlocked(unlocked)) = item_value {
                     let kg = keyring.read().await;
                     match kg.as_ref() {
                         Some(file::Keyring::Unlocked(backend)) => {
@@ -490,7 +493,7 @@ impl Item {
                         None => unreachable!("A keyring must exist"),
                     }
                 } else {
-                    *item_guard = item_guard.take();
+                    *item_guard = item_value;
                 }
             }
         }
@@ -503,7 +506,8 @@ impl Item {
             Self::DBus(item) => item.unlock(None).await?,
             Self::File(item, keyring) => {
                 let mut item_guard = item.write().await;
-                if let Some(file::Item::Locked(locked)) = item_guard.take() {
+                let item_value = item_guard.take();
+                if let Some(file::Item::Locked(locked)) = item_value {
                     let kg = keyring.read().await;
                     match kg.as_ref() {
                         Some(file::Keyring::Unlocked(backend)) => {
@@ -520,7 +524,7 @@ impl Item {
                         None => unreachable!("A keyring must exist"),
                     }
                 } else {
-                    *item_guard = item_guard.take();
+                    *item_guard = item_value;
                 }
             }
         }
@@ -794,6 +798,24 @@ mod tests {
             let attrs = item.attributes().await.unwrap();
             assert_eq!(attrs.get("version").unwrap(), "2.0");
 
+            // Test edge case: set_attributes when item doesn't exist in keyring
+            if idx == 0 {
+                keyring
+                    .delete(&[("test-name", "item_update_attributes")])
+                    .await
+                    .unwrap();
+
+                item.set_attributes(&[("test-name", "item_update_attributes"), ("version", "3.0")])
+                    .await
+                    .unwrap();
+
+                let new_items = keyring
+                    .search_items(&[("test-name", "item_update_attributes")])
+                    .await
+                    .unwrap();
+                assert_eq!(new_items.len(), 1);
+            }
+
             keyring
                 .delete(&[("test-name", "item_update_attributes")])
                 .await
@@ -997,6 +1019,10 @@ mod tests {
         keyring.lock().await.unwrap();
         assert!(keyring.is_locked().await.unwrap());
 
+        // Test edge case: locking an already locked keyring
+        keyring.lock().await.unwrap();
+        assert!(keyring.is_locked().await.unwrap());
+
         let result = keyring
             .create_item("test", &[("app", "test")], "secret", false)
             .await;
@@ -1035,6 +1061,14 @@ mod tests {
         assert!(!item.is_locked().await.unwrap());
         assert_eq!(item.secret().await.unwrap(), Secret::text("secret"));
 
+        // Test edge case: unlocking an already unlocked item
+        item.unlock().await.unwrap();
+        assert!(!item.is_locked().await.unwrap());
+
+        item.lock().await.unwrap();
+        assert!(item.is_locked().await.unwrap());
+
+        // Test edge case: locking an already locked item
         item.lock().await.unwrap();
         assert!(item.is_locked().await.unwrap());
 
