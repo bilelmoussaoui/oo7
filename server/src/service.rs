@@ -2306,7 +2306,7 @@ mod tests {
         assert_eq!(discovered.len(), 3, "Should discover 3 keyrings");
         for (_, _, keyring) in &discovered {
             assert!(
-                matches!(keyring, Keyring::Locked(_)),
+                keyring.is_locked(),
                 "All keyrings should be locked without secret"
             );
         }
@@ -2320,7 +2320,7 @@ mod tests {
             .find(|(label, _, _)| label == "Work")
             .unwrap();
         assert!(
-            matches!(work_keyring.2, Keyring::Unlocked(_)),
+            !work_keyring.2.is_locked(),
             "Work keyring should be unlocked with correct password"
         );
 
@@ -2329,7 +2329,7 @@ mod tests {
             .find(|(label, _, _)| label == "Personal")
             .unwrap();
         assert!(
-            matches!(personal_keyring.2, Keyring::Locked(_)),
+            personal_keyring.2.is_locked(),
             "Personal keyring should be locked with wrong password"
         );
 
@@ -2344,7 +2344,7 @@ mod tests {
             "Login keyring should have default alias"
         );
         assert!(
-            matches!(login_keyring.2, Keyring::Locked(_)),
+            login_keyring.2.is_locked(),
             "Login keyring should be locked with wrong password"
         );
 
@@ -2405,10 +2405,7 @@ mod tests {
         // Test 1: Discover without secret, v0 marked for migration, v1 locked
         let discovered = service.discover_keyrings(None).await?;
         assert_eq!(discovered.len(), 1, "Should discover v1 keyring only");
-        assert!(
-            matches!(discovered[0].2, Keyring::Locked(_)),
-            "V1 should be locked"
-        );
+        assert!(discovered[0].2.is_locked(), "V1 should be locked");
 
         let pending = service.pending_migrations.lock().await;
         assert_eq!(pending.len(), 1, "V0 should be pending migration");
@@ -2421,10 +2418,7 @@ mod tests {
         assert_eq!(discovered.len(), 2, "Should discover both keyrings");
 
         let legacy = discovered.iter().find(|(l, _, _)| l == "Legacy").unwrap();
-        assert!(
-            matches!(legacy.2, Keyring::Unlocked(_)),
-            "V0 should be migrated and unlocked"
-        );
+        assert!(!legacy.2.is_locked(), "V0 should be migrated and unlocked");
         assert_eq!(
             service.pending_migrations.lock().await.len(),
             0,

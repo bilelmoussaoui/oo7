@@ -271,7 +271,7 @@ impl PamListener {
             };
 
             // Track if we unlocked the collection (so we can re-lock it after)
-            let was_locked = matches!(keyring, oo7::file::Keyring::Locked(_));
+            let was_locked = keyring.is_locked();
 
             // Check if the keyring is locked and unlock if needed
             if was_locked {
