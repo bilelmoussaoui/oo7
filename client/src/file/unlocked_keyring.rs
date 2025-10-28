@@ -250,6 +250,11 @@ impl UnlockedKeyring {
         self.path.as_deref()
     }
 
+    /// Get the modification timestamp
+    pub async fn modified_time(&self) -> std::time::Duration {
+        self.keyring.read().await.modified_time()
+    }
+
     /// Retrieve the number of items
     ///
     /// This function will not trigger a key derivation and can therefore be

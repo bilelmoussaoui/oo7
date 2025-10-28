@@ -303,6 +303,11 @@ impl Keyring {
         Ok(self.items.iter().any(|item| item.is_valid(&key)))
     }
 
+    /// Get the modification timestamp
+    pub fn modified_time(&self) -> std::time::Duration {
+        std::time::Duration::from_secs(self.modified_time)
+    }
+
     // Reset Keyring content
     pub(crate) fn reset(&mut self) {
         let salt = rand::rng().random::<[u8; DEFAULT_SALT_SIZE]>().to_vec();

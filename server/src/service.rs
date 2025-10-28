@@ -698,7 +698,7 @@ impl Service {
 
         // Set up discovered collections
         for (label, alias, keyring) in discovered_keyrings {
-            let collection = Collection::new(&label, &alias, self.clone(), keyring);
+            let collection = Collection::new(&label, &alias, self.clone(), keyring).await;
             collections.insert(collection.path().to_owned().into(), collection.clone());
             collection.dispatch_items().await?;
             object_server
@@ -719,7 +719,8 @@ impl Service {
             oo7::dbus::Service::SESSION_COLLECTION,
             self.clone(),
             Keyring::Unlocked(UnlockedKeyring::temporary(Secret::random().unwrap()).await?),
-        );
+        )
+        .await;
         object_server
             .at(collection.path(), collection.clone())
             .await?;
@@ -928,7 +929,7 @@ impl Service {
         let keyring = Keyring::Unlocked(keyring);
 
         // Create the collection
-        let collection = Collection::new(&label, &alias, self.clone(), keyring);
+        let collection = Collection::new(&label, &alias, self.clone(), keyring).await;
         let collection_path: OwnedObjectPath = collection.path().to_owned().into();
 
         // Register with object server
@@ -1070,7 +1071,7 @@ impl Service {
 
                     // Create a collection for this migrated keyring
                     let keyring = Keyring::Unlocked(unlocked);
-                    let collection = Collection::new(label, alias, self.clone(), keyring);
+                    let collection = Collection::new(label, alias, self.clone(), keyring).await;
                     let collection_path: OwnedObjectPath = collection.path().to_owned().into();
 
                     // Dispatch items

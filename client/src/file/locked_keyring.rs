@@ -49,6 +49,11 @@ impl LockedKeyring {
         self.path.as_deref()
     }
 
+    /// Get the modification timestamp
+    pub async fn modified_time(&self) -> std::time::Duration {
+        self.keyring.read().await.modified_time()
+    }
+
     /// Retrieve the list of available [`LockedItem`]s without decrypting them.
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self)))]
     pub async fn items(&self) -> Result<Vec<Result<Item, InvalidItemError>>, Error> {

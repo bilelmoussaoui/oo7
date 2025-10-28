@@ -387,10 +387,9 @@ impl Collection {
 }
 
 impl Collection {
-    pub fn new(label: &str, alias: &str, service: Service, keyring: Keyring) -> Self {
-        let created = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap();
+    pub async fn new(label: &str, alias: &str, service: Service, keyring: Keyring) -> Self {
+        let modified = keyring.modified_time().await;
+        let created = keyring.created_time().await.unwrap_or(modified);
 
         let sanitized_label = label
             .chars()
@@ -406,7 +405,7 @@ impl Collection {
         Self {
             items: Default::default(),
             label: Arc::new(Mutex::new(label.to_owned())),
-            modified: Arc::new(Mutex::new(created)),
+            modified: Arc::new(Mutex::new(modified)),
             alias: Arc::new(Mutex::new(alias.to_owned())),
             item_index: Arc::new(RwLock::new(0)),
             path: OwnedObjectPath::try_from(format!(

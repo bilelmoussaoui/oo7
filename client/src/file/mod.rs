@@ -114,6 +114,30 @@ impl Keyring {
         }
     }
 
+    /// Get the modification timestamp
+    pub async fn modified_time(&self) -> std::time::Duration {
+        match self {
+            Self::Locked(keyring) => keyring.modified_time().await,
+            Self::Unlocked(keyring) => keyring.modified_time().await,
+        }
+    }
+
+    /// Get the creation timestamp from the filesystem if the keyring has an
+    /// associated file.
+    pub async fn created_time(&self) -> Option<std::time::Duration> {
+        let path = self.path()?;
+
+        #[cfg(feature = "tokio")]
+        let metadata = tokio::fs::metadata(path).await.ok()?;
+        #[cfg(feature = "async-std")]
+        let metadata = async_fs::metadata(path).await.ok()?;
+
+        metadata
+            .created()
+            .ok()
+            .and_then(|time| time.duration_since(std::time::SystemTime::UNIX_EPOCH).ok())
+    }
+
     pub async fn items(&self) -> Result<Vec<Result<Item, InvalidItemError>>, Error> {
         match self {
             Self::Locked(keyring) => keyring.items().await,
