@@ -130,7 +130,11 @@ impl Keyring {
             if !parent.exists() {
                 #[cfg(feature = "tracing")]
                 tracing::debug!("Parent directory {:?} doesn't exists, creating it", parent);
-                fs::DirBuilder::new().recursive(true).create(parent).await?;
+                fs::DirBuilder::new()
+                    .recursive(true)
+                    .mode(0o700)
+                    .create(parent)
+                    .await?;
             }
 
             Ok(tmp_path)
