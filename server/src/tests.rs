@@ -150,6 +150,56 @@ impl TestServiceSetup {
             mock_prompter,
         })
     }
+
+    /// Create a test setup that discovers keyrings from disk
+    /// This is useful for PAM tests that need to create keyrings on disk first
+    pub(crate) async fn with_disk_keyrings(
+        secret: Option<Secret>,
+    ) -> Result<TestServiceSetup, Box<dyn std::error::Error>> {
+        use zbus::proxy::Defaults;
+
+        let (server_conn, client_conn) = create_p2p_connection().await?;
+
+        let service = crate::Service::default();
+
+        server_conn
+            .object_server()
+            .at(
+                oo7::dbus::api::Service::PATH.as_deref().unwrap(),
+                service.clone(),
+            )
+            .await?;
+
+        let discovered = service.discover_keyrings(secret.clone()).await?;
+        service.initialize(server_conn, discovered, false).await?;
+
+        let mock_prompter = MockPrompterService::new();
+        client_conn
+            .object_server()
+            .at("/org/gnome/keyring/Prompter", mock_prompter.clone())
+            .await?;
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let service_api = dbus::api::Service::new(&client_conn).await?;
+
+        let (server_public_key, session) = service_api.open_session(None).await?;
+        let session = Arc::new(session);
+
+        let collections = service_api.collections().await?;
+
+        Ok(TestServiceSetup {
+            server: service,
+            keyring_secret: secret,
+            client_conn,
+            service_api,
+            session,
+            collections,
+            server_public_key,
+            aes_key: None,
+            mock_prompter,
+        })
+    }
 }
 
 /// Mock implementation of org.gnome.keyring.internal.Prompter

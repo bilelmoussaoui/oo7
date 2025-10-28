@@ -456,7 +456,7 @@ impl Service {
 
     /// Discover existing keyrings in the data directory
     /// Returns a vector of (label, alias, keyring) tuples
-    async fn discover_keyrings(
+    pub(crate) async fn discover_keyrings(
         &self,
         secret: Option<Secret>,
     ) -> Result<Vec<(String, String, Keyring)>, Error> {
@@ -662,7 +662,7 @@ impl Service {
 
     /// Initialize the service with collections and start client disconnect
     /// handler
-    async fn initialize(
+    pub(crate) async fn initialize(
         &self,
         connection: zbus::Connection,
         mut discovered_keyrings: Vec<(String, String, Keyring)>, // (name, alias, keyring)
