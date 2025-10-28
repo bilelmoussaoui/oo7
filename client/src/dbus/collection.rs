@@ -128,15 +128,7 @@ impl<'a> Collection<'a> {
             let items = self.inner.search_items(attributes).await?;
             Ok(items
                 .into_iter()
-                .map(|item| {
-                    Item::new(
-                        Arc::clone(&self.service),
-                        Arc::clone(&self.session),
-                        self.algorithm,
-                        item,
-                        self.aes_key.clone(), // Cheap clone, it is an Arc,
-                    )
-                })
+                .map(|item| self.new_item(item))
                 .collect::<Vec<_>>())
         }
     }
