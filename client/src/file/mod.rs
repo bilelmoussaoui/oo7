@@ -49,7 +49,7 @@ pub enum Item {
 }
 
 impl Item {
-    pub fn is_locked(&self) -> bool {
+    pub const fn is_locked(&self) -> bool {
         matches!(self, Self::Locked(_))
     }
 
@@ -153,7 +153,7 @@ impl Keyring {
         }
     }
 
-    pub fn is_locked(&self) -> bool {
+    pub const fn is_locked(&self) -> bool {
         matches!(self, Self::Locked(_))
     }
 

@@ -130,15 +130,13 @@ impl UnlockedItem {
     }
 
     /// The UNIX time when the item was created.
-    pub fn created(&self) -> Duration {
-        let secs = self.created;
-        Duration::from_secs(secs)
+    pub const fn created(&self) -> Duration {
+        Duration::from_secs(self.created)
     }
 
     /// The UNIX time when the item was modified.
-    pub fn modified(&self) -> Duration {
-        let secs = self.modified;
-        Duration::from_secs(secs)
+    pub const fn modified(&self) -> Duration {
+        Duration::from_secs(self.modified)
     }
 
     /// Lock the item with the given key.

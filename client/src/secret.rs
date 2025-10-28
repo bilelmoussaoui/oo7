@@ -43,7 +43,7 @@ impl FromStr for ContentType {
 }
 
 impl ContentType {
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Text => "text/plain",
             Self::Blob => "application/octet-stream",
@@ -90,7 +90,7 @@ impl Secret {
         Self::Blob(value.as_ref().to_owned())
     }
 
-    pub fn content_type(&self) -> ContentType {
+    pub const fn content_type(&self) -> ContentType {
         match self {
             Self::Text(_) => ContentType::Text,
             Self::Blob(_) => ContentType::Blob,

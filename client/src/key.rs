@@ -37,7 +37,7 @@ impl Key {
         Self::new_with_strength(key, Err(file::WeakKeyError::StrengthUnknown))
     }
 
-    pub(crate) fn check_strength(&self) -> Result<(), file::WeakKeyError> {
+    pub(crate) const fn check_strength(&self) -> Result<(), file::WeakKeyError> {
         self.strength
     }
 

@@ -17,7 +17,7 @@ impl std::fmt::Debug for Mac {
 
 impl Mac {
     pub(crate) fn new(inner: Vec<u8>) -> Self {
-        Mac(inner)
+        Self(inner)
     }
 
     /// Constant-time comparison against a slice of bytes.
@@ -33,7 +33,7 @@ impl Mac {
     }
 
     // This is made private to prevent non-constant-time comparisons.
-    pub(crate) fn as_slice(&self) -> &[u8] {
+    pub(crate) const fn as_slice(&self) -> &[u8] {
         self.0.as_slice()
     }
 }
