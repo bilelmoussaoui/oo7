@@ -45,3 +45,7 @@ openssl_crypto = [
     "dep:openssl",
     "oo7/openssl_crypto"
 ]
+
+[dev-dependencies]
+serial_test = "3.2"
+tempfile.workspace = true

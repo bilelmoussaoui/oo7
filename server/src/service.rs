@@ -481,10 +481,11 @@ impl Service {
 
         let keyrings_dir = data_dir.join("keyrings");
 
-        // Scan for v0 keyrings (in keyrings/*.keyring)
-        if keyrings_dir.exists() {
-            tracing::debug!("Scanning for v0 keyrings in {:?}", keyrings_dir);
-            if let Ok(mut entries) = tokio::fs::read_dir(&keyrings_dir).await {
+        // Scan for v1 keyrings first
+        let v1_dir = keyrings_dir.join("v1");
+        if v1_dir.exists() {
+            tracing::debug!("Scanning for v1 keyrings in {}", v1_dir.display());
+            if let Ok(mut entries) = tokio::fs::read_dir(&v1_dir).await {
                 while let Ok(Some(entry)) = entries.next_entry().await {
                     let path = entry.path();
 
@@ -494,7 +495,7 @@ impl Service {
                     }
 
                     if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
-                        tracing::debug!("Found v0 keyring: {}", name);
+                        tracing::debug!("Found v1 keyring: {name}");
 
                         // Try to load the keyring
                         match self.load_keyring(&path, name, secret.as_ref()).await {
@@ -506,11 +507,10 @@ impl Service {
             }
         }
 
-        // Scan for v1 keyrings (in keyrings/v1/*.keyring)
-        let v1_dir = keyrings_dir.join("v1");
-        if v1_dir.exists() {
-            tracing::debug!("Scanning for v1 keyrings in {:?}", v1_dir);
-            if let Ok(mut entries) = tokio::fs::read_dir(&v1_dir).await {
+        // Scan for v0 keyrings
+        if keyrings_dir.exists() {
+            tracing::debug!("Scanning for v0 keyrings in {}", keyrings_dir.display());
+            if let Ok(mut entries) = tokio::fs::read_dir(&keyrings_dir).await {
                 while let Ok(Some(entry)) = entries.next_entry().await {
                     let path = entry.path();
 
@@ -520,7 +520,7 @@ impl Service {
                     }
 
                     if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
-                        tracing::debug!("Found v1 keyring: {}", name);
+                        tracing::debug!("Found v0 keyring: {name}");
 
                         // Try to load the keyring
                         match self.load_keyring(&path, name, secret.as_ref()).await {
@@ -601,23 +601,35 @@ impl Service {
             {
                 // This is a v0 keyring that needs migration
                 tracing::info!(
-                    "Found legacy v0 keyring '{}' at {:?}, registering for migration",
-                    name,
-                    path
+                    "Found legacy v0 keyring '{name}' at {}, registering for migration",
+                    path.display()
                 );
 
                 if let Some(secret) = secret {
-                    tracing::debug!("Attempting immediate migration of v0 keyring '{}'", name);
+                    tracing::debug!("Attempting immediate migration of v0 keyring '{name}'",);
                     match UnlockedKeyring::open(name, secret.clone()).await {
                         Ok(unlocked) => {
-                            tracing::info!("Successfully migrated v0 keyring '{}' to v1", name);
+                            tracing::info!("Successfully migrated v0 keyring '{name}' to v1",);
+
+                            // Write the migrated keyring to disk
+                            unlocked.write().await?;
+                            tracing::info!("Wrote migrated keyring '{name}' to disk");
+
+                            // Remove the v0 keyring file after successful migration
+                            if let Err(e) = tokio::fs::remove_file(path).await {
+                                tracing::warn!(
+                                    "Failed to remove v0 keyring at {}: {e}",
+                                    path.display()
+                                );
+                            } else {
+                                tracing::info!("Removed v0 keyring file at {}", path.display());
+                            }
+
                             Keyring::Unlocked(unlocked)
                         }
                         Err(e) => {
                             tracing::warn!(
-                                "Failed to migrate v0 keyring '{}': {}. Will retry when secret is available.",
-                                name,
-                                e
+                                "Failed to migrate v0 keyring '{name}': {e}. Will retry when secret is available.",
                             );
                             self.pending_migrations.lock().await.insert(
                                 name.to_owned(),
@@ -2001,6 +2013,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial(xdg_env)]
     async fn create_collection_basic() -> Result<(), Box<dyn std::error::Error>> {
         let setup = TestServiceSetup::plain_session(true).await?;
 
@@ -2062,6 +2075,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial(xdg_env)]
     async fn create_collection_signal() -> Result<(), Box<dyn std::error::Error>> {
         let setup = TestServiceSetup::plain_session(true).await?;
 
@@ -2105,6 +2119,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial(xdg_env)]
     async fn create_collection_and_add_items() -> Result<(), Box<dyn std::error::Error>> {
         let setup = TestServiceSetup::plain_session(true).await?;
 
@@ -2164,6 +2179,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial(xdg_env)]
     async fn create_collection_dismissed() -> Result<(), Box<dyn std::error::Error>> {
         let setup = TestServiceSetup::plain_session(true).await?;
 
@@ -2217,6 +2233,228 @@ mod tests {
             matches!(result, Err(ServiceError::NoSuchObject(_))),
             "Should return NoSuchObject error when no pending collection exists"
         );
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[serial_test::serial(xdg_env)]
+    async fn discover_v1_keyrings() -> Result<(), Box<dyn std::error::Error>> {
+        let service = Service::default();
+
+        // Set up a temporary data directory
+        let temp_dir = tempfile::tempdir()?;
+        unsafe { std::env::set_var("XDG_DATA_HOME", temp_dir.path()) };
+
+        // Create v1 keyrings directory
+        let v1_dir = temp_dir.path().join("keyrings/v1");
+        tokio::fs::create_dir_all(&v1_dir).await?;
+
+        // Test 1: Empty directory
+        let discovered = service.discover_keyrings(None).await?;
+        assert!(
+            discovered.is_empty(),
+            "Should discover no keyrings in empty directory"
+        );
+
+        // Create multiple keyrings with different passwords
+        // Add items to each so password validation works
+        let secret1 = Secret::from("password-for-work");
+        let keyring1 = UnlockedKeyring::open("work", secret1.clone()).await?;
+        keyring1
+            .create_item(
+                "Work Item",
+                &[("type", "work")],
+                Secret::text("work-secret"),
+                false,
+            )
+            .await?;
+        keyring1.write().await?;
+
+        let secret2 = Secret::from("password-for-personal");
+        let keyring2 = UnlockedKeyring::open("personal", secret2.clone()).await?;
+        keyring2
+            .create_item(
+                "Personal Item",
+                &[("type", "personal")],
+                Secret::text("personal-secret"),
+                false,
+            )
+            .await?;
+        keyring2.write().await?;
+
+        // Create a "login" keyring which should get the default alias
+        let secret3 = Secret::from("password-for-login");
+        let keyring3 = UnlockedKeyring::open("login", secret3.clone()).await?;
+        keyring3
+            .create_item(
+                "Login Item",
+                &[("type", "login")],
+                Secret::text("login-secret"),
+                false,
+            )
+            .await?;
+        keyring3.write().await?;
+
+        // Create some non-keyring files that should be skipped
+        tokio::fs::write(v1_dir.join("README.txt"), b"This is a readme").await?;
+        tokio::fs::write(v1_dir.join("config.json"), b"{}").await?;
+        tokio::fs::create_dir(v1_dir.join("subdir")).await?;
+
+        // Test 2: Discover without any password, all should be locked
+        let discovered = service.discover_keyrings(None).await?;
+        assert_eq!(discovered.len(), 3, "Should discover 3 keyrings");
+        for (_, _, keyring) in &discovered {
+            assert!(
+                matches!(keyring, Keyring::Locked(_)),
+                "All keyrings should be locked without secret"
+            );
+        }
+
+        // Test 3: Discover with one password, only that keyring should be unlocked
+        let discovered = service.discover_keyrings(Some(secret1.clone())).await?;
+        assert_eq!(discovered.len(), 3, "Should discover 3 keyrings");
+
+        let work_keyring = discovered
+            .iter()
+            .find(|(label, _, _)| label == "Work")
+            .unwrap();
+        assert!(
+            matches!(work_keyring.2, Keyring::Unlocked(_)),
+            "Work keyring should be unlocked with correct password"
+        );
+
+        let personal_keyring = discovered
+            .iter()
+            .find(|(label, _, _)| label == "Personal")
+            .unwrap();
+        assert!(
+            matches!(personal_keyring.2, Keyring::Locked(_)),
+            "Personal keyring should be locked with wrong password"
+        );
+
+        // Test 4: Verify login keyring gets default alias
+        let login_keyring = discovered
+            .iter()
+            .find(|(label, _, _)| label == "Login")
+            .unwrap();
+        assert_eq!(
+            login_keyring.1,
+            oo7::dbus::Service::DEFAULT_COLLECTION,
+            "Login keyring should have default alias"
+        );
+        assert!(
+            matches!(login_keyring.2, Keyring::Locked(_)),
+            "Login keyring should be locked with wrong password"
+        );
+
+        // Test 5: Verify labels are properly capitalized
+        let labels: Vec<_> = discovered
+            .iter()
+            .map(|(label, _, _)| label.as_str())
+            .collect();
+        assert!(labels.contains(&"Work"), "Should have Work with capital W");
+        assert!(
+            labels.contains(&"Personal"),
+            "Should have Personal with capital P"
+        );
+        assert!(
+            labels.contains(&"Login"),
+            "Should have Login with capital L"
+        );
+
+        // Clean up
+        unsafe { std::env::remove_var("XDG_DATA_HOME") };
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[serial_test::serial(xdg_env)]
+    async fn discover_v0_keyrings() -> Result<(), Box<dyn std::error::Error>> {
+        let service = Service::default();
+        let temp_dir = tempfile::tempdir()?;
+        unsafe { std::env::set_var("XDG_DATA_HOME", temp_dir.path()) };
+
+        let keyrings_dir = temp_dir.path().join("keyrings");
+        let v1_dir = keyrings_dir.join("v1");
+        tokio::fs::create_dir_all(&keyrings_dir).await?;
+        tokio::fs::create_dir_all(&v1_dir).await?;
+
+        // Copy the existing v0 keyring fixture
+        let v0_secret = Secret::from("test");
+        let fixture_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .join("client/fixtures/legacy.keyring");
+        let v0_path = keyrings_dir.join("legacy.keyring");
+        tokio::fs::copy(&fixture_path, &v0_path).await?;
+
+        // Create a v1 keyring for mixed scenario
+        let v1_secret = Secret::from("v1-password");
+        let v1_keyring = UnlockedKeyring::open("modern", v1_secret.clone()).await?;
+        v1_keyring
+            .create_item(
+                "V1 Item",
+                &[("type", "v1")],
+                Secret::text("v1-secret"),
+                false,
+            )
+            .await?;
+        v1_keyring.write().await?;
+
+        // Test 1: Discover without secret, v0 marked for migration, v1 locked
+        let discovered = service.discover_keyrings(None).await?;
+        assert_eq!(discovered.len(), 1, "Should discover v1 keyring only");
+        assert!(
+            matches!(discovered[0].2, Keyring::Locked(_)),
+            "V1 should be locked"
+        );
+
+        let pending = service.pending_migrations.lock().await;
+        assert_eq!(pending.len(), 1, "V0 should be pending migration");
+        assert!(pending.contains_key("legacy"));
+        drop(pending);
+
+        // Test 2: Discover with v0 secret, v0 migrated, v1 locked
+        service.pending_migrations.lock().await.clear();
+        let discovered = service.discover_keyrings(Some(v0_secret.clone())).await?;
+        assert_eq!(discovered.len(), 2, "Should discover both keyrings");
+
+        let legacy = discovered.iter().find(|(l, _, _)| l == "Legacy").unwrap();
+        assert!(
+            matches!(legacy.2, Keyring::Unlocked(_)),
+            "V0 should be migrated and unlocked"
+        );
+        assert_eq!(
+            service.pending_migrations.lock().await.len(),
+            0,
+            "No pending after successful migration"
+        );
+
+        // Verify v1 file was created
+        let v1_migrated = temp_dir.path().join("keyrings/v1/legacy.keyring");
+        assert!(v1_migrated.exists(), "V1 file should exist after migration");
+
+        // Test 3: Discover with wrong v0 secret,  marked for pending migration
+        tokio::fs::remove_file(&v1_migrated).await?;
+        service.pending_migrations.lock().await.clear();
+
+        // Restore the v0 file for this test
+        tokio::fs::copy(&fixture_path, &v0_path).await?;
+
+        let wrong_secret = Secret::from("wrong-password");
+        let discovered = service.discover_keyrings(Some(wrong_secret)).await?;
+        assert_eq!(
+            discovered.len(),
+            1,
+            "Only v1 should be discovered with wrong v0 password"
+        );
+        assert_eq!(
+            service.pending_migrations.lock().await.len(),
+            1,
+            "V0 should be pending with wrong password"
+        );
+
+        unsafe { std::env::remove_var("XDG_DATA_HOME") };
         Ok(())
     }
 }
