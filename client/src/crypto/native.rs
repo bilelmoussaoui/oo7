@@ -173,6 +173,7 @@ pub(crate) fn legacy_derive_key_and_iv(
     let mut buffer = vec![0; EncAlg::key_size() + EncAlg::iv_size()];
     let mut hasher = Sha256::new();
     let mut digest_buffer = vec![0; <Sha256 as Digest>::output_size()];
+    #[allow(deprecated)]
     let digest = Output::<Sha256>::from_mut_slice(digest_buffer.as_mut_slice());
 
     let mut pos = 0usize;

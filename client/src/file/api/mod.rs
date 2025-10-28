@@ -15,7 +15,7 @@ use std::{
 #[cfg(feature = "async-std")]
 use async_fs as fs;
 #[cfg(feature = "async-std")]
-use async_fs::unix::OpenOptionsExt;
+use async_fs::unix::{DirBuilderExt, OpenOptionsExt};
 #[cfg(feature = "async-std")]
 use futures_lite::AsyncWriteExt;
 use rand::Rng;

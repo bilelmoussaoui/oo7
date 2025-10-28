@@ -10,7 +10,7 @@ pub async fn migrate(attributes: Vec<impl AsAttributes>, replace: bool) -> Resul
     let secret = crate::Secret::from(
         ashpd::desktop::secret::retrieve()
             .await
-            .map_err(|err| crate::file::Error::from(err))?,
+            .map_err(crate::file::Error::from)?,
     );
     let file_backend =
         match UnlockedKeyring::load(crate::file::api::Keyring::default_path()?, secret).await {

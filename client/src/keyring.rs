@@ -49,7 +49,7 @@ impl Keyring {
             let secret = Secret::from(
                 ashpd::desktop::secret::retrieve()
                     .await
-                    .map_err(|err| crate::file::Error::from(err))?,
+                    .map_err(crate::file::Error::from)?,
             );
             match file::UnlockedKeyring::load(
                 crate::file::api::Keyring::default_path()?,
