@@ -46,7 +46,17 @@ impl Keyring {
             #[cfg(feature = "tracing")]
             tracing::debug!("Application is sandboxed, using the file backend");
 
-            match file::UnlockedKeyring::load_default().await {
+            let secret = Secret::from(
+                ashpd::desktop::secret::retrieve()
+                    .await
+                    .map_err(|err| crate::file::Error::from(err))?,
+            );
+            match file::UnlockedKeyring::load(
+                crate::file::api::Keyring::default_path()?,
+                secret.clone(),
+            )
+            .await
+            {
                 Ok(file) => return Ok(Self::File(Arc::new(file))),
                 // Do nothing in this case, we are supposed to fallback to the host keyring
                 Err(super::file::Error::Portal(ashpd::Error::PortalNotFound(_))) => {
@@ -57,8 +67,13 @@ impl Keyring {
                 }
                 Err(e) => {
                     if matches!(e, file::Error::IncorrectSecret) && auto_delete_broken_items {
-                        let keyring =
-                            unsafe { file::UnlockedKeyring::load_default_unchecked().await? };
+                        let keyring = unsafe {
+                            file::UnlockedKeyring::load_unchecked(
+                                crate::file::api::Keyring::default_path()?,
+                                secret,
+                            )
+                            .await?
+                        };
                         let deleted_items = keyring.delete_broken_items().await?;
                         debug_assert!(deleted_items > 0);
                         return Ok(Self::File(Arc::new(keyring)));

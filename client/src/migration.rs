@@ -7,15 +7,21 @@ use crate::{AsAttributes, Result, dbus::Service, file::UnlockedKeyring};
 /// Secret Service.
 pub async fn migrate(attributes: Vec<impl AsAttributes>, replace: bool) -> Result<()> {
     let service = Service::new().await?;
-    let file_backend = match UnlockedKeyring::load_default().await {
-        Ok(file) => Ok(file),
-        Err(super::file::Error::Portal(ashpd::Error::PortalNotFound(_))) => {
-            #[cfg(feature = "tracing")]
-            tracing::debug!("Portal not available, no migration to do");
-            return Ok(());
-        }
-        Err(err) => Err(err),
-    }?;
+    let secret = crate::Secret::from(
+        ashpd::desktop::secret::retrieve()
+            .await
+            .map_err(|err| crate::file::Error::from(err))?,
+    );
+    let file_backend =
+        match UnlockedKeyring::load(crate::file::api::Keyring::default_path()?, secret).await {
+            Ok(file) => Ok(file),
+            Err(super::file::Error::Portal(ashpd::Error::PortalNotFound(_))) => {
+                #[cfg(feature = "tracing")]
+                tracing::debug!("Portal not available, no migration to do");
+                return Ok(());
+            }
+            Err(err) => Err(err),
+        }?;
 
     let collection = service.default_collection().await?;
     let mut all_items = Vec::default();

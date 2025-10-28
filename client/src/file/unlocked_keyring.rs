@@ -37,29 +37,6 @@ pub struct UnlockedKeyring {
 }
 
 impl UnlockedKeyring {
-    /// Load from default keyring file
-    #[cfg_attr(feature = "tracing", tracing::instrument())]
-    pub async fn load_default() -> Result<Self, Error> {
-        #[cfg(feature = "tracing")]
-        tracing::debug!("Loading default keyring file");
-
-        let secret = Secret::from(ashpd::desktop::secret::retrieve().await?);
-        Self::load(api::Keyring::default_path()?, secret).await
-    }
-
-    /// Load from default keyring file
-    ///
-    /// # Safety
-    ///
-    /// The secret validation is skipped.
-    #[cfg_attr(feature = "tracing", tracing::instrument())]
-    pub async unsafe fn load_default_unchecked() -> Result<Self, Error> {
-        #[cfg(feature = "tracing")]
-        tracing::debug!("Loading default keyring file");
-        let secret = Secret::from(ashpd::desktop::secret::retrieve().await?);
-        unsafe { Self::load_unchecked(api::Keyring::default_path()?, secret).await }
-    }
-
     /// Load from a keyring file.
     ///
     /// # Arguments

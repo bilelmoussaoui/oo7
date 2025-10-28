@@ -1,10 +1,10 @@
 //! File backend implementation that can be backed by the [Secret portal](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.Secret.html).
 //!
 //! ```no_run
-//! use oo7::file::UnlockedKeyring;
+//! use oo7::{Secret, file::UnlockedKeyring};
 //!
 //! # async fn run() -> oo7::Result<()> {
-//! let keyring = UnlockedKeyring::load_default().await?;
+//! let keyring = UnlockedKeyring::load("default.keyring", Secret::text("some_text")).await?;
 //! keyring
 //!     .create_item("My Label", &[("account", "alice")], "My Password", true)
 //!     .await?;
@@ -24,7 +24,7 @@
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 pub mod api;
 #[cfg(not(feature = "unstable"))]
-mod api;
+pub(crate) mod api;
 
 pub(crate) use api::AttributeValue;
 
