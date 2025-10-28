@@ -19,7 +19,7 @@ use crate::{AsAttributes, Result, Secret, dbus, file};
 #[derive(Debug)]
 pub enum Keyring {
     #[doc(hidden)]
-    File(Arc<file::UnlockedKeyring>),
+    File(Arc<RwLock<Option<file::Keyring>>>),
     #[doc(hidden)]
     DBus(dbus::Collection<'static>),
 }
@@ -57,7 +57,11 @@ impl Keyring {
             )
             .await
             {
-                Ok(file) => return Ok(Self::File(Arc::new(file))),
+                Ok(file) => {
+                    return Ok(Self::File(Arc::new(RwLock::new(Some(
+                        file::Keyring::Unlocked(file),
+                    )))));
+                }
                 // Do nothing in this case, we are supposed to fallback to the host keyring
                 Err(super::file::Error::Portal(ashpd::Error::PortalNotFound(_))) => {
                     #[cfg(feature = "tracing")]
@@ -76,7 +80,9 @@ impl Keyring {
                         };
                         let deleted_items = keyring.delete_broken_items().await?;
                         debug_assert!(deleted_items > 0);
-                        return Ok(Self::File(Arc::new(keyring)));
+                        return Ok(Self::File(Arc::new(RwLock::new(Some(
+                            file::Keyring::Unlocked(keyring),
+                        )))));
                     }
                     return Err(crate::Error::File(e));
                 }
@@ -92,26 +98,62 @@ impl Keyring {
         Ok(Self::DBus(collection))
     }
 
-    /// Unlock the used collection if using the Secret service.
-    ///
-    /// The method does nothing if keyring is backed by a file backend.
+    /// Unlock the used collection.
     pub async fn unlock(&self) -> Result<()> {
-        // No unlocking is needed for the file backend
-        if let Self::DBus(backend) = self {
-            backend.unlock(None).await?;
+        match self {
+            Self::DBus(backend) => backend.unlock(None).await?,
+            Self::File(keyring) => {
+                let mut kg = keyring.write().await;
+                if let Some(file::Keyring::Locked(locked)) = kg.take() {
+                    #[cfg(feature = "tracing")]
+                    tracing::debug!("Unlocking file backend keyring");
+
+                    // Retrieve secret from portal
+                    let secret = Secret::from(
+                        ashpd::desktop::secret::retrieve()
+                            .await
+                            .map_err(crate::file::Error::from)?,
+                    );
+
+                    let unlocked = locked.unlock(secret).await.map_err(crate::Error::File)?;
+                    *kg = Some(file::Keyring::Unlocked(unlocked));
+                } else {
+                    *kg = kg.take();
+                }
+            }
         };
         Ok(())
     }
 
-    /// Lock the used collection if using the Secret service.
-    ///
-    /// The method does nothing if keyring is backed by a file backend.
+    /// Lock the used collection.
     pub async fn lock(&self) -> Result<()> {
-        // No locking is needed for the file backend
-        if let Self::DBus(backend) = self {
-            backend.lock(None).await?;
+        match self {
+            Self::DBus(backend) => backend.lock(None).await?,
+            Self::File(keyring) => {
+                let mut kg = keyring.write().await;
+                if let Some(file::Keyring::Unlocked(unlocked)) = kg.take() {
+                    #[cfg(feature = "tracing")]
+                    tracing::debug!("Locking file backend keyring");
+
+                    let locked = unlocked.lock();
+                    *kg = Some(file::Keyring::Locked(locked));
+                } else {
+                    *kg = kg.take();
+                }
+            }
         };
         Ok(())
+    }
+
+    /// Whether the keyring is locked or not.
+    pub async fn is_locked(&self) -> Result<bool> {
+        match self {
+            Self::DBus(collection) => collection.is_locked().await.map_err(From::from),
+            Self::File(keyring) => {
+                let keyring_guard = keyring.read().await;
+                Ok(keyring_guard.as_ref().expect("Item must exist").is_locked())
+            }
+        }
     }
 
     /// Remove items that matches the attributes.
@@ -123,8 +165,20 @@ impl Keyring {
                     item.delete(None).await?;
                 }
             }
-            Self::File(backend) => {
-                backend.delete(attributes).await?;
+            Self::File(keyring) => {
+                let kg = keyring.read().await;
+                match kg.as_ref() {
+                    Some(file::Keyring::Unlocked(backend)) => {
+                        backend
+                            .delete(attributes)
+                            .await
+                            .map_err(crate::Error::File)?;
+                    }
+                    Some(file::Keyring::Locked(_)) => {
+                        return Err(crate::file::Error::Locked.into());
+                    }
+                    _ => unreachable!("A keyring must exist"),
+                }
             }
         };
         Ok(())
@@ -137,14 +191,23 @@ impl Keyring {
                 let items = backend.items().await?;
                 items.into_iter().map(Item::for_dbus).collect::<Vec<_>>()
             }
-            Self::File(backend) => {
-                let items = backend.items().await?;
-                items
-                    .into_iter()
-                    // Ignore invalid items
-                    .flatten()
-                    .map(|i| Item::for_file(i, Arc::clone(backend)))
-                    .collect::<Vec<_>>()
+            Self::File(keyring) => {
+                let kg = keyring.read().await;
+                match kg.as_ref() {
+                    Some(file::Keyring::Unlocked(backend)) => {
+                        let items = backend.items().await.map_err(crate::Error::File)?;
+                        items
+                            .into_iter()
+                            // Ignore invalid items
+                            .flatten()
+                            .map(|i| Item::for_file(i, Arc::clone(keyring)))
+                            .collect::<Vec<_>>()
+                    }
+                    Some(file::Keyring::Locked(_)) => {
+                        return Err(crate::file::Error::Locked.into());
+                    }
+                    _ => unreachable!("A keyring must exist"),
+                }
             }
         };
         Ok(items)
@@ -164,10 +227,20 @@ impl Keyring {
                     .create_item(label, attributes, secret, replace, None)
                     .await?;
             }
-            Self::File(backend) => {
-                backend
-                    .create_item(label, attributes, secret, replace)
-                    .await?;
+            Self::File(keyring) => {
+                let kg = keyring.read().await;
+                match kg.as_ref() {
+                    Some(file::Keyring::Unlocked(backend)) => {
+                        backend
+                            .create_item(label, attributes, secret, replace)
+                            .await
+                            .map_err(crate::Error::File)?;
+                    }
+                    Some(file::Keyring::Locked(_)) => {
+                        return Err(crate::file::Error::Locked.into());
+                    }
+                    _ => unreachable!("A keyring must exist"),
+                }
             }
         };
         Ok(())
@@ -180,31 +253,27 @@ impl Keyring {
                 let items = backend.search_items(attributes).await?;
                 items.into_iter().map(Item::for_dbus).collect::<Vec<_>>()
             }
-            Self::File(backend) => {
-                let items = backend.search_items(attributes).await?;
-                items
-                    .into_iter()
-                    .map(|i| Item::for_file(i, Arc::clone(backend)))
-                    .collect::<Vec<_>>()
+            Self::File(keyring) => {
+                let kg = keyring.read().await;
+                match kg.as_ref() {
+                    Some(file::Keyring::Unlocked(backend)) => {
+                        let items = backend
+                            .search_items(attributes)
+                            .await
+                            .map_err(crate::Error::File)?;
+                        items
+                            .into_iter()
+                            .map(|i| Item::for_file(i, Arc::clone(keyring)))
+                            .collect::<Vec<_>>()
+                    }
+                    Some(file::Keyring::Locked(_)) => {
+                        return Err(crate::file::Error::Locked.into());
+                    }
+                    _ => unreachable!("A keyring must exist"),
+                }
             }
         };
         Ok(items)
-    }
-
-    /// Get the inner file backend if the keyring is backed by one.
-    pub fn as_file(&self) -> Arc<file::UnlockedKeyring> {
-        match self {
-            Self::File(keyring) => keyring.clone(),
-            _ => unreachable!(),
-        }
-    }
-
-    /// Get the inner DBus backend if the keyring is backed by one.
-    pub fn as_dbus(&self) -> &dbus::Collection<'_> {
-        match self {
-            Self::DBus(collection) => collection,
-            _ => unreachable!(),
-        }
     }
 }
 
@@ -212,14 +281,17 @@ impl Keyring {
 #[derive(Debug)]
 pub enum Item {
     #[doc(hidden)]
-    File(RwLock<file::UnlockedItem>, Arc<file::UnlockedKeyring>),
+    File(
+        RwLock<Option<file::Item>>,
+        Arc<RwLock<Option<file::Keyring>>>,
+    ),
     #[doc(hidden)]
     DBus(dbus::Item<'static>),
 }
 
 impl Item {
-    fn for_file(item: file::Item, backend: Arc<file::UnlockedKeyring>) -> Self {
-        Self::File(RwLock::new(item.as_unlocked().clone()), backend)
+    fn for_file(item: file::Item, backend: Arc<RwLock<Option<file::Keyring>>>) -> Self {
+        Self::File(RwLock::new(Some(item)), backend)
     }
 
     fn for_dbus(item: dbus::Item<'static>) -> Self {
@@ -229,7 +301,14 @@ impl Item {
     /// The item label.
     pub async fn label(&self) -> Result<String> {
         let label = match self {
-            Self::File(item, _) => item.read().await.label().to_owned(),
+            Self::File(item, _) => {
+                let item_guard = item.read().await;
+                let file_item = item_guard.as_ref().expect("Item must exist");
+                match file_item {
+                    file::Item::Unlocked(unlocked) => unlocked.label().to_owned(),
+                    file::Item::Locked(_) => return Err(crate::file::Error::Locked.into()),
+                }
+            }
             Self::DBus(item) => item.label().await?,
         };
         Ok(label)
@@ -238,19 +317,37 @@ impl Item {
     /// Sets the item label.
     pub async fn set_label(&self, label: &str) -> Result<()> {
         match self {
-            Self::File(item, backend) => {
-                item.write().await.set_label(label);
+            Self::File(item, keyring) => {
+                let mut item_guard = item.write().await;
+                let file_item = item_guard.as_mut().expect("Item must exist");
 
-                let item_guard = item.read().await;
+                match file_item {
+                    file::Item::Unlocked(unlocked) => {
+                        unlocked.set_label(label);
 
-                backend
-                    .create_item(
-                        item_guard.label(),
-                        &item_guard.attributes(),
-                        item_guard.secret(),
-                        true,
-                    )
-                    .await?;
+                        let kg = keyring.read().await;
+                        match kg.as_ref() {
+                            Some(file::Keyring::Unlocked(backend)) => {
+                                backend
+                                    .create_item(
+                                        unlocked.label(),
+                                        &unlocked.attributes(),
+                                        unlocked.secret(),
+                                        true,
+                                    )
+                                    .await
+                                    .map_err(crate::Error::File)?;
+                            }
+                            Some(file::Keyring::Locked(_)) => {
+                                return Err(crate::file::Error::Locked.into());
+                            }
+                            None => unreachable!("A keyring must exist"),
+                        }
+                    }
+                    file::Item::Locked(_) => {
+                        return Err(crate::file::Error::Locked.into());
+                    }
+                }
             }
             Self::DBus(item) => item.set_label(label).await?,
         };
@@ -260,13 +357,18 @@ impl Item {
     /// Retrieve the item attributes.
     pub async fn attributes(&self) -> Result<HashMap<String, String>> {
         let attributes = match self {
-            Self::File(item, _) => item
-                .read()
-                .await
-                .attributes()
-                .iter()
-                .map(|(k, v)| (k.to_owned(), v.to_string()))
-                .collect::<HashMap<_, _>>(),
+            Self::File(item, _) => {
+                let item_guard = item.read().await;
+                let file_item = item_guard.as_ref().expect("Item must exist");
+                match file_item {
+                    file::Item::Unlocked(unlocked) => unlocked
+                        .attributes()
+                        .iter()
+                        .map(|(k, v)| (k.to_owned(), v.to_string()))
+                        .collect::<HashMap<_, _>>(),
+                    file::Item::Locked(_) => return Err(crate::file::Error::Locked.into()),
+                }
+            }
             Self::DBus(item) => item.attributes().await?,
         };
         Ok(attributes)
@@ -275,20 +377,49 @@ impl Item {
     /// Sets the item attributes.
     pub async fn set_attributes(&self, attributes: &impl AsAttributes) -> Result<()> {
         match self {
-            Self::File(item, backend) => {
-                let index = backend
-                    .lookup_item_index(item.read().await.attributes())
-                    .await?;
+            Self::File(item, keyring) => {
+                let kg = keyring.read().await;
 
-                item.write().await.set_attributes(attributes);
-                let item_guard = item.read().await;
+                match kg.as_ref() {
+                    Some(file::Keyring::Unlocked(backend)) => {
+                        let mut item_guard = item.write().await;
+                        let file_item = item_guard.as_mut().expect("Item must exist");
 
-                if let Some(index) = index {
-                    backend.replace_item_index(index, &item_guard).await?;
-                } else {
-                    backend
-                        .create_item(item_guard.label(), attributes, item_guard.secret(), true)
-                        .await?;
+                        match file_item {
+                            file::Item::Unlocked(unlocked) => {
+                                let index = backend
+                                    .lookup_item_index(&unlocked.attributes())
+                                    .await
+                                    .map_err(crate::Error::File)?;
+
+                                unlocked.set_attributes(attributes);
+
+                                if let Some(index) = index {
+                                    backend
+                                        .replace_item_index(index, unlocked)
+                                        .await
+                                        .map_err(crate::Error::File)?;
+                                } else {
+                                    backend
+                                        .create_item(
+                                            unlocked.label(),
+                                            attributes,
+                                            unlocked.secret(),
+                                            true,
+                                        )
+                                        .await
+                                        .map_err(crate::Error::File)?;
+                                }
+                            }
+                            file::Item::Locked(_) => {
+                                return Err(crate::file::Error::Locked.into());
+                            }
+                        }
+                    }
+                    Some(file::Keyring::Locked(_)) => {
+                        return Err(crate::file::Error::Locked.into());
+                    }
+                    None => unreachable!("A keyring must exist"),
                 }
             }
             Self::DBus(item) => item.set_attributes(attributes).await?,
@@ -299,18 +430,37 @@ impl Item {
     /// Sets a new secret.
     pub async fn set_secret(&self, secret: impl Into<Secret>) -> Result<()> {
         match self {
-            Self::File(item, backend) => {
-                item.write().await.set_secret(secret);
-                let item_guard = item.read().await;
+            Self::File(item, keyring) => {
+                let mut item_guard = item.write().await;
+                let file_item = item_guard.as_mut().expect("Item must exist");
 
-                backend
-                    .create_item(
-                        item_guard.label(),
-                        &item_guard.attributes(),
-                        item_guard.secret(),
-                        true,
-                    )
-                    .await?;
+                match file_item {
+                    file::Item::Unlocked(unlocked) => {
+                        unlocked.set_secret(secret);
+
+                        let kg = keyring.read().await;
+                        match kg.as_ref() {
+                            Some(file::Keyring::Unlocked(backend)) => {
+                                backend
+                                    .create_item(
+                                        unlocked.label(),
+                                        &unlocked.attributes(),
+                                        unlocked.secret(),
+                                        true,
+                                    )
+                                    .await
+                                    .map_err(crate::Error::File)?;
+                            }
+                            Some(file::Keyring::Locked(_)) => {
+                                return Err(crate::file::Error::Locked.into());
+                            }
+                            None => unreachable!("A keyring must exist"),
+                        }
+                    }
+                    file::Item::Locked(_) => {
+                        return Err(crate::file::Error::Locked.into());
+                    }
+                }
             }
             Self::DBus(item) => item.set_secret(secret).await?,
         };
@@ -320,40 +470,87 @@ impl Item {
     /// Retrieves the stored secret.
     pub async fn secret(&self) -> Result<Secret> {
         let secret = match self {
-            Self::File(item, _) => item.read().await.secret(),
+            Self::File(item, _) => {
+                let item_guard = item.read().await;
+                let file_item = item_guard.as_ref().expect("Item must exist");
+                match file_item {
+                    file::Item::Unlocked(unlocked) => unlocked.secret(),
+                    file::Item::Locked(_) => return Err(crate::file::Error::Locked.into()),
+                }
+            }
             Self::DBus(item) => item.secret().await?,
         };
         Ok(secret)
     }
 
     /// Whether the item is locked or not
-    ///
-    /// The method always returns `false` if keyring is backed by a file
-    /// backend.
     pub async fn is_locked(&self) -> Result<bool> {
-        if let Self::DBus(item) = self {
-            item.is_locked().await.map_err(From::from)
-        } else {
-            Ok(false)
+        match self {
+            Self::DBus(item) => item.is_locked().await.map_err(From::from),
+            Self::File(item, _) => {
+                let item_guard = item.read().await;
+                let file_item = item_guard.as_ref().expect("Item must exist");
+                Ok(file_item.is_locked())
+            }
         }
     }
 
     /// Lock the item
-    ///
-    /// The method does nothing if keyring is backed by a file backend.
     pub async fn lock(&self) -> Result<()> {
-        if let Self::DBus(item) = self {
-            item.lock(None).await?;
+        match self {
+            Self::DBus(item) => item.lock(None).await?,
+            Self::File(item, keyring) => {
+                let mut item_guard = item.write().await;
+                if let Some(file::Item::Unlocked(unlocked)) = item_guard.take() {
+                    let kg = keyring.read().await;
+                    match kg.as_ref() {
+                        Some(file::Keyring::Unlocked(backend)) => {
+                            let locked = backend
+                                .lock_item(unlocked)
+                                .await
+                                .map_err(crate::Error::File)?;
+                            *item_guard = Some(file::Item::Locked(locked));
+                        }
+                        Some(file::Keyring::Locked(_)) => {
+                            *item_guard = Some(file::Item::Unlocked(unlocked));
+                            return Err(crate::file::Error::Locked.into());
+                        }
+                        None => unreachable!("A keyring must exist"),
+                    }
+                } else {
+                    *item_guard = item_guard.take();
+                }
+            }
         }
         Ok(())
     }
 
     /// Unlock the item
-    ///
-    /// The method does nothing if keyring is backed by a file backend.
     pub async fn unlock(&self) -> Result<()> {
-        if let Self::DBus(item) = self {
-            item.unlock(None).await?;
+        match self {
+            Self::DBus(item) => item.unlock(None).await?,
+            Self::File(item, keyring) => {
+                let mut item_guard = item.write().await;
+                if let Some(file::Item::Locked(locked)) = item_guard.take() {
+                    let kg = keyring.read().await;
+                    match kg.as_ref() {
+                        Some(file::Keyring::Unlocked(backend)) => {
+                            let unlocked = backend
+                                .unlock_item(locked)
+                                .await
+                                .map_err(crate::Error::File)?;
+                            *item_guard = Some(file::Item::Unlocked(unlocked));
+                        }
+                        Some(file::Keyring::Locked(_)) => {
+                            *item_guard = Some(file::Item::Locked(locked));
+                            return Err(crate::file::Error::Locked.into());
+                        }
+                        None => unreachable!("A keyring must exist"),
+                    }
+                } else {
+                    *item_guard = item_guard.take();
+                }
+            }
         }
         Ok(())
     }
@@ -361,10 +558,30 @@ impl Item {
     /// Delete the item.
     pub async fn delete(&self) -> Result<()> {
         match self {
-            Self::File(item, backend) => {
+            Self::File(item, keyring) => {
                 let item_guard = item.read().await;
+                let file_item = item_guard.as_ref().expect("Item must exist");
 
-                backend.delete(&item_guard.attributes()).await?;
+                match file_item {
+                    file::Item::Unlocked(unlocked) => {
+                        let kg = keyring.read().await;
+                        match kg.as_ref() {
+                            Some(file::Keyring::Unlocked(backend)) => {
+                                backend
+                                    .delete(&unlocked.attributes())
+                                    .await
+                                    .map_err(crate::Error::File)?;
+                            }
+                            Some(file::Keyring::Locked(_)) => {
+                                return Err(crate::file::Error::Locked.into());
+                            }
+                            None => unreachable!("A keyring must exist"),
+                        }
+                    }
+                    file::Item::Locked(_) => {
+                        return Err(crate::file::Error::Locked.into());
+                    }
+                }
             }
             Self::DBus(item) => {
                 item.delete(None).await?;
@@ -377,7 +594,14 @@ impl Item {
     pub async fn created(&self) -> Result<Duration> {
         match self {
             Self::DBus(item) => Ok(item.created().await?),
-            Self::File(item, _) => Ok(item.read().await.created()),
+            Self::File(item, _) => {
+                let item_guard = item.read().await;
+                let file_item = item_guard.as_ref().expect("Item must exist");
+                match file_item {
+                    file::Item::Unlocked(unlocked) => Ok(unlocked.created()),
+                    file::Item::Locked(_) => Err(crate::file::Error::Locked.into()),
+                }
+            }
         }
     }
 
@@ -385,7 +609,14 @@ impl Item {
     pub async fn modified(&self) -> Result<Duration> {
         match self {
             Self::DBus(item) => Ok(item.modified().await?),
-            Self::File(item, _) => Ok(item.read().await.modified()),
+            Self::File(item, _) => {
+                let item_guard = item.read().await;
+                let file_item = item_guard.as_ref().expect("Item must exist");
+                match file_item {
+                    file::Item::Unlocked(unlocked) => Ok(unlocked.modified()),
+                    file::Item::Locked(_) => Err(crate::file::Error::Locked.into()),
+                }
+            }
         }
     }
 }

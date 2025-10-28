@@ -44,6 +44,8 @@ pub enum Error {
     },
     /// Crypto related error.
     Crypto(crate::crypto::Error),
+    /// Keyring or item is locked
+    Locked,
 }
 
 impl From<zvariant::Error> for Error {
@@ -123,6 +125,7 @@ impl std::fmt::Display for Error {
                 "Keyring partially corrupted: {valid_items} valid items, {broken_items} broken items",
             ),
             Self::Crypto(e) => write!(f, "Failed to do a cryptography operation, {e}"),
+            Self::Locked => write!(f, "Keyring or item is locked"),
         }
     }
 }
