@@ -231,21 +231,24 @@ impl<'a> Service<'a> {
 
 impl Drop for Service<'_> {
     fn drop(&mut self) {
-        let session = Arc::clone(&self.session);
-        #[cfg(feature = "tokio")]
-        {
-            tokio::spawn(async move {
-                let _ = session.close().await;
-            });
-        }
-        #[cfg(feature = "async-std")]
-        {
-            blocking::unblock(move || {
-                futures_lite::future::block_on(async move {
+        // Only close the session if this is the last reference to it
+        if Arc::strong_count(&self.session) == 1 {
+            let session = Arc::clone(&self.session);
+            #[cfg(feature = "tokio")]
+            {
+                tokio::spawn(async move {
                     let _ = session.close().await;
+                });
+            }
+            #[cfg(feature = "async-std")]
+            {
+                blocking::unblock(move || {
+                    futures_lite::future::block_on(async move {
+                        let _ = session.close().await;
+                    })
                 })
-            })
-            .detach();
+                .detach();
+            }
         }
     }
 }
