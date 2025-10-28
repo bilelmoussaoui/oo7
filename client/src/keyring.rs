@@ -125,7 +125,10 @@ impl Keyring {
             Self::DBus(collection) => collection.is_locked().await.map_err(From::from),
             Self::File(keyring) => {
                 let keyring_guard = keyring.read().await;
-                Ok(keyring_guard.as_ref().expect("Keyring must exist").is_locked())
+                Ok(keyring_guard
+                    .as_ref()
+                    .expect("Keyring must exist")
+                    .is_locked())
             }
         }
     }
