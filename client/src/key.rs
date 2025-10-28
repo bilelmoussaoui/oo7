@@ -33,7 +33,7 @@ impl AsMut<[u8]> for Key {
 }
 
 impl Key {
-    pub fn new(key: Vec<u8>) -> Self {
+    pub const fn new(key: Vec<u8>) -> Self {
         Self::new_with_strength(key, Err(file::WeakKeyError::StrengthUnknown))
     }
 
@@ -41,7 +41,7 @@ impl Key {
         self.strength
     }
 
-    pub(crate) fn new_with_strength(
+    pub(crate) const fn new_with_strength(
         key: Vec<u8>,
         strength: Result<(), file::WeakKeyError>,
     ) -> Self {
