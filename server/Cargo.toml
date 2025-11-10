@@ -20,7 +20,7 @@ hkdf = { version = "0.12", optional = true }
 libc = "0.2"
 nix = { version = "0.30", default-features = false, features = ["user"]}
 num = "0.4.0"
-num-bigint-dig = { version = "0.8", features = ["zeroize"] }
+num-bigint-dig = { version = "0.9", features = ["zeroize"] }
 openssl = { version = "0.10", optional = true }
 oo7 = { workspace = true, features = ["tokio"] }
 rpassword = "7.4"
