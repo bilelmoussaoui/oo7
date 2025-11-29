@@ -7,6 +7,7 @@ members = [
   "cli",
   "pam",
   "portal",
+  "python",
   "server",
 ]
 

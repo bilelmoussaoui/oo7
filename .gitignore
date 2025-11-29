@@ -3,3 +3,6 @@
 #Cargo.lock
 cli/target
 coverage/
+python/.venv
+python/*.so
+python/**/__pycache__
