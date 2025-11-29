@@ -63,6 +63,7 @@ grcov coverage-raw/combined.info \
   --branch \
   --ignore-not-existing \
   --ignore "**/portal/*" \
+  --ignore "**/python/*" \
   --ignore "**/cli/*" \
   --ignore "**/pam/*" \
   --ignore "**/tests/*" \
@@ -79,6 +80,7 @@ grcov coverage-raw/combined.info \
   --branch \
   --ignore-not-existing \
   --ignore "**/portal/*" \
+  --ignore "**/python/*" \
   --ignore "**/cli/*" \
   --ignore "**/pam/*" \
   --ignore "**/tests/*" \
