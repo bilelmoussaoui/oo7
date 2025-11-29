@@ -15,6 +15,7 @@ allow = [
   "Apache-2.0", # rpassword by cli only
   "BSD-3-Clause", # used by subtle -> digest
   "Unicode-3.0", # used by icu_collections -> url
+  "Apache-2.0 WITH LLVM-exception", # target-lexicon -> pyo3
 ]
 
 [sources]
