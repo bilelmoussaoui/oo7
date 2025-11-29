@@ -1,0 +1,26 @@
+[package]
+name = "oo7-python"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+repository.workspace = true
+homepage.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Python bindings for oo7"
+
+[lib]
+name = "oo7"
+crate-type = ["cdylib"]
+
+[dependencies]
+oo7_rs = { package = "oo7", path = "../client", version = "0.6" }
+pyo3 = { version = "0.24", features = ["extension-module", "abi3-py38"] }
+pyo3-async-runtimes = { version = "0.24", features = ["tokio-runtime"] }
+tokio = { version = "1", features = ["rt-multi-thread"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
