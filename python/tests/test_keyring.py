@@ -3,6 +3,7 @@ Tests for oo7 Python bindings
 """
 
 import pytest
+
 import oo7
 
 
