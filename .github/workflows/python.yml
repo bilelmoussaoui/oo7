@@ -13,6 +13,8 @@ on:
       - 'python/**'
       - 'client/**'
       - '.github/workflows/python.yml'
+  release:
+    types: [published]
 
 jobs:
   test:
@@ -81,3 +83,33 @@ jobs:
     - name: Check Python linting
       working-directory: python
       run: ruff check tests/
+
+  publish:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    needs: [test, lint]
+    permissions:
+      id-token: write
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Set up Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Build wheels
+      uses: PyO3/maturin-action@v1
+      with:
+        working-directory: python
+        command: build
+        args: --release --out dist --interpreter 3.8 3.9 3.10 3.11 3.12 3.13
+
+    - name: Publish to PyPI
+      uses: PyO3/maturin-action@v1
+      with:
+        working-directory: python
+        command: upload
+        args: --non-interactive --skip-existing dist/*
+      env:
+        MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
