@@ -12,7 +12,7 @@ rust-version.workspace = true
 description = "Python bindings for oo7"
 
 [lib]
-name = "oo7"
+name = "oo7_python"
 crate-type = ["cdylib"]
 
 [dependencies]
