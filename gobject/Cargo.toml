@@ -1,0 +1,24 @@
+[package]
+name = "oo7-gobject"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+repository.workspace = true
+homepage.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "GObject bindings for oo7"
+
+[lib]
+name = "oo7"
+crate-type = ["staticlib", "cdylib"]
+
+[dependencies]
+oo7_rs = { package = "oo7", path = "../client", version = "0.6", default-features = false, features = ["async-std", "native_crypto"] }
+gobject-ffi = { git = "https://github.com/bilelmoussaoui/gobject-ffi", version = "0.1" }
+glib = "0.21"
+gio = "0.21"
+futures-util = "0.3"
+
