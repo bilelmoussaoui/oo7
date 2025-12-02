@@ -28,6 +28,7 @@ classifiers = [
 
 [tool.maturin]
 include = ["oo7.pyi", "py.typed"]
+module-name = "oo7"
 
 [tool.ruff]
 line-length = 88

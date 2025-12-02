@@ -5,6 +5,7 @@ members = [
  "cargo-credential",
   "client",
   "cli",
+  "gobject",
   "pam",
   "portal",
   "python",
