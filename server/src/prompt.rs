@@ -1,6 +1,5 @@
 // org.freedesktop.Secret.Prompt
-
-use std::{future::Future, pin::Pin, str::FromStr, sync::Arc};
+use std::{env, future::Future, pin::Pin, str::FromStr, sync::Arc};
 
 use oo7::{Secret, dbus::ServiceError};
 use tokio::sync::{Mutex, OnceCell};
@@ -13,6 +12,7 @@ use zbus::{
 use crate::{
     error::custom_service_error,
     gnome::prompter::{PrompterCallback, PrompterProxy},
+    plasma::prompter::{PlasmaPrompterCallback, PlasmaPrompterProxy},
     service::Service,
 };
 
@@ -63,6 +63,8 @@ pub struct Prompt {
     collection: Option<crate::collection::Collection>,
     /// GNOME Specific
     callback: Arc<OnceCell<PrompterCallback>>,
+    /// KDE Plasma Specific
+    callback_plasma: Arc<OnceCell<PlasmaPrompterCallback>>,
     /// The action to execute when the prompt completes
     action: Arc<Mutex<Option<PromptAction>>>,
 }
@@ -83,6 +85,65 @@ impl std::fmt::Debug for Prompt {
 #[interface(name = "org.freedesktop.Secret.Prompt")]
 impl Prompt {
     pub async fn prompt(&self, window_id: Optional<&str>) -> Result<(), ServiceError> {
+        let is_plasma = env::var("XDG_CURRENT_DESKTOP")
+            .map(|v| v.to_lowercase() == "kde")
+            .unwrap_or(false);
+
+        if is_plasma {
+            if self.callback_plasma.get().is_some() {
+                return Err(custom_service_error(
+                    "A prompt callback is ongoing already.",
+                ));
+            };
+
+            let window_id = window_id.unwrap_or("").to_string();
+            let callback = PlasmaPrompterCallback::new(self.service.clone(), self.path.clone())
+                .await
+                .map_err(|err| {
+                    custom_service_error(&format!("Failed to create PrompterCallback {err}."))
+                })?;
+
+            let path = OwnedObjectPath::from(callback.path().clone());
+
+            self.callback_plasma
+                .set(callback.clone())
+                .expect("A prompt callback is only set once");
+
+            self.service.object_server().at(&path, callback).await?;
+            tracing::debug!("Prompt `{}` created.", self.path);
+
+            let prompter = PlasmaPrompterProxy::new(self.service.connection()).await?;
+            let collection_name = self.label.clone();
+            match self.role() {
+                PromptRole::Unlock => {
+                    tokio::spawn(async move {
+                        prompter
+                            .UnlockCollectionPrompt(
+                                &path,
+                                window_id.as_str(),
+                                "",
+                                collection_name.as_str(),
+                            )
+                            .await
+                    });
+                }
+                PromptRole::CreateCollection => {
+                    tokio::spawn(async move {
+                        prompter
+                            .CreateCollectionPrompt(
+                                &path,
+                                window_id.as_str(),
+                                "",
+                                collection_name.as_str(),
+                            )
+                            .await
+                    });
+                }
+            }
+
+            return Ok(());
+        }
+
         if self.callback.get().is_some() {
             return Err(custom_service_error(
                 "A prompt callback is ongoing already.",
@@ -108,7 +169,7 @@ impl Prompt {
         self.service.object_server().at(&path, callback).await?;
         tracing::debug!("Prompt `{}` created.", self.path);
 
-        // Starts GNOME System Prompting.
+        // Starts System Prompting.
         // Spawned separately to avoid blocking the early return of the current
         // execution.
         let prompter = PrompterProxy::new(self.service.connection()).await?;
@@ -118,6 +179,14 @@ impl Prompt {
     }
 
     pub async fn dismiss(&self) -> Result<(), ServiceError> {
+        if let Some(callback_plasma) = self.callback_plasma.get() {
+            let emitter = SignalEmitter::from_parts(
+                self.service.connection().clone(),
+                callback_plasma.path().clone(),
+            );
+            PlasmaPrompterCallback::dismiss(&emitter).await?;
+        }
+
         if let Some(_callback) = self.callback.get() {
             // TODO: figure out if we should destroy the un-export the callback
             // here?
@@ -156,6 +225,7 @@ impl Prompt {
             label,
             collection,
             callback: Default::default(),
+            callback_plasma: Default::default(),
             action: Arc::new(Mutex::new(None)),
         }
     }
