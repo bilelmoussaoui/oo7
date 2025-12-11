@@ -1,9 +1,12 @@
 mod capability;
 mod collection;
 mod error;
+#[cfg(feature = "gnome")]
 mod gnome;
 mod item;
 mod pam_listener;
+#[cfg(feature = "plasma")]
+mod plasma;
 mod prompt;
 mod service;
 mod session;

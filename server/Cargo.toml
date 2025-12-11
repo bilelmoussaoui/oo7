@@ -36,7 +36,10 @@ zbus = { workspace = true, features = ["p2p"] }
 zeroize.workspace = true
 
 [features]
-default = ["native_crypto"]
+default = ["gnome_native_crypto", "plasma"]
+gnome = []
+gnome_native_crypto = ["gnome", "native_crypto"]
+gnome_openssl_crypto = ["gnome", "openssl_crypto"]
 native_crypto = [
     "dep:hkdf",
     "dep:sha2",
@@ -46,6 +49,7 @@ openssl_crypto = [
     "dep:openssl",
     "oo7/openssl_crypto"
 ]
+plasma = []
 
 [dev-dependencies]
 serial_test = "3.3"
