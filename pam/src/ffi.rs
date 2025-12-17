@@ -11,8 +11,18 @@ pub const PAM_AUTHTOK: c_int = 6;
 pub const PAM_OLDAUTHTOK: c_int = 7;
 
 // PAM chauthtok flags
+// Solaris/Illumos use different values than Linux
+#[cfg(any(target_os = "solaris", target_os = "illumos"))]
 pub const PAM_PRELIM_CHECK: c_int = 0x1;
+
+#[cfg(any(target_os = "solaris", target_os = "illumos"))]
 pub const PAM_UPDATE_AUTHTOK: c_int = 0x2;
+
+#[cfg(not(any(target_os = "solaris", target_os = "illumos")))]
+pub const PAM_PRELIM_CHECK: c_int = 0x4000;
+
+#[cfg(not(any(target_os = "solaris", target_os = "illumos")))]
+pub const PAM_UPDATE_AUTHTOK: c_int = 0x2000;
 
 // Opaque PAM handle type
 #[repr(C)]
