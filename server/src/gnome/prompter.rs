@@ -347,67 +347,27 @@ impl PrompterCallback {
 
     async fn prompter_done(&self, prompt: &Prompt, exchange: &str) -> Result<(), ServiceError> {
         let prompter = PrompterProxy::new(self.service.connection()).await?;
+        let aes_key = secret_exchange::handshake(&self.private_key, exchange).map_err(|err| {
+            custom_service_error(&format!(
+                "Failed to generate AES key for SecretExchange {err}."
+            ))
+        })?;
+
+        let Some(secret) = secret_exchange::retrieve(exchange, &aes_key) else {
+            return Err(custom_service_error(
+                "Failed to retrieve keyring secret from SecretExchange.",
+            ));
+        };
 
         // Handle each role differently based on what validation/preparation is needed
         match prompt.role() {
             PromptRole::Unlock => {
-                let aes_key =
-                    secret_exchange::handshake(&self.private_key, exchange).map_err(|err| {
-                        custom_service_error(&format!(
-                            "Failed to generate AES key for SecretExchange {err}."
-                        ))
-                    })?;
-
-                let Some(secret) = secret_exchange::retrieve(exchange, &aes_key) else {
-                    return Err(custom_service_error(
-                        "Failed to retrieve keyring secret from SecretExchange.",
-                    ));
-                };
-
-                // Get the collection to validate the secret
-                let collection = prompt.collection().expect("Unlock requires a collection");
-                let label = prompt.label();
-
-                // Validate the secret using the already-open keyring
-                let keyring_guard = collection.keyring.read().await;
-                let is_valid = keyring_guard
-                    .as_ref()
-                    .unwrap()
-                    .validate_secret(&secret)
-                    .await
-                    .map_err(|err| {
-                        custom_service_error(&format!(
-                            "Failed to validate secret for {label} keyring: {err}."
-                        ))
-                    })?;
-                drop(keyring_guard);
-
-                if is_valid {
-                    tracing::debug!("Keyring secret matches for {label}.");
-
-                    let Some(action) = prompt.take_action().await else {
-                        return Err(custom_service_error(
-                            "Prompt action was already executed or not set",
-                        ));
-                    };
-
-                    // Execute the unlock action after successful validation
-                    let result_value = action.execute(secret).await?;
-
+                if prompt.on_unlock_collection(secret).await? {
                     let path = self.path.clone();
-                    let prompt_path = OwnedObjectPath::from(prompt.path().clone());
                     tokio::spawn(async move { prompter.stop_prompting(&path).await });
-
-                    let signal_emitter = self.service.signal_emitter(prompt_path)?;
-                    tokio::spawn(async move {
-                        tracing::debug!("Unlock prompt completed.");
-                        let _ = Prompt::completed(&signal_emitter, false, result_value).await;
-                    });
-                    Ok(())
                 } else {
-                    tracing::error!("Keyring {label} failed to unlock, incorrect secret.");
                     let properties = Properties::for_unlock(
-                        label,
+                        prompt.label(),
                         Some("The unlock password was incorrect"),
                         self.window_id.as_ref(),
                     );
@@ -428,56 +388,16 @@ impl PrompterCallback {
                             )
                             .await
                     });
-
-                    Ok(())
                 }
             }
             PromptRole::CreateCollection => {
-                // Compute AES key from client's public key in the final exchange
-                let aes_key =
-                    secret_exchange::handshake(&self.private_key, exchange).map_err(|err| {
-                        custom_service_error(&format!(
-                            "Failed to generate AES key for SecretExchange {err}."
-                        ))
-                    })?;
+                prompt.on_create_collection(secret).await?;
 
-                let Some(secret) = secret_exchange::retrieve(exchange, &aes_key) else {
-                    return Err(custom_service_error(
-                        "Failed to retrieve keyring secret from SecretExchange.",
-                    ));
-                };
-
-                let Some(action) = prompt.take_action().await else {
-                    return Err(custom_service_error(
-                        "Prompt action was already executed or not set",
-                    ));
-                };
-
-                // Execute the collection creation action with the secret
-                match action.execute(secret).await {
-                    Ok(collection_path_value) => {
-                        tracing::info!("CreateCollection action completed successfully");
-
-                        let path = self.path.clone();
-                        tokio::spawn(async move { prompter.stop_prompting(&path).await });
-
-                        let signal_emitter =
-                            self.service.signal_emitter(prompt.path().to_owned())?;
-
-                        tokio::spawn(async move {
-                            tracing::debug!("CreateCollection prompt completed.");
-                            let _ =
-                                Prompt::completed(&signal_emitter, false, collection_path_value)
-                                    .await;
-                        });
-                        Ok(())
-                    }
-                    Err(err) => Err(custom_service_error(&format!(
-                        "Failed to create collection: {err}."
-                    ))),
-                }
+                let path = self.path.clone();
+                tokio::spawn(async move { prompter.stop_prompting(&path).await });
             }
         }
+        Ok(())
     }
 
     async fn prompter_dismissed(&self, prompt_path: OwnedObjectPath) -> Result<(), ServiceError> {

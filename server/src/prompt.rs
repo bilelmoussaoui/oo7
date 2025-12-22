@@ -16,7 +16,7 @@ use crate::{
     service::Service,
 };
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PromptRole {
     Unlock,
     CreateCollection,
@@ -172,7 +172,7 @@ impl Prompt {
         &self.label
     }
 
-    pub fn collection(&self) -> Option<&crate::collection::Collection> {
+    fn collection(&self) -> Option<&crate::collection::Collection> {
         self.collection.as_ref()
     }
 
@@ -182,8 +182,83 @@ impl Prompt {
     }
 
     /// Take the action, consuming it so it can only be executed once
-    pub async fn take_action(&self) -> Option<PromptAction> {
+    async fn take_action(&self) -> Option<PromptAction> {
         self.action.lock().await.take()
+    }
+
+    pub async fn on_unlock_collection(&self, secret: Secret) -> Result<bool, ServiceError> {
+        debug_assert_eq!(self.role, PromptRole::Unlock);
+
+        // Get the collection to validate the secret
+        let collection = self.collection().expect("Unlock requires a collection");
+        let label = self.label();
+
+        // Validate the secret using the already-open keyring
+        let keyring_guard = collection.keyring.read().await;
+        let is_valid = keyring_guard
+            .as_ref()
+            .unwrap()
+            .validate_secret(&secret)
+            .await
+            .map_err(|err| {
+                custom_service_error(&format!(
+                    "Failed to validate secret for {label} keyring: {err}."
+                ))
+            })?;
+        drop(keyring_guard);
+
+        if is_valid {
+            tracing::debug!("Keyring secret matches for {label}.");
+
+            let Some(action) = self.take_action().await else {
+                return Err(custom_service_error(
+                    "Prompt action was already executed or not set",
+                ));
+            };
+
+            // Execute the unlock action after successful validation
+            let result_value = action.execute(secret).await?;
+
+            let prompt_path = self.path().to_owned();
+            let signal_emitter = self.service.signal_emitter(&prompt_path)?;
+            tokio::spawn(async move {
+                tracing::debug!("Unlock prompt completed.");
+                let _ = Prompt::completed(&signal_emitter, false, result_value).await;
+            });
+            Ok(true)
+        } else {
+            tracing::error!("Keyring {label} failed to unlock, incorrect secret.");
+
+            Ok(false)
+        }
+    }
+
+    pub async fn on_create_collection(&self, secret: Secret) -> Result<(), ServiceError> {
+        debug_assert_eq!(self.role, PromptRole::CreateCollection);
+
+        let Some(action) = self.take_action().await else {
+            return Err(custom_service_error(
+                "Prompt action was already executed or not set",
+            ));
+        };
+
+        // Execute the collection creation action with the secret
+        match action.execute(secret).await {
+            Ok(collection_path_value) => {
+                tracing::info!("CreateCollection action completed successfully");
+
+                let signal_emitter = self.service.signal_emitter(self.path().to_owned())?;
+
+                tokio::spawn(async move {
+                    tracing::debug!("CreateCollection prompt completed.");
+                    let _ = Prompt::completed(&signal_emitter, false, collection_path_value).await;
+                });
+                Ok(())
+            }
+            Err(err) => Err(custom_service_error(&format!(
+                "Failed to create collection: {err}."
+            ))),
+        }
     }
 }
 
