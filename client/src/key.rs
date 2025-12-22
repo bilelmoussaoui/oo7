@@ -1,3 +1,4 @@
+#![expect(unused_assignments)]
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{crypto, file};
