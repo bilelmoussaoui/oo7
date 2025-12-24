@@ -615,6 +615,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "formatx"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d8866fac38f53fc87fa3ae1b09ddd723e0482f8fa74323518b4c59df2c55a00a"
+
+[[package]]
 name = "futures"
 version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1313,6 +1319,7 @@ dependencies = [
  "caps",
  "clap",
  "enumflags2",
+ "formatx",
  "gettext-rs",
  "hkdf",
  "libc",
