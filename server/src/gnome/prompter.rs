@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use formatx::formatx;
 use gettextrs::gettext;
 use oo7::{Key, ashpd::WindowIdentifierType, dbus::ServiceError};
 use serde::{Deserialize, Serialize};
@@ -12,7 +13,6 @@ use zbus::zvariant::{
 use super::secret_exchange;
 use crate::{
     error::custom_service_error,
-    i18n::i18n_f,
     prompt::{Prompt, PromptRole},
     service::Service,
 };
@@ -138,10 +138,13 @@ impl Properties {
         Self {
             title: Some(gettext("Unlock Keyring")),
             message: Some(gettext("Authentication required")),
-            description: Some(i18n_f(
-                "An application wants access to the keyring '{}', but it is locked",
-                &[keyring],
-            )),
+            description: Some(
+                formatx!(
+                    gettext("An application wants access to the keyring '{}', but it is locked",),
+                    keyring,
+                )
+                .expect("Wrong format in translatable string"),
+            ),
             warning: warning.map(ToOwned::to_owned),
             password_new: None,
             password_strength: None,
@@ -157,10 +160,13 @@ impl Properties {
         Self {
             title: Some(gettext("New Keyring Password")),
             message: Some(gettext("Choose password for new keyring")),
-            description: Some(i18n_f(
-                "An application wants to create a new keyring called '{}'. Choose the password you want to use for it.",
-                &[label],
-            )),
+            description: Some(
+                formatx!(
+                    gettext("An application wants to create a new keyring called '{}'. Choose the password you want to use for it."),
+                    &label
+                )
+                .expect("Wrong format in translatable string")
+            ),
             warning: None,
             password_new: Some(true),
             password_strength: None,
