@@ -5,6 +5,7 @@ mod error;
 mod gnome;
 mod item;
 mod pam_listener;
+mod plasma;
 mod prompt;
 mod service;
 mod session;
