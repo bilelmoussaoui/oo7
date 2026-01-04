@@ -74,7 +74,7 @@ impl Keyring {
 
     fn read_items(self, decrypted: &[u8]) -> Result<Vec<UnlockedItem>, Error> {
         let mut cursor = Cursor::new(decrypted);
-        let mut items = Vec::new();
+        let mut items = Vec::with_capacity(self.item_count);
         for _ in 0..self.item_count {
             let display_name = Self::read_string(&mut cursor)?
                 .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "empty item label"))?;

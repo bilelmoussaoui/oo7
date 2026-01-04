@@ -155,9 +155,10 @@ impl LockedKeyring {
             Ok(mut file) => {
                 #[cfg(feature = "tracing")]
                 tracing::debug!("Keyring file found, loading its content");
-                let mtime = file.metadata().await?.modified().ok();
+                let metadata = file.metadata().await?;
+                let mtime = metadata.modified().ok();
 
-                let mut content = Vec::new();
+                let mut content = Vec::with_capacity(metadata.len() as usize);
                 file.read_to_end(&mut content).await?;
 
                 let keyring = api::Keyring::try_from(content.as_slice())?;

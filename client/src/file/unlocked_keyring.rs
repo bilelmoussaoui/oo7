@@ -111,7 +111,8 @@ impl UnlockedKeyring {
         path: impl AsRef<Path>,
         secret: Secret,
     ) -> Result<Self, Error> {
-        let mut content = Vec::new();
+        let metadata = file.metadata().await?;
+        let mut content = Vec::with_capacity(metadata.len() as usize);
         file.read_to_end(&mut content).await?;
 
         match api::Keyring::try_from(content.as_slice()) {
