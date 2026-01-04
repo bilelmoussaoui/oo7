@@ -7,7 +7,7 @@ use zbus::zvariant::Type;
 /// A message authentication code. It provides constant-time comparison when
 /// compared against another mac or against a slice of bytes.
 #[derive(Deserialize, Serialize, Type, Clone)]
-pub struct Mac(Vec<u8>);
+pub struct Mac(#[serde(with = "serde_bytes")] Vec<u8>);
 
 impl std::fmt::Debug for Mac {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

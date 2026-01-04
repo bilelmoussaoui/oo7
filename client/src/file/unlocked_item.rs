@@ -22,6 +22,7 @@ pub struct UnlockedItem {
     created: u64,
     #[zeroize(skip)]
     modified: u64,
+    #[serde(with = "serde_bytes")]
     secret: Vec<u8>,
 }
 

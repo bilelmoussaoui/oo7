@@ -73,6 +73,7 @@ pub(crate) static GVARIANT_ENCODING: LazyLock<Context> =
 #[derive(Deserialize, Serialize, Type, Debug)]
 pub struct Keyring {
     salt_size: u32,
+    #[serde(with = "serde_bytes")]
     salt: Vec<u8>,
     iteration_count: u32,
     modified_time: u64,

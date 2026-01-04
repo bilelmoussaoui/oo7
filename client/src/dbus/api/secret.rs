@@ -12,7 +12,9 @@ use crate::{Key, Secret, crypto, dbus::Error, secret::ContentType};
 /// Same as [`DBusSecret`] without tying the session path to a [`Session`] type.
 pub struct DBusSecretInner(
     pub OwnedObjectPath,
+    #[serde(with = "serde_bytes")]
     pub Vec<u8>,
+    #[serde(with = "serde_bytes")]
     pub Vec<u8>,
     pub ContentType,
 );
@@ -104,8 +106,8 @@ impl Serialize for DBusSecret {
     {
         let mut tuple_serializer = serializer.serialize_tuple(4)?;
         tuple_serializer.serialize_element(self.session().inner().path())?;
-        tuple_serializer.serialize_element(self.parameters())?;
-        tuple_serializer.serialize_element(self.value())?;
+        tuple_serializer.serialize_element(&serde_bytes::Bytes::new(self.parameters()))?;
+        tuple_serializer.serialize_element(&serde_bytes::Bytes::new(self.value()))?;
         tuple_serializer.serialize_element(self.content_type().as_str())?;
         tuple_serializer.end()
     }

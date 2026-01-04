@@ -9,6 +9,7 @@ use crate::{Key, Mac, crypto};
 #[derive(Deserialize, Serialize, Type, Debug, Clone)]
 pub(crate) struct EncryptedItem {
     pub(crate) hashed_attributes: HashMap<String, Mac>,
+    #[serde(with = "serde_bytes")]
     pub(crate) blob: Vec<u8>,
 }
 
