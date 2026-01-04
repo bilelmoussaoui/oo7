@@ -14,9 +14,9 @@ use crate::{
 #[derive(Type)]
 #[zvariant(signature = "o")]
 #[doc(alias = "org.freedesktop.Secret.Collection")]
-pub struct Collection<'a>(zbus::Proxy<'a>);
+pub struct Collection(zbus::Proxy<'static>);
 
-impl zbus::proxy::Defaults for Collection<'_> {
+impl zbus::proxy::Defaults for Collection {
     const INTERFACE: &'static Option<zbus::names::InterfaceName<'static>> = &Some(
         zbus::names::InterfaceName::from_static_str_unchecked("org.freedesktop.Secret.Collection"),
     );
@@ -24,19 +24,16 @@ impl zbus::proxy::Defaults for Collection<'_> {
     const PATH: &'static Option<ObjectPath<'static>> = &None;
 }
 
-impl<'a> From<zbus::Proxy<'a>> for Collection<'a> {
-    fn from(value: zbus::Proxy<'a>) -> Self {
+impl From<zbus::Proxy<'static>> for Collection {
+    fn from(value: zbus::Proxy<'static>) -> Self {
         Self(value)
     }
 }
 
-impl<'a> Collection<'a> {
-    pub async fn new<P>(
-        connection: &zbus::Connection,
-        object_path: P,
-    ) -> Result<Collection<'a>, Error>
+impl Collection {
+    pub async fn new<P>(connection: &zbus::Connection, object_path: P) -> Result<Self, Error>
     where
-        P: TryInto<ObjectPath<'a>>,
+        P: TryInto<ObjectPath<'static>>,
         P::Error: Into<zbus::Error>,
     {
         zbus::proxy::Builder::new(connection)
@@ -47,16 +44,16 @@ impl<'a> Collection<'a> {
             .map_err(From::from)
     }
 
-    pub fn inner(&self) -> &zbus::Proxy<'_> {
+    pub fn inner(&self) -> &zbus::Proxy<'static> {
         &self.0
     }
 
     pub(crate) async fn from_paths<P>(
         connection: &zbus::Connection,
         paths: Vec<P>,
-    ) -> Result<Vec<Collection<'a>>, Error>
+    ) -> Result<Vec<Self>, Error>
     where
-        P: TryInto<ObjectPath<'a>>,
+        P: TryInto<ObjectPath<'static>>,
         P::Error: Into<zbus::Error>,
     {
         let mut collections = Vec::with_capacity(paths.capacity());
@@ -67,7 +64,7 @@ impl<'a> Collection<'a> {
     }
 
     #[doc(alias = "ItemCreated")]
-    pub async fn receive_item_created(&self) -> Result<impl Stream<Item = Item<'a>> + '_, Error> {
+    pub async fn receive_item_created(&self) -> Result<impl Stream<Item = Item> + '_, Error> {
         let stream = self.inner().receive_signal("ItemCreated").await?;
         let conn = self.inner().connection();
         Ok(stream.filter_map(move |message| async move {
@@ -85,7 +82,7 @@ impl<'a> Collection<'a> {
     }
 
     #[doc(alias = "ItemChanged")]
-    pub async fn receive_item_changed(&self) -> Result<impl Stream<Item = Item<'a>> + '_, Error> {
+    pub async fn receive_item_changed(&self) -> Result<impl Stream<Item = Item> + '_, Error> {
         let stream = self.inner().receive_signal("ItemChanged").await?;
         let conn = self.inner().connection();
         Ok(stream.filter_map(move |message| async move {
@@ -94,7 +91,7 @@ impl<'a> Collection<'a> {
         }))
     }
 
-    pub async fn items(&self) -> Result<Vec<Item<'a>>, Error> {
+    pub async fn items(&self) -> Result<Vec<Item>, Error> {
         let item_paths = self
             .inner()
             .get_property::<Vec<ObjectPath>>("Items")
@@ -144,10 +141,7 @@ impl<'a> Collection<'a> {
     }
 
     #[doc(alias = "SearchItems")]
-    pub async fn search_items(
-        &self,
-        attributes: &impl AsAttributes,
-    ) -> Result<Vec<Item<'a>>, Error> {
+    pub async fn search_items(&self, attributes: &impl AsAttributes) -> Result<Vec<Item>, Error> {
         let msg = self
             .inner()
             .call_method("SearchItems", &(attributes.as_attributes()))
@@ -163,10 +157,10 @@ impl<'a> Collection<'a> {
         &self,
         label: &str,
         attributes: &impl AsAttributes,
-        secret: &DBusSecret<'_>,
+        secret: &DBusSecret,
         replace: bool,
         window_id: Option<WindowIdentifier>,
-    ) -> Result<Item<'a>, Error> {
+    ) -> Result<Item, Error> {
         let properties = Properties::for_item(label, attributes);
         let (item_path, prompt_path) = self
             .inner()
@@ -186,7 +180,7 @@ impl<'a> Collection<'a> {
     }
 }
 
-impl Serialize for Collection<'_> {
+impl Serialize for Collection {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -195,7 +189,7 @@ impl Serialize for Collection<'_> {
     }
 }
 
-impl fmt::Debug for Collection<'_> {
+impl fmt::Debug for Collection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Collection")
             .field(&self.inner().path().as_str())
@@ -203,4 +197,4 @@ impl fmt::Debug for Collection<'_> {
     }
 }
 
-impl Unlockable for Collection<'_> {}
+impl Unlockable for Collection {}

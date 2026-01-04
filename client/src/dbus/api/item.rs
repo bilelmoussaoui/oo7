@@ -13,9 +13,9 @@ use crate::{
 #[derive(Type, Clone)]
 #[zvariant(signature = "o")]
 #[doc(alias = "org.freedesktop.Secret.Item")]
-pub struct Item<'a>(zbus::Proxy<'a>);
+pub struct Item(zbus::Proxy<'static>);
 
-impl zbus::proxy::Defaults for Item<'_> {
+impl zbus::proxy::Defaults for Item {
     const INTERFACE: &'static Option<zbus::names::InterfaceName<'static>> = &Some(
         zbus::names::InterfaceName::from_static_str_unchecked("org.freedesktop.Secret.Item"),
     );
@@ -23,16 +23,16 @@ impl zbus::proxy::Defaults for Item<'_> {
     const PATH: &'static Option<ObjectPath<'static>> = &None;
 }
 
-impl<'a> From<zbus::Proxy<'a>> for Item<'a> {
-    fn from(value: zbus::Proxy<'a>) -> Self {
+impl From<zbus::Proxy<'static>> for Item {
+    fn from(value: zbus::Proxy<'static>) -> Self {
         Self(value)
     }
 }
 
-impl<'a> Item<'a> {
-    pub async fn new<P>(connection: &zbus::Connection, object_path: P) -> Result<Item<'a>, Error>
+impl Item {
+    pub async fn new<P>(connection: &zbus::Connection, object_path: P) -> Result<Self, Error>
     where
-        P: TryInto<ObjectPath<'a>>,
+        P: TryInto<ObjectPath<'static>>,
         P::Error: Into<zbus::Error>,
     {
         zbus::proxy::Builder::new(connection)
@@ -46,9 +46,9 @@ impl<'a> Item<'a> {
     pub(crate) async fn from_paths<P>(
         connection: &zbus::Connection,
         paths: Vec<P>,
-    ) -> Result<Vec<Item<'a>>, Error>
+    ) -> Result<Vec<Self>, Error>
     where
-        P: TryInto<ObjectPath<'a>>,
+        P: TryInto<ObjectPath<'static>>,
         P::Error: Into<zbus::Error>,
     {
         let mut items = Vec::with_capacity(paths.capacity());
@@ -58,7 +58,7 @@ impl<'a> Item<'a> {
         Ok(items)
     }
 
-    pub fn inner(&self) -> &zbus::Proxy<'_> {
+    pub fn inner(&self) -> &zbus::Proxy<'static> {
         &self.0
     }
 
@@ -118,7 +118,7 @@ impl<'a> Item<'a> {
     }
 
     #[doc(alias = "GetSecret")]
-    pub async fn secret(&self, session: &Session<'_>) -> Result<DBusSecret<'_>, Error> {
+    pub async fn secret(&self, session: &Session) -> Result<DBusSecret, Error> {
         let inner = self
             .inner()
             .call_method("GetSecret", &(session))
@@ -130,7 +130,7 @@ impl<'a> Item<'a> {
     }
 
     #[doc(alias = "SetSecret")]
-    pub async fn set_secret(&self, secret: &DBusSecret<'_>) -> Result<(), Error> {
+    pub async fn set_secret(&self, secret: &DBusSecret) -> Result<(), Error> {
         self.inner()
             .call_method("SetSecret", &(secret,))
             .await
@@ -139,7 +139,7 @@ impl<'a> Item<'a> {
     }
 }
 
-impl Serialize for Item<'_> {
+impl Serialize for Item {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -148,21 +148,21 @@ impl Serialize for Item<'_> {
     }
 }
 
-impl PartialEq for Item<'_> {
+impl PartialEq for Item {
     fn eq(&self, other: &Self) -> bool {
         self.inner().path() == other.inner().path()
     }
 }
 
-impl Eq for Item<'_> {}
+impl Eq for Item {}
 
-impl Hash for Item<'_> {
+impl Hash for Item {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.inner().path().hash(state);
     }
 }
 
-impl fmt::Debug for Item<'_> {
+impl fmt::Debug for Item {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Item")
             .field(&self.inner().path().as_str())
@@ -170,4 +170,4 @@ impl fmt::Debug for Item<'_> {
     }
 }
 
-impl Unlockable for Item<'_> {}
+impl Unlockable for Item {}

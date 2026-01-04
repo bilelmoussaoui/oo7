@@ -1,6 +1,6 @@
 use oo7::dbus::Service;
 
-async fn create_item(service: Service<'_>, encrypted: bool) {
+async fn create_item(service: Service, encrypted: bool) {
     let attributes = if encrypted {
         &[("type", "encrypted-type-test")]
     } else {

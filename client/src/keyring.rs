@@ -21,7 +21,7 @@ pub enum Keyring {
     #[doc(hidden)]
     File(Arc<RwLock<Option<file::Keyring>>>),
     #[doc(hidden)]
-    DBus(dbus::Collection<'static>),
+    DBus(dbus::Collection),
 }
 
 impl Keyring {
@@ -263,7 +263,7 @@ pub enum Item {
         Arc<RwLock<Option<file::Keyring>>>,
     ),
     #[doc(hidden)]
-    DBus(dbus::Item<'static>),
+    DBus(dbus::Item),
 }
 
 impl Item {
@@ -271,7 +271,7 @@ impl Item {
         Self::File(RwLock::new(Some(item)), backend)
     }
 
-    fn for_dbus(item: dbus::Item<'static>) -> Self {
+    fn for_dbus(item: dbus::Item) -> Self {
         Self::DBus(item)
     }
 

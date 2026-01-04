@@ -1,4 +1,3 @@
-
 use oo7::file::UnlockedKeyring;
 use zbus::zvariant::serialized::Context;
 

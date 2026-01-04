@@ -1,4 +1,3 @@
-
 use crate::tests::TestServiceSetup;
 
 #[tokio::test]
@@ -26,7 +25,7 @@ async fn prompt_called_twice_error() -> Result<(), Box<dyn std::error::Error>> {
     assert!(!prompt_path.is_empty(), "Should have a prompt path");
 
     // Create a Prompt proxy manually
-    let prompt = oo7::dbus::api::Prompt::new(&setup.client_conn, prompt_path.as_ref())
+    let prompt = oo7::dbus::api::Prompt::new(&setup.client_conn, prompt_path.clone())
         .await?
         .unwrap();
 
@@ -135,7 +134,7 @@ async fn dismiss_prompt_cleanup() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Verify prompt is accessible via D-Bus
-    let prompt = oo7::dbus::api::Prompt::new(&setup.client_conn, prompt_path.as_ref()).await?;
+    let prompt = oo7::dbus::api::Prompt::new(&setup.client_conn, prompt_path.clone()).await?;
     assert!(
         prompt.is_some(),
         "Prompt should be accessible via D-Bus before dismissal"

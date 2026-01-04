@@ -60,7 +60,7 @@ impl Termination for Error {
 
 enum Keyring {
     File(oo7::file::UnlockedKeyring),
-    Collection(oo7::dbus::Collection<'static>),
+    Collection(oo7::dbus::Collection),
 }
 
 #[derive(Subcommand)]
@@ -531,7 +531,7 @@ fn print_item_keyring(
 }
 
 async fn print_item_dbus(
-    item: &oo7::dbus::Item<'_>,
+    item: &oo7::dbus::Item,
     secret_only: bool,
     as_hex: bool,
 ) -> Result<(), Error> {

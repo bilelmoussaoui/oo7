@@ -20,18 +20,18 @@ pub struct DBusSecretInner(
 
 #[derive(Debug, Type, Zeroize, ZeroizeOnDrop)]
 #[zvariant(signature = "(oayays)")]
-pub struct DBusSecret<'a> {
+pub struct DBusSecret {
     #[zeroize(skip)]
-    pub(crate) session: Arc<Session<'a>>,
+    pub(crate) session: Arc<Session>,
     pub(crate) parameters: Vec<u8>,
     pub(crate) value: Vec<u8>,
     #[zeroize(skip)]
     pub(crate) content_type: ContentType,
 }
 
-impl<'a> DBusSecret<'a> {
+impl DBusSecret {
     /// Create a new plain (unencrypted) DBusSecret
-    pub fn new(session: Arc<Session<'a>>, secret: impl Into<Secret>) -> Self {
+    pub fn new(session: Arc<Session>, secret: impl Into<Secret>) -> Self {
         let secret = secret.into();
         Self {
             session,
@@ -43,7 +43,7 @@ impl<'a> DBusSecret<'a> {
 
     /// Create a new encrypted DBusSecret
     pub fn new_encrypted(
-        session: Arc<Session<'a>>,
+        session: Arc<Session>,
         secret: impl Into<Secret>,
         aes_key: &Key,
     ) -> Result<Self, crate::dbus::Error> {
@@ -78,7 +78,7 @@ impl<'a> DBusSecret<'a> {
     }
 
     /// Session used to encode the secret
-    pub fn session(&self) -> &Session<'_> {
+    pub fn session(&self) -> &Session {
         &self.session
     }
 
@@ -98,7 +98,7 @@ impl<'a> DBusSecret<'a> {
     }
 }
 
-impl Serialize for DBusSecret<'_> {
+impl Serialize for DBusSecret {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,

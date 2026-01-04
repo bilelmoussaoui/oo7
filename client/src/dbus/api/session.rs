@@ -9,9 +9,9 @@ use crate::dbus::{Error, ServiceError};
 #[derive(Type)]
 #[zvariant(signature = "o")]
 #[doc(alias = "org.freedesktop.Secret.Session")]
-pub struct Session<'a>(zbus::Proxy<'a>);
+pub struct Session(zbus::Proxy<'static>);
 
-impl zbus::proxy::Defaults for Session<'_> {
+impl zbus::proxy::Defaults for Session {
     const INTERFACE: &'static Option<zbus::names::InterfaceName<'static>> = &Some(
         zbus::names::InterfaceName::from_static_str_unchecked("org.freedesktop.Secret.Session"),
     );
@@ -19,16 +19,16 @@ impl zbus::proxy::Defaults for Session<'_> {
     const PATH: &'static Option<ObjectPath<'static>> = &None;
 }
 
-impl<'a> From<zbus::Proxy<'a>> for Session<'a> {
-    fn from(value: zbus::Proxy<'a>) -> Self {
+impl From<zbus::Proxy<'static>> for Session {
+    fn from(value: zbus::Proxy<'static>) -> Self {
         Self(value)
     }
 }
 
-impl<'a> Session<'a> {
-    pub async fn new<P>(connection: &zbus::Connection, object_path: P) -> Result<Session<'a>, Error>
+impl Session {
+    pub async fn new<P>(connection: &zbus::Connection, object_path: P) -> Result<Self, Error>
     where
-        P: TryInto<ObjectPath<'a>>,
+        P: TryInto<ObjectPath<'static>>,
         P::Error: Into<zbus::Error>,
     {
         zbus::proxy::Builder::new(connection)
@@ -38,7 +38,7 @@ impl<'a> Session<'a> {
             .map_err(From::from)
     }
 
-    pub fn inner(&self) -> &zbus::Proxy<'_> {
+    pub fn inner(&self) -> &zbus::Proxy<'static> {
         &self.0
     }
 
@@ -51,7 +51,7 @@ impl<'a> Session<'a> {
     }
 }
 
-impl Serialize for Session<'_> {
+impl Serialize for Session {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -60,7 +60,7 @@ impl Serialize for Session<'_> {
     }
 }
 
-impl fmt::Debug for Session<'_> {
+impl fmt::Debug for Session {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Session")
             .field(&self.inner().path().as_str())

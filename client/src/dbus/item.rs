@@ -26,24 +26,24 @@ use crate::{AsAttributes, Key, Secret};
 /// If the item is deleted using [`Item::delete`] any future usage of it API
 /// will fail with [`Error::Deleted`].
 #[derive(Debug)]
-pub struct Item<'a> {
-    inner: Arc<api::Item<'a>>,
-    session: Arc<api::Session<'a>>,
-    service: Arc<api::Service<'a>>,
+pub struct Item {
+    inner: Arc<api::Item>,
+    session: Arc<api::Session>,
+    service: Arc<api::Service>,
     algorithm: Algorithm,
     /// Defines whether the Item has been deleted or not
     available: RwLock<bool>,
     aes_key: Option<Arc<Key>>,
 }
 
-impl<'a> Item<'a> {
+impl Item {
     pub(crate) fn new(
-        service: Arc<api::Service<'a>>,
-        session: Arc<api::Session<'a>>,
+        service: Arc<api::Service>,
+        session: Arc<api::Session>,
         algorithm: Algorithm,
-        item: api::Item<'a>,
+        item: api::Item,
         aes_key: Option<Arc<Key>>,
-    ) -> Item<'a> {
+    ) -> Self {
         Self {
             inner: Arc::new(item),
             service,

@@ -24,24 +24,24 @@ use crate::{AsAttributes, Key, Secret};
 /// If the collection is deleted using [`Collection::delete`] any future usage
 /// of it API will fail with [`Error::Deleted`].
 #[derive(Debug)]
-pub struct Collection<'a> {
-    inner: Arc<api::Collection<'a>>,
-    service: Arc<api::Service<'a>>,
-    session: Arc<api::Session<'a>>,
+pub struct Collection {
+    inner: Arc<api::Collection>,
+    service: Arc<api::Service>,
+    session: Arc<api::Session>,
     algorithm: Algorithm,
     /// Defines whether the Collection has been deleted or not
     available: RwLock<bool>,
     aes_key: Option<Arc<Key>>,
 }
 
-impl<'a> Collection<'a> {
+impl Collection {
     pub(crate) fn new(
-        service: Arc<api::Service<'a>>,
-        session: Arc<api::Session<'a>>,
+        service: Arc<api::Service>,
+        session: Arc<api::Session>,
         algorithm: Algorithm,
-        collection: api::Collection<'a>,
+        collection: api::Collection,
         aes_key: Option<Arc<Key>>,
-    ) -> Collection<'a> {
+    ) -> Self {
         Self {
             inner: Arc::new(collection),
             session,
@@ -57,7 +57,7 @@ impl<'a> Collection<'a> {
     }
 
     /// Retrieve the list of available [`Item`] in the collection.
-    pub async fn items(&self) -> Result<Vec<Item<'a>>, Error> {
+    pub async fn items(&self) -> Result<Vec<Item>, Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
@@ -118,10 +118,7 @@ impl<'a> Collection<'a> {
     }
 
     /// Search for items based on their attributes.
-    pub async fn search_items(
-        &self,
-        attributes: &impl AsAttributes,
-    ) -> Result<Vec<Item<'a>>, Error> {
+    pub async fn search_items(&self, attributes: &impl AsAttributes) -> Result<Vec<Item>, Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
@@ -150,7 +147,7 @@ impl<'a> Collection<'a> {
         secret: impl Into<Secret>,
         replace: bool,
         window_id: Option<WindowIdentifier>,
-    ) -> Result<Item<'a>, Error> {
+    ) -> Result<Item, Error> {
         if !self.is_available().await {
             Err(Error::Deleted)
         } else {
@@ -212,7 +209,7 @@ impl<'a> Collection<'a> {
     }
 
     /// Stream yielding when new items get created
-    pub async fn receive_item_created(&self) -> Result<impl Stream<Item = Item<'a>> + '_, Error> {
+    pub async fn receive_item_created(&self) -> Result<impl Stream<Item = Item> + '_, Error> {
         Ok(self
             .inner
             .receive_item_created()
@@ -221,7 +218,7 @@ impl<'a> Collection<'a> {
     }
 
     /// Stream yielding when existing items get changed
-    pub async fn receive_item_changed(&self) -> Result<impl Stream<Item = Item<'a>> + '_, Error> {
+    pub async fn receive_item_changed(&self) -> Result<impl Stream<Item = Item> + '_, Error> {
         Ok(self
             .inner
             .receive_item_changed()
@@ -235,7 +232,7 @@ impl<'a> Collection<'a> {
     }
 
     // Get public `Item`` from `api::Item`
-    fn new_item(&self, item: api::Item<'a>) -> Item<'a> {
+    fn new_item(&self, item: api::Item) -> Item {
         Item::new(
             Arc::clone(&self.service),
             Arc::clone(&self.session),

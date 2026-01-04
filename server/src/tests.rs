@@ -34,9 +34,9 @@ async fn create_p2p_connection()
 pub(crate) struct TestServiceSetup {
     pub server: Service,
     pub client_conn: zbus::Connection,
-    pub service_api: dbus::api::Service<'static>,
-    pub session: Arc<dbus::api::Session<'static>>,
-    pub collections: Vec<dbus::api::Collection<'static>>,
+    pub service_api: dbus::api::Service,
+    pub session: Arc<dbus::api::Session>,
+    pub collections: Vec<dbus::api::Collection>,
     pub server_public_key: Option<oo7::Key>,
     pub keyring_secret: Option<oo7::Secret>,
     pub aes_key: Option<Arc<oo7::Key>>,
@@ -47,7 +47,7 @@ impl TestServiceSetup {
     /// Get the default/Login collection
     pub(crate) async fn default_collection(
         &self,
-    ) -> Result<&dbus::api::Collection<'static>, Box<dyn std::error::Error>> {
+    ) -> Result<&dbus::api::Collection, Box<dyn std::error::Error>> {
         for collection in &self.collections {
             let label = collection.label().await?;
             if label == "Login" {

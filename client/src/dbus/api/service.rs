@@ -15,9 +15,9 @@ use crate::{
 #[derive(Type)]
 #[zvariant(signature = "o")]
 #[doc(alias = "org.freedesktop.secrets")]
-pub struct Service<'a>(zbus::Proxy<'a>);
+pub struct Service(zbus::Proxy<'static>);
 
-impl zbus::proxy::Defaults for Service<'_> {
+impl zbus::proxy::Defaults for Service {
     const INTERFACE: &'static Option<zbus::names::InterfaceName<'static>> = &Some(
         zbus::names::InterfaceName::from_static_str_unchecked("org.freedesktop.Secret.Service"),
     );
@@ -25,28 +25,28 @@ impl zbus::proxy::Defaults for Service<'_> {
     const PATH: &'static Option<ObjectPath<'static>> = &Some(PATH);
 }
 
-impl<'a> From<zbus::Proxy<'a>> for Service<'a> {
-    fn from(value: zbus::Proxy<'a>) -> Self {
+impl From<zbus::Proxy<'static>> for Service {
+    fn from(value: zbus::Proxy<'static>) -> Self {
         Self(value)
     }
 }
 
-impl<'a> Service<'a> {
-    pub async fn new(connection: &zbus::Connection) -> Result<Service<'a>, Error> {
+impl Service {
+    pub async fn new(connection: &zbus::Connection) -> Result<Self, Error> {
         zbus::proxy::Builder::new(connection)
             .build()
             .await
             .map_err(From::from)
     }
 
-    pub fn inner(&self) -> &zbus::Proxy<'_> {
+    pub fn inner(&self) -> &zbus::Proxy<'static> {
         &self.0
     }
 
     #[doc(alias = "CollectionCreated")]
     pub async fn receive_collection_created(
         &self,
-    ) -> Result<impl Stream<Item = Collection<'a>> + '_, Error> {
+    ) -> Result<impl Stream<Item = Collection> + '_, Error> {
         let stream = self.inner().receive_signal("CollectionCreated").await?;
         let conn = self.inner().connection();
         Ok(stream.filter_map(move |message| async move {
@@ -68,7 +68,7 @@ impl<'a> Service<'a> {
     #[doc(alias = "CollectionChanged")]
     pub async fn receive_collection_changed(
         &self,
-    ) -> Result<impl Stream<Item = Collection<'a>> + '_, Error> {
+    ) -> Result<impl Stream<Item = Collection> + '_, Error> {
         let stream = self.inner().receive_signal("CollectionChanged").await?;
         let conn = self.inner().connection();
         Ok(stream.filter_map(move |message| async move {
@@ -77,7 +77,7 @@ impl<'a> Service<'a> {
         }))
     }
 
-    pub async fn collections(&self) -> Result<Vec<Collection<'a>>, Error> {
+    pub async fn collections(&self) -> Result<Vec<Collection>, Error> {
         let collections_paths = self
             .inner()
             .get_property::<Vec<ObjectPath>>("Collections")
@@ -89,7 +89,7 @@ impl<'a> Service<'a> {
     pub async fn open_session(
         &self,
         client_public_key: Option<Key>,
-    ) -> Result<(Option<Key>, Session<'a>), Error> {
+    ) -> Result<(Option<Key>, Session), Error> {
         let (algorithm, key): (_, Value<'_>) = match client_public_key {
             None => (Algorithm::Plain, zvariant::Str::default().into()),
             Some(key) => (Algorithm::Encrypted, key.into()),
@@ -117,7 +117,7 @@ impl<'a> Service<'a> {
         label: &str,
         alias: Option<&str>,
         window_id: Option<WindowIdentifier>,
-    ) -> Result<Collection<'a>, Error> {
+    ) -> Result<Collection, Error> {
         let properties = Properties::for_collection(label);
         let (collection_path, prompt_path) = self
             .inner()
@@ -141,7 +141,7 @@ impl<'a> Service<'a> {
     pub async fn search_items(
         &self,
         attributes: &impl AsAttributes,
-    ) -> Result<(Vec<Item<'a>>, Vec<Item<'a>>), Error> {
+    ) -> Result<(Vec<Item>, Vec<Item>), Error> {
         let (unlocked_item_paths, locked_item_paths) = self
             .inner()
             .call_method("SearchItems", &(attributes.as_attributes()))
@@ -205,9 +205,9 @@ impl<'a> Service<'a> {
     #[doc(alias = "GetSecrets")]
     pub async fn secrets(
         &self,
-        items: &[Item<'_>],
-        session: &Session<'_>,
-    ) -> Result<HashMap<Item<'_>, DBusSecret<'_>>, Error> {
+        items: &[Item],
+        session: &Session,
+    ) -> Result<HashMap<Item, DBusSecret>, Error> {
         let secrets = self
             .inner()
             .call_method("GetSecrets", &(items, session))
@@ -231,7 +231,7 @@ impl<'a> Service<'a> {
     }
 
     #[doc(alias = "ReadAlias")]
-    pub async fn read_alias(&self, name: &str) -> Result<Option<Collection<'a>>, Error> {
+    pub async fn read_alias(&self, name: &str) -> Result<Option<Collection>, Error> {
         let collection_path = self
             .inner()
             .call_method("ReadAlias", &(name))
@@ -249,7 +249,7 @@ impl<'a> Service<'a> {
     }
 
     #[doc(alias = "SetAlias")]
-    pub async fn set_alias(&self, name: &str, collection: &Collection<'_>) -> Result<(), Error> {
+    pub async fn set_alias(&self, name: &str, collection: &Collection) -> Result<(), Error> {
         self.inner()
             .call_method("SetAlias", &(name, collection))
             .await
@@ -258,7 +258,7 @@ impl<'a> Service<'a> {
     }
 }
 
-impl fmt::Debug for Service<'_> {
+impl fmt::Debug for Service {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Service")
             .field(&self.inner().path().as_str())

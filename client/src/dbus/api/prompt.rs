@@ -11,9 +11,9 @@ use crate::dbus::{Error, ServiceError};
 #[derive(Type)]
 #[zvariant(signature = "o")]
 #[doc(alias = "org.freedesktop.Secret.Prompt")]
-pub struct Prompt<'a>(zbus::Proxy<'a>);
+pub struct Prompt(zbus::Proxy<'static>);
 
-impl zbus::proxy::Defaults for Prompt<'_> {
+impl zbus::proxy::Defaults for Prompt {
     const INTERFACE: &'static Option<zbus::names::InterfaceName<'static>> = &Some(
         zbus::names::InterfaceName::from_static_str_unchecked("org.freedesktop.Secret.Prompt"),
     );
@@ -21,19 +21,19 @@ impl zbus::proxy::Defaults for Prompt<'_> {
     const PATH: &'static Option<ObjectPath<'static>> = &None;
 }
 
-impl<'a> From<zbus::Proxy<'a>> for Prompt<'a> {
-    fn from(value: zbus::Proxy<'a>) -> Self {
+impl From<zbus::Proxy<'static>> for Prompt {
+    fn from(value: zbus::Proxy<'static>) -> Self {
         Self(value)
     }
 }
 
-impl<'a> Prompt<'a> {
+impl Prompt {
     pub async fn new<P>(
         connection: &zbus::Connection,
         object_path: P,
-    ) -> Result<Option<Prompt<'a>>, Error>
+    ) -> Result<Option<Self>, Error>
     where
-        P: TryInto<ObjectPath<'a>>,
+        P: TryInto<ObjectPath<'static>>,
         P::Error: Into<zbus::Error>,
     {
         let path = object_path.try_into().map_err(Into::into)?;
@@ -49,7 +49,7 @@ impl<'a> Prompt<'a> {
         }
     }
 
-    pub fn inner(&self) -> &zbus::Proxy<'_> {
+    pub fn inner(&self) -> &zbus::Proxy<'static> {
         &self.0
     }
 
@@ -95,7 +95,7 @@ impl<'a> Prompt<'a> {
     }
 }
 
-impl Serialize for Prompt<'_> {
+impl Serialize for Prompt {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -104,7 +104,7 @@ impl Serialize for Prompt<'_> {
     }
 }
 
-impl fmt::Debug for Prompt<'_> {
+impl fmt::Debug for Prompt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Prompt")
             .field(&self.inner().path().as_str())
