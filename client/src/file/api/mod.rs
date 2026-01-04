@@ -233,19 +233,25 @@ impl Keyring {
     pub fn remove_items(&mut self, attributes: &impl AsAttributes, key: &Key) -> Result<(), Error> {
         let hashed_search = attributes.hash(key);
 
-        let (remove, keep): (Vec<EncryptedItem>, _) =
-            self.items.clone().into_iter().partition(|e| {
-                hashed_search
-                    .iter()
-                    .all(|(k, v)| v.as_ref().is_ok_and(|v| e.has_attribute(k, v)))
-            });
-
-        // check hashes for the ones to be removed
-        for item in remove {
-            item.decrypt(key)?;
+        // Validate items to be removed before actually removing them
+        for item in &self.items {
+            if hashed_search
+                .iter()
+                .all(|(k, v)| v.as_ref().is_ok_and(|v| item.has_attribute(k, v)))
+            {
+                // Validate by checking if it can be decrypted
+                if !item.is_valid(key) {
+                    return Err(Error::MacError);
+                }
+            }
         }
 
-        self.items = keep;
+        // Remove matching items
+        self.items.retain(|e| {
+            !hashed_search
+                .iter()
+                .all(|(k, v)| v.as_ref().is_ok_and(|v| e.has_attribute(k, v)))
+        });
 
         Ok(())
     }

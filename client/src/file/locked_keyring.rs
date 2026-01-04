@@ -98,10 +98,10 @@ impl LockedKeyring {
             let mut n_broken_items = 0;
             let mut n_valid_items = 0;
             for encrypted_item in &inner_keyring.items {
-                if encrypted_item.clone().decrypt(&key).is_err() {
-                    n_broken_items += 1;
-                } else {
+                if encrypted_item.is_valid(&key) {
                     n_valid_items += 1;
+                } else {
+                    n_broken_items += 1;
                 }
             }
 
@@ -127,6 +127,7 @@ impl LockedKeyring {
                     broken_items: n_broken_items,
                 });
             }
+
             Some(Arc::new(key))
         } else {
             None
