@@ -79,9 +79,10 @@ impl Item {
         match self {
             Self::Unlocked(unlocked) => {
                 let item_attrs = unlocked.attributes();
-                attributes.as_attributes().iter().all(|(k, value)| {
-                    item_attrs.get(*k).map(|v| v.as_ref()) == Some(value)
-                })
+                attributes
+                    .as_attributes()
+                    .iter()
+                    .all(|(k, value)| item_attrs.get(*k).map(|v| v.as_ref()) == Some(value))
             }
             Self::Locked(locked) => {
                 let hashed_attrs = attributes.hash(key);
