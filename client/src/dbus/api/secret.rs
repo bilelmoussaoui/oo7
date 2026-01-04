@@ -1,4 +1,3 @@
-#![expect(unused_assignments)]
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize, ser::SerializeTuple};

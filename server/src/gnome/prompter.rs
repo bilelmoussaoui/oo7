@@ -5,10 +5,7 @@ use gettextrs::gettext;
 use oo7::{Key, ashpd::WindowIdentifierType, dbus::ServiceError};
 use serde::{Deserialize, Serialize};
 use tokio::sync::OnceCell;
-use zbus::zvariant::{
-    self, ObjectPath, Optional, OwnedObjectPath, Type, Value, as_value, serialized::Context,
-    to_bytes,
-};
+use zbus::zvariant::{self, ObjectPath, Optional, OwnedObjectPath, Type, Value, as_value};
 
 use super::secret_exchange;
 use crate::{
@@ -253,7 +250,6 @@ impl PrompterCallback {
         reply: Optional<Reply>,
         _properties: Properties,
         exchange: &str,
-        #[zbus(connection)] connection: &zbus::Connection,
     ) -> Result<(), ServiceError> {
         let prompt_path = &self.prompt_path;
         let Some(prompt) = self.service.prompt(prompt_path).await else {
@@ -283,7 +279,7 @@ impl PrompterCallback {
     async fn prompt_done(&self) -> Result<(), ServiceError> {
         // This is only does check if the prompt is tracked on Service
         let path = &self.prompt_path;
-        if let Some(prompt) = self.service.prompt(path).await {
+        if self.service.prompt(path).await.is_some() {
             self.service
                 .object_server()
                 .remove::<Prompt, _>(path)

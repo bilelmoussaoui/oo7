@@ -1,4 +1,3 @@
-#![expect(unused_assignments)]
 //! PAM integration - Unix socket listener for receiving secrets from PAM module
 
 use std::{os::unix::fs::PermissionsExt, path::PathBuf, sync::Arc};

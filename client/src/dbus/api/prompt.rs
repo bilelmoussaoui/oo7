@@ -65,7 +65,6 @@ impl Prompt {
         Ok(())
     }
 
-    #[allow(unused)]
     pub async fn dismiss(&self) -> Result<(), Error> {
         self.inner()
             .call_method("Dismiss", &())

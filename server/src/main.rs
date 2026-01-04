@@ -1,7 +1,6 @@
 mod capability;
 mod collection;
 mod error;
-#[allow(unused)]
 mod gnome;
 mod item;
 mod pam_listener;

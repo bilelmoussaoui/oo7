@@ -17,7 +17,6 @@ const SECRET: &str = "secret";
 const PUBLIC: &str = "public";
 const IV: &str = "iv";
 const PROTOCOL: &str = "[sx-aes-1]\n";
-const CIPHER_TEXT_LEN: usize = 16;
 
 // Creates the initial payload containing public_key
 pub fn begin(public_key: &Key) -> String {

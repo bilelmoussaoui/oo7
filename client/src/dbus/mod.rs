@@ -41,7 +41,6 @@
 pub mod api;
 
 #[cfg(not(feature = "unstable"))]
-#[allow(unused)]
 mod api;
 
 mod algorithm;
