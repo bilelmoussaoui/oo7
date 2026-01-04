@@ -80,7 +80,7 @@ impl Item {
             Self::Unlocked(unlocked) => {
                 let item_attrs = unlocked.attributes();
                 attributes.as_attributes().iter().all(|(k, value)| {
-                    item_attrs.get(&k.to_string()).map(|v| v.as_ref()) == Some(value)
+                    item_attrs.get(*k).map(|v| v.as_ref()) == Some(value)
                 })
             }
             Self::Locked(locked) => {
