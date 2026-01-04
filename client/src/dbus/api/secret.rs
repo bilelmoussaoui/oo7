@@ -12,10 +12,8 @@ use crate::{Key, Secret, crypto, dbus::Error, secret::ContentType};
 /// Same as [`DBusSecret`] without tying the session path to a [`Session`] type.
 pub struct DBusSecretInner(
     pub OwnedObjectPath,
-    #[serde(with = "serde_bytes")]
-    pub Vec<u8>,
-    #[serde(with = "serde_bytes")]
-    pub Vec<u8>,
+    #[serde(with = "serde_bytes")] pub Vec<u8>,
+    #[serde(with = "serde_bytes")] pub Vec<u8>,
     pub ContentType,
 );
 

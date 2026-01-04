@@ -89,7 +89,6 @@ async fn prompt_not_found_error() -> Result<(), Box<dyn std::error::Error>> {
             zbus::zvariant::Optional::from(None),
             crate::gnome::prompter::Properties::default(),
             "",
-            setup.server.connection(),
         )
         .await;
 

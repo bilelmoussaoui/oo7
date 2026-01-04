@@ -38,7 +38,7 @@ pub use error::{Error, InvalidItemError, WeakKeyError};
 pub use locked_item::LockedItem;
 pub use locked_keyring::LockedKeyring;
 pub use unlocked_item::UnlockedItem;
-pub use unlocked_keyring::UnlockedKeyring;
+pub use unlocked_keyring::{ItemDefinition, UnlockedKeyring};
 
 use crate::{AsAttributes, Key, Secret};
 
