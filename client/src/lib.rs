@@ -61,14 +61,13 @@ pub const CONTENT_TYPE_ATTRIBUTE: &str = "xdg:content-type";
 pub trait AsAttributes {
     fn as_attributes(&self) -> HashMap<&str, &str>;
 
-    #[allow(clippy::type_complexity)]
     fn hash<'a>(
         &'a self,
         key: &Key,
     ) -> Vec<(&'a str, std::result::Result<Mac, crate::crypto::Error>)> {
         self.as_attributes()
             .into_iter()
-            .map(|(k, v)| (k, crate::file::AttributeValue::from(v).mac(key)))
+            .map(|(k, v)| (k, crypto::compute_mac(v.as_bytes(), key)))
             .collect()
     }
 }
