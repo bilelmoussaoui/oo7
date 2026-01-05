@@ -112,6 +112,34 @@ impl Item {
         }
     }
 
+    /// Retrieve the item attributes as a typed schema.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use oo7::{SecretSchema, dbus::Item};
+    /// # #[derive(SecretSchema, Debug)]
+    /// # #[schema(name = "org.example.Password")]
+    /// # struct PasswordSchema {
+    /// #     username: String,
+    /// #     server: String,
+    /// # }
+    /// # async fn example(item: &Item) -> Result<(), Box<dyn std::error::Error>> {
+    /// let schema = item.attributes_as::<PasswordSchema>().await?;
+    /// println!("Username: {}", schema.username);
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "schema")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "schema")))]
+    pub async fn attributes_as<T>(&self) -> Result<T, Error>
+    where
+        T: std::convert::TryFrom<HashMap<String, String>, Error = crate::SchemaError>,
+    {
+        let attrs = self.attributes().await?;
+        T::try_from(attrs).map_err(Into::into)
+    }
+
     /// Update the item attributes.
     pub async fn set_attributes(&self, attributes: &impl AsAttributes) -> Result<(), Error> {
         if !self.is_available().await {

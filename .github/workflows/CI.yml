@@ -24,16 +24,16 @@ jobs:
 
       - name: Build client (async-std / native)
         run: |
-          cargo build --manifest-path ./client/Cargo.toml --no-default-features --features async-std --features native_crypto
+          cargo build --manifest-path ./client/Cargo.toml --no-default-features --features async-std --features native_crypto --features schema
       - name: Build client (async-std / OpenSSL)
         run: |
-          cargo build --manifest-path ./client/Cargo.toml --no-default-features --features async-std --features openssl_crypto
+          cargo build --manifest-path ./client/Cargo.toml --no-default-features --features async-std --features openssl_crypto --features schema
       - name: Build client (tokio / native)
         run: |
-          cargo build --manifest-path ./client/Cargo.toml --no-default-features --features tokio --features native_crypto
+          cargo build --manifest-path ./client/Cargo.toml --no-default-features --features tokio --features native_crypto --features schema
       - name: Build client (tokio / OpenSSL)
         run: |
-          cargo build --manifest-path ./client/Cargo.toml --no-default-features --features tokio --features openssl_crypto
+          cargo build --manifest-path ./client/Cargo.toml --no-default-features --features tokio --features openssl_crypto --features schema
 
       - name: Build CLI
         run: |
@@ -73,10 +73,10 @@ jobs:
 
       - name: Test (native)
         run: |
-          cargo test --manifest-path ./client/Cargo.toml --no-default-features --features tokio --features native_crypto
+          cargo test --manifest-path ./client/Cargo.toml --no-default-features --features tokio --features native_crypto --features schema
       - name: Test (OpenSSL)
         run: |
-          cargo test --manifest-path ./client/Cargo.toml --no-default-features --features tokio --features openssl_crypto
+          cargo test --manifest-path ./client/Cargo.toml --no-default-features --features tokio --features openssl_crypto --features schema
 
       - name: Test Server (native)
         run: |
@@ -113,9 +113,9 @@ jobs:
       - name: Clippy workspace (default features)
         run: cargo clippy --workspace -- -D warnings
       - name: Clippy client (tracing / async-std / native crypto)
-        run: cargo clippy -p oo7 --no-default-features --features tracing,async-std,native_crypto -- -D warnings
+        run: cargo clippy -p oo7 --no-default-features --features tracing,async-std,native_crypto,schema -- -D warnings
       - name: Clippy client (tracing / tokio / OpenSSL)
-        run: cargo clippy -p oo7 --no-default-features --features tracing,tokio,openssl_crypto -- -D warnings
+        run: cargo clippy -p oo7 --no-default-features --features tracing,tokio,openssl_crypto,schema -- -D warnings
 
   meson:
     name: Meson

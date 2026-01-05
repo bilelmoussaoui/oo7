@@ -1275,6 +1275,7 @@ dependencies = [
  "md-5",
  "num",
  "num-bigint-dig",
+ "oo7-macros",
  "openssl",
  "pbkdf2",
  "rand 0.9.2",
@@ -1336,6 +1337,15 @@ dependencies = [
  "tracing-subscriber",
  "zbus",
  "zeroize",
+]
+
+[[package]]
+name = "oo7-macros"
+version = "0.6.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

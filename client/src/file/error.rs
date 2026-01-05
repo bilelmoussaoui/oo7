@@ -46,6 +46,9 @@ pub enum Error {
     Crypto(crate::crypto::Error),
     /// Keyring or item is locked
     Locked,
+    /// Schema error.
+    #[cfg(feature = "schema")]
+    Schema(crate::SchemaError),
 }
 
 impl From<zvariant::Error> for Error {
@@ -81,6 +84,13 @@ impl From<ashpd::Error> for Error {
 impl From<crate::crypto::Error> for Error {
     fn from(value: crate::crypto::Error) -> Self {
         Self::Crypto(value)
+    }
+}
+
+#[cfg(feature = "schema")]
+impl From<crate::SchemaError> for Error {
+    fn from(value: crate::SchemaError) -> Self {
+        Self::Schema(value)
     }
 }
 
@@ -126,6 +136,8 @@ impl std::fmt::Display for Error {
             ),
             Self::Crypto(e) => write!(f, "Failed to do a cryptography operation, {e}"),
             Self::Locked => write!(f, "Keyring or item is locked"),
+            #[cfg(feature = "schema")]
+            Self::Schema(e) => write!(f, "Schema error: {e}"),
         }
     }
 }

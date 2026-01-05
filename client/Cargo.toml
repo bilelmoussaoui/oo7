@@ -29,6 +29,7 @@ endi.workspace = true
 futures-lite = { workspace = true, optional = true }
 futures-util.workspace = true
 getrandom = "0.3"
+oo7-macros = { path = "../macros", version = "0.6", optional = true }
 hkdf = { version = "0.12", optional = true }
 hmac = { version = "0.12", optional = true }
 md-5 = { version = "0.10", optional = true }
@@ -86,6 +87,7 @@ native_crypto = [
 ]
 openssl_crypto = ["dep:openssl"]
 tracing = ["dep:tracing", "ashpd/tracing"]
+schema = ["dep:oo7-macros"]
 
 [package.metadata.docs.rs]
 features = ["unstable"]
@@ -111,3 +113,8 @@ required-features = ["tokio"]
 name = "file_tracing"
 path = "examples/file_tracing.rs"
 required-features = ["tokio", "tracing"]
+
+[[example]]
+name = "schema"
+path = "examples/schema.rs"
+required-features = ["tokio", "schema"]

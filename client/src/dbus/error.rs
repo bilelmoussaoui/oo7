@@ -31,6 +31,9 @@ pub enum Error {
     IO(std::io::Error),
     /// Crypto related error.
     Crypto(crate::crypto::Error),
+    /// Schema error.
+    #[cfg(feature = "schema")]
+    Schema(crate::SchemaError),
 }
 
 impl From<zbus::Error> for Error {
@@ -69,6 +72,13 @@ impl From<crate::crypto::Error> for Error {
     }
 }
 
+#[cfg(feature = "schema")]
+impl From<crate::SchemaError> for Error {
+    fn from(value: crate::SchemaError) -> Self {
+        Self::Schema(value)
+    }
+}
+
 impl std::error::Error for Error {}
 
 impl std::fmt::Display for Error {
@@ -81,6 +91,8 @@ impl std::fmt::Display for Error {
             Self::NotFound(name) => write!(f, "The collection '{name}' doesn't exists"),
             Self::Dismissed => write!(f, "Prompt was dismissed"),
             Self::Crypto(e) => write!(f, "Failed to do a cryptography operation, {e}"),
+            #[cfg(feature = "schema")]
+            Self::Schema(e) => write!(f, "Schema error: {e}"),
         }
     }
 }

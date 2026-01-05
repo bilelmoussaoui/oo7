@@ -5,7 +5,7 @@ use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 use super::{
     Error, LockedItem,
-    api::{AttributeValue, EncryptedItem, GVARIANT_ENCODING},
+    api::{EncryptedItem, GVARIANT_ENCODING},
 };
 use crate::{AsAttributes, CONTENT_TYPE_ATTRIBUTE, Key, Secret, crypto, secret::ContentType};
 
@@ -15,7 +15,7 @@ use crate::{AsAttributes, CONTENT_TYPE_ATTRIBUTE, Key, Secret, crypto, secret::C
 )]
 pub struct UnlockedItem {
     #[zeroize(skip)]
-    attributes: HashMap<String, AttributeValue>,
+    attributes: HashMap<String, String>,
     #[zeroize(skip)]
     label: String,
     #[zeroize(skip)]
@@ -37,18 +37,14 @@ impl UnlockedItem {
             .unwrap()
             .as_secs();
 
-        let mut item_attributes: HashMap<String, AttributeValue> = attributes
-            .as_attributes()
-            .into_iter()
-            .map(|(k, v)| (k.to_string(), v.into()))
-            .collect();
+        let mut item_attributes = attributes.as_attributes();
 
         let secret = secret.into();
         // Set default MIME type if not provided
         if !item_attributes.contains_key(CONTENT_TYPE_ATTRIBUTE) {
             item_attributes.insert(
                 CONTENT_TYPE_ATTRIBUTE.to_owned(),
-                secret.content_type().as_str().into(),
+                secret.content_type().as_str().to_string(),
             );
         }
 
@@ -62,17 +58,40 @@ impl UnlockedItem {
     }
 
     /// Retrieve the item attributes.
-    pub fn attributes(&self) -> &HashMap<String, AttributeValue> {
+    pub fn attributes(&self) -> &HashMap<String, String> {
         &self.attributes
+    }
+
+    /// Retrieve the item attributes as a typed schema.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use oo7::{SecretSchema, file::UnlockedItem};
+    /// # #[derive(SecretSchema, Debug)]
+    /// # #[schema(name = "org.example.Password")]
+    /// # struct PasswordSchema {
+    /// #     username: String,
+    /// #     server: String,
+    /// # }
+    /// # fn example(item: &UnlockedItem) -> Result<(), oo7::file::Error> {
+    /// let schema = item.attributes_as::<PasswordSchema>()?;
+    /// println!("Username: {}", schema.username);
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "schema")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "schema")))]
+    pub fn attributes_as<T>(&self) -> Result<T, Error>
+    where
+        T: for<'a> std::convert::TryFrom<&'a HashMap<String, String>, Error = crate::SchemaError>,
+    {
+        T::try_from(&self.attributes).map_err(Into::into)
     }
 
     /// Update the item attributes.
     pub fn set_attributes(&mut self, attributes: &impl AsAttributes) {
-        let mut new_attributes: HashMap<String, AttributeValue> = attributes
-            .as_attributes()
-            .into_iter()
-            .map(|(k, v)| (k.to_string(), v.into()))
-            .collect();
+        let mut new_attributes = attributes.as_attributes();
 
         // Preserve MIME type if not explicitly set in new attributes
         if !new_attributes.contains_key(CONTENT_TYPE_ATTRIBUTE) {
@@ -84,7 +103,7 @@ impl UnlockedItem {
             } else {
                 new_attributes.insert(
                     CONTENT_TYPE_ATTRIBUTE.to_owned(),
-                    ContentType::default().as_str().into(),
+                    ContentType::default().as_str().to_string(),
                 );
             }
         }
@@ -166,7 +185,7 @@ impl UnlockedItem {
         let hashed_attributes = self
             .attributes
             .iter()
-            .filter_map(|(k, v)| Some((k.to_owned(), v.mac(key).ok()?)))
+            .filter_map(|(k, v)| Some((k.to_owned(), crypto::compute_mac(v.as_bytes(), key).ok()?)))
             .collect();
 
         Ok(EncryptedItem {
@@ -188,7 +207,7 @@ impl TryFrom<&[u8]> for UnlockedItem {
         if !item.attributes.contains_key(CONTENT_TYPE_ATTRIBUTE) {
             item.attributes.insert(
                 CONTENT_TYPE_ATTRIBUTE.to_owned(),
-                ContentType::default().as_str().into(),
+                ContentType::default().as_str().to_string(),
             );
         }
 
@@ -309,8 +328,8 @@ mod tests {
         let iv = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 0, 0, 0, 0, 0];
         assert_eq!(iv.len(), n_iv);
 
-        let attribute_value = AttributeValue::from("5");
-        let attribute_value_mac = attribute_value.mac(&key).unwrap();
+        let attribute_value = "5".to_string();
+        let attribute_value_mac = crypto::compute_mac(attribute_value.as_bytes(), &key).unwrap();
 
         let mut item = UnlockedItem {
             attributes: HashMap::from([("fooness".to_string(), attribute_value)]),
@@ -348,7 +367,7 @@ mod tests {
         // attribute set.
         item.attributes.insert(
             crate::CONTENT_TYPE_ATTRIBUTE.to_string(),
-            AttributeValue::from(crate::secret::ContentType::Blob.as_str()),
+            crate::secret::ContentType::Blob.as_str().to_string(),
         );
         assert_eq!(decrypted, item);
     }

@@ -24,13 +24,7 @@ impl Properties {
     pub fn for_item(label: &str, attributes: &impl AsAttributes) -> Self {
         Self {
             label: label.to_owned(),
-            attributes: Some(
-                attributes
-                    .as_attributes()
-                    .iter()
-                    .map(|(k, v)| (k.to_string(), v.to_string()))
-                    .collect(),
-            ),
+            attributes: Some(attributes.as_attributes()),
         }
     }
 

@@ -10,7 +10,7 @@ use endi::{Endian, ReadBytes};
 use super::{Secret, UnlockedItem};
 use crate::{
     AsAttributes, crypto,
-    file::{AttributeValue, Error, WeakKeyError},
+    file::{Error, WeakKeyError},
 };
 
 const FILE_HEADER: &[u8] = b"GnomeKeyring\n\r\0\n";
@@ -52,13 +52,13 @@ impl Keyring {
             let name = Self::read_string(cursor)?.ok_or_else(|| {
                 io::Error::new(io::ErrorKind::InvalidInput, "empty attribute name")
             })?;
-            let value: AttributeValue = match cursor.read_u32(Endian::Big)? {
+            let value = match cursor.read_u32(Endian::Big)? {
                 0 => Self::read_string(cursor)?
                     .ok_or_else(|| {
                         io::Error::new(io::ErrorKind::InvalidInput, "empty attribute value")
                     })?
-                    .into(),
-                1 => cursor.read_u32(Endian::Big)?.into(),
+                    .to_string(),
+                1 => cursor.read_u32(Endian::Big)?.to_string(),
                 _ => {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidInput,

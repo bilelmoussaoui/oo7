@@ -26,8 +26,6 @@ pub mod api;
 #[cfg(not(feature = "unstable"))]
 pub(crate) mod api;
 
-pub(crate) use api::AttributeValue;
-
 mod error;
 mod locked_item;
 mod locked_keyring;
@@ -79,10 +77,9 @@ impl Item {
         match self {
             Self::Unlocked(unlocked) => {
                 let item_attrs = unlocked.attributes();
-                attributes
-                    .as_attributes()
-                    .iter()
-                    .all(|(k, value)| item_attrs.get(*k).map(|v| v.as_ref()) == Some(value))
+                attributes.as_attributes().iter().all(|(k, value)| {
+                    item_attrs.get(k.as_str()).map(|v| v.as_ref()) == Some(value.as_str())
+                })
             }
             Self::Locked(locked) => {
                 let hashed_attrs = attributes.hash(key);
@@ -91,7 +88,7 @@ impl Item {
                     mac_result
                         .as_ref()
                         .ok()
-                        .map(|mac| locked.inner.has_attribute(attr_key, mac))
+                        .map(|mac| locked.inner.has_attribute(attr_key.as_str(), mac))
                         .unwrap_or(false)
                 })
             }

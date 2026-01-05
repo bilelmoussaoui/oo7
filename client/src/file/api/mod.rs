@@ -40,11 +40,9 @@ const FILE_HEADER_LEN: usize = FILE_HEADER.len();
 pub(super) const MAJOR_VERSION: u8 = 1;
 const MINOR_VERSION: u8 = 0;
 
-mod attribute_value;
 mod encrypted_item;
 mod legacy_keyring;
 
-pub use attribute_value::AttributeValue;
 pub(super) use encrypted_item::EncryptedItem;
 pub(super) use legacy_keyring::{Keyring as LegacyKeyring, MAJOR_VERSION as LEGACY_MAJOR_VERSION};
 
@@ -196,7 +194,7 @@ impl Keyring {
             .filter(|e| {
                 hashed_search
                     .iter()
-                    .all(|(k, v)| v.as_ref().is_ok_and(|v| e.has_attribute(k, v)))
+                    .all(|(k, v)| v.as_ref().is_ok_and(|v| e.has_attribute(k.as_str(), v)))
             })
             .map(|e| (*e).clone().decrypt(key))
             .collect()
@@ -214,7 +212,7 @@ impl Keyring {
             .find(|e| {
                 hashed_search
                     .iter()
-                    .all(|(k, v)| v.as_ref().is_ok_and(|v| e.has_attribute(k, v)))
+                    .all(|(k, v)| v.as_ref().is_ok_and(|v| e.has_attribute(k.as_str(), v)))
             })
             .map(|e| (*e).clone().decrypt(key))
             .transpose()
@@ -226,7 +224,7 @@ impl Keyring {
         self.items.iter().position(|e| {
             hashed_search
                 .iter()
-                .all(|(k, v)| v.as_ref().is_ok_and(|v| e.has_attribute(k, v)))
+                .all(|(k, v)| v.as_ref().is_ok_and(|v| e.has_attribute(k.as_str(), v)))
         })
     }
 
@@ -237,7 +235,7 @@ impl Keyring {
         for item in &self.items {
             if hashed_search
                 .iter()
-                .all(|(k, v)| v.as_ref().is_ok_and(|v| item.has_attribute(k, v)))
+                .all(|(k, v)| v.as_ref().is_ok_and(|v| item.has_attribute(k.as_str(), v)))
             {
                 // Validate by checking if it can be decrypted
                 if !item.is_valid(key) {
@@ -250,7 +248,7 @@ impl Keyring {
         self.items.retain(|e| {
             !hashed_search
                 .iter()
-                .all(|(k, v)| v.as_ref().is_ok_and(|v| e.has_attribute(k, v)))
+                .all(|(k, v)| v.as_ref().is_ok_and(|v| e.has_attribute(k.as_str(), v)))
         });
 
         Ok(())

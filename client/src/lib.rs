@@ -40,9 +40,15 @@ mod keyring;
 mod secret;
 
 pub use ashpd;
+#[cfg(feature = "schema")]
+#[cfg_attr(docsrs, doc(cfg(feature = "schema")))]
+pub use error::SchemaError;
 pub use error::{Error, Result};
 pub use keyring::{Item, Keyring};
 pub use migration::migrate;
+#[cfg(feature = "schema")]
+#[cfg_attr(docsrs, doc(cfg(feature = "schema")))]
+pub use oo7_macros::SecretSchema;
 pub use secret::{ContentType, Secret};
 pub use zbus;
 
@@ -59,12 +65,9 @@ pub const CONTENT_TYPE_ATTRIBUTE: &str = "xdg:content-type";
 
 /// An item/collection attributes.
 pub trait AsAttributes {
-    fn as_attributes(&self) -> HashMap<&str, &str>;
+    fn as_attributes(&self) -> HashMap<String, String>;
 
-    fn hash<'a>(
-        &'a self,
-        key: &Key,
-    ) -> Vec<(&'a str, std::result::Result<Mac, crate::crypto::Error>)> {
+    fn hash(&self, key: &Key) -> Vec<(String, std::result::Result<Mac, crate::crypto::Error>)> {
         self.as_attributes()
             .into_iter()
             .map(|(k, v)| (k, crypto::compute_mac(v.as_bytes(), key)))
@@ -79,8 +82,10 @@ macro_rules! impl_as_attributes {
             K: AsRef<str>,
             V: AsRef<str>,
         {
-            fn as_attributes(&self) -> std::collections::HashMap<&str, &str> {
-                self.iter().map(|(k, v)| (k.as_ref(), v.as_ref())).collect()
+            fn as_attributes(&self) -> std::collections::HashMap<String, String> {
+                self.iter()
+                    .map(|(k, v)| (k.as_ref().to_string(), v.as_ref().to_string()))
+                    .collect()
             }
         }
 
@@ -89,8 +94,10 @@ macro_rules! impl_as_attributes {
             K: AsRef<str>,
             V: AsRef<str>,
         {
-            fn as_attributes(&self) -> std::collections::HashMap<&str, &str> {
-                self.iter().map(|(k, v)| (k.as_ref(), v.as_ref())).collect()
+            fn as_attributes(&self) -> std::collections::HashMap<String, String> {
+                self.iter()
+                    .map(|(k, v)| (k.as_ref().to_string(), v.as_ref().to_string()))
+                    .collect()
             }
         }
     };
@@ -106,8 +113,10 @@ where
     K: AsRef<str>,
     V: AsRef<str>,
 {
-    fn as_attributes(&self) -> HashMap<&str, &str> {
-        self.iter().map(|(k, v)| (k.as_ref(), v.as_ref())).collect()
+    fn as_attributes(&self) -> HashMap<String, String> {
+        self.iter()
+            .map(|(k, v)| (k.as_ref().to_string(), v.as_ref().to_string()))
+            .collect()
     }
 }
 
@@ -117,7 +126,9 @@ where
     K: AsRef<str>,
     V: AsRef<str>,
 {
-    fn as_attributes(&self) -> HashMap<&str, &str> {
-        self.iter().map(|(k, v)| (k.as_ref(), v.as_ref())).collect()
+    fn as_attributes(&self) -> HashMap<String, String> {
+        self.iter()
+            .map(|(k, v)| (k.as_ref().to_string(), v.as_ref().to_string()))
+            .collect()
     }
 }
