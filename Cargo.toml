@@ -2,7 +2,7 @@
 resolver = "2"
 
 members = [
- "cargo-credential",
+  "cargo-credential",
   "client",
   "cli",
   "macros",
