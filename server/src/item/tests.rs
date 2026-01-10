@@ -3,7 +3,7 @@ use std::sync::Arc;
 use oo7::dbus;
 use tokio_stream::StreamExt;
 
-use crate::tests::TestServiceSetup;
+use crate::tests::{TestServiceSetup, gnome_prompter_test, plasma_prompter_test};
 
 #[tokio::test]
 async fn label_property() -> Result<(), Box<dyn std::error::Error>> {
@@ -440,7 +440,15 @@ async fn item_changed_signal() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-#[tokio::test]
+gnome_prompter_test!(
+    delete_locked_item_with_prompt_gnome,
+    delete_locked_item_with_prompt
+);
+plasma_prompter_test!(
+    delete_locked_item_with_prompt_plasma,
+    delete_locked_item_with_prompt
+);
+
 async fn delete_locked_item_with_prompt() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestServiceSetup::plain_session(true).await?;
     let default_collection = setup.default_collection().await?;
