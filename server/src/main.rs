@@ -1,11 +1,11 @@
 mod capability;
 mod collection;
 mod error;
-#[cfg(feature = "gnome")]
+#[cfg(any(feature = "gnome_native_crypto", feature = "gnome_openssl_crypto"))]
 mod gnome;
 mod item;
 mod pam_listener;
-#[cfg(feature = "plasma")]
+#[cfg(any(feature = "plasma_native_crypto", feature = "plasma_openssl_crypto"))]
 mod plasma;
 mod prompt;
 mod service;

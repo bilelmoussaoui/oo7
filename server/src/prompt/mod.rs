@@ -10,9 +10,9 @@ use zbus::{
     zvariant::{ObjectPath, Optional, OwnedObjectPath, OwnedValue},
 };
 
-#[cfg(feature = "gnome")]
+#[cfg(any(feature = "gnome_native_crypto", feature = "gnome_openssl_crypto"))]
 use crate::gnome::prompter::{PrompterCallback, PrompterProxy};
-#[cfg(feature = "plasma")]
+#[cfg(any(feature = "plasma_native_crypto", feature = "plasma_openssl_crypto"))]
 use crate::plasma::prompter::{PlasmaPrompterCallback, in_plasma_environment};
 use crate::{error::custom_service_error, service::Service};
 
@@ -62,10 +62,10 @@ pub struct Prompt {
     /// The collection for Unlock prompts (needed for secret validation)
     collection: Option<crate::collection::Collection>,
     /// GNOME Specific
-    #[cfg(feature = "gnome")]
+    #[cfg(any(feature = "gnome_native_crypto", feature = "gnome_openssl_crypto"))]
     callback: Arc<OnceCell<PrompterCallback>>,
     /// KDE Plasma Specific
-    #[cfg(feature = "plasma")]
+    #[cfg(any(feature = "plasma_native_crypto", feature = "plasma_openssl_crypto"))]
     callback_plasma: Arc<OnceCell<PlasmaPrompterCallback>>,
     /// The action to execute when the prompt completes
     action: Arc<Mutex<Option<PromptAction>>>,
@@ -84,11 +84,16 @@ impl std::fmt::Debug for Prompt {
     }
 }
 
-#[cfg(any(feature = "gnome", feature = "plasma"))] // User has to enable at least one prompt backend
+#[cfg(any(
+    feature = "gnome_openssl_crypto",
+    feature = "gnome_native_crypto",
+    feature = "plasma_native_crypto",
+    feature = "plasma_openssl_crypto"
+))] // User has to enable at least one prompt backend
 #[interface(name = "org.freedesktop.Secret.Prompt")]
 impl Prompt {
     pub async fn prompt(&self, window_id: Optional<&str>) -> Result<(), ServiceError> {
-        #[cfg(feature = "plasma")]
+        #[cfg(any(feature = "plasma_native_crypto", feature = "plasma_openssl_crypto"))]
         if in_plasma_environment(self.service.connection()).await {
             use ashpd::WindowIdentifierType;
 
@@ -96,7 +101,7 @@ impl Prompt {
                 return Err(custom_service_error(
                     "A prompt callback is ongoing already.",
                 ));
-            };
+            }
 
             let callback =
                 PlasmaPrompterCallback::new(self.service.clone(), self.path.clone()).await;
@@ -120,7 +125,7 @@ impl Prompt {
                 .await;
         }
 
-        #[cfg(feature = "gnome")]
+        #[cfg(any(feature = "gnome_native_crypto", feature = "gnome_openssl_crypto"))]
         {
             if self.callback.get().is_some() {
                 return Err(custom_service_error(
@@ -153,17 +158,17 @@ impl Prompt {
             let prompter = PrompterProxy::new(self.service.connection()).await?;
             tokio::spawn(async move { prompter.begin_prompting(&path).await });
 
-            Ok(())
+            return Ok(());
         }
 
-        #[cfg(not(feature = "gnome"))] // ...and not plasma at runtime -> error out
+        #[allow(unreachable_code)]
         Err(custom_service_error(
             "No prompt backend available in the current environment.",
         ))
     }
 
     pub async fn dismiss(&self) -> Result<(), ServiceError> {
-        #[cfg(feature = "plasma")]
+        #[cfg(any(feature = "plasma_native_crypto", feature = "plasma_openssl_crypto"))]
         if let Some(callback_plasma) = self.callback_plasma.get() {
             let emitter = SignalEmitter::from_parts(
                 self.service.connection().clone(),
@@ -172,7 +177,7 @@ impl Prompt {
             PlasmaPrompterCallback::dismiss(&emitter).await?;
         }
 
-        #[cfg(feature = "gnome")]
+        #[cfg(any(feature = "gnome_native_crypto", feature = "gnome_openssl_crypto"))]
         if let Some(_callback) = self.callback.get() {
             // TODO: figure out if we should destroy the un-export the callback
             // here?
@@ -210,9 +215,9 @@ impl Prompt {
             role,
             label,
             collection,
-            #[cfg(feature = "gnome")]
+            #[cfg(any(feature = "gnome_native_crypto", feature = "gnome_openssl_crypto"))]
             callback: Default::default(),
-            #[cfg(feature = "plasma")]
+            #[cfg(any(feature = "plasma_native_crypto", feature = "plasma_openssl_crypto"))]
             callback_plasma: Default::default(),
             action: Arc::new(Mutex::new(None)),
         }

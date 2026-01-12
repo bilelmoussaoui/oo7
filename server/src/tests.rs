@@ -1,13 +1,13 @@
 use std::{collections::HashMap, fs::File, io::Write, sync::Arc};
 
-#[cfg(feature = "gnome")]
+#[cfg(any(feature = "gnome_native_crypto", feature = "gnome_openssl_crypto"))]
 use base64::Engine;
 use nix::sys::socket::{AddressFamily, socketpair};
 use oo7::{Secret, crypto, dbus};
 use tokio_stream::StreamExt;
 use zbus::zvariant::{Fd, ObjectPath, Optional, Value};
 
-#[cfg(feature = "gnome")]
+#[cfg(any(feature = "gnome_native_crypto", feature = "gnome_openssl_crypto"))]
 use crate::gnome::{
     prompter::{PromptType, Properties, Reply},
     secret_exchange,
@@ -16,7 +16,7 @@ use crate::service::Service;
 
 macro_rules! gnome_prompter_test {
     ($name:tt, $test_function:tt $(, $meta:meta)*) => {
-        #[cfg(feature = "gnome")]
+#[cfg(any(feature = "gnome_native_crypto", feature = "gnome_openssl_crypto"))]
         #[tokio::test]
         #[serial_test::serial(prompter_env)]
         $(
@@ -38,7 +38,8 @@ pub(crate) use gnome_prompter_test;
 
 macro_rules! plasma_prompter_test {
     ($name:tt, $test_function:tt $(, $meta:meta)*) => {
-        #[cfg(feature = "plasma")]
+        #[cfg(any(feature = "plasma_native_crypto", feature = "plasma_openssl_crypto"))]
+
         #[tokio::test]
         #[serial_test::serial(prompter_env)]
         $(
@@ -86,9 +87,9 @@ pub(crate) struct TestServiceSetup {
     pub server_public_key: Option<oo7::Key>,
     pub keyring_secret: Option<oo7::Secret>,
     pub aes_key: Option<Arc<oo7::Key>>,
-    #[cfg(feature = "gnome")]
+    #[cfg(any(feature = "gnome_native_crypto", feature = "gnome_openssl_crypto"))]
     pub mock_prompter: MockPrompterService,
-    #[cfg(feature = "plasma")]
+    #[cfg(any(feature = "plasma_native_crypto", feature = "plasma_openssl_crypto"))]
     pub mock_prompter_plasma: MockPrompterServicePlasma,
 }
 
@@ -120,7 +121,7 @@ impl TestServiceSetup {
         let server = Service::run_with_connection(server_conn.clone(), secret.clone()).await?;
 
         // Create and serve the mock prompter
-        #[cfg(feature = "gnome")]
+        #[cfg(any(feature = "gnome_native_crypto", feature = "gnome_openssl_crypto"))]
         let mock_prompter = {
             let mock_prompter = MockPrompterService::new();
             client_conn
@@ -129,7 +130,7 @@ impl TestServiceSetup {
                 .await?;
             mock_prompter
         };
-        #[cfg(feature = "plasma")]
+        #[cfg(any(feature = "plasma_native_crypto", feature = "plasma_openssl_crypto"))]
         let mock_prompter_plasma = {
             let mock_prompter_plasma = MockPrompterServicePlasma::new();
             client_conn
@@ -158,9 +159,9 @@ impl TestServiceSetup {
             collections,
             server_public_key,
             aes_key: None,
-            #[cfg(feature = "gnome")]
+            #[cfg(any(feature = "gnome_native_crypto", feature = "gnome_openssl_crypto"))]
             mock_prompter,
-            #[cfg(feature = "plasma")]
+            #[cfg(any(feature = "plasma_native_crypto", feature = "plasma_openssl_crypto"))]
             mock_prompter_plasma,
         })
     }
@@ -179,7 +180,7 @@ impl TestServiceSetup {
         let server = Service::run_with_connection(server_conn.clone(), secret.clone()).await?;
 
         // Create and serve the mock prompter
-        #[cfg(feature = "gnome")]
+        #[cfg(any(feature = "gnome_native_crypto", feature = "gnome_openssl_crypto"))]
         let mock_prompter = {
             let mock_prompter = MockPrompterService::new();
             client_conn
@@ -189,7 +190,7 @@ impl TestServiceSetup {
             mock_prompter
         };
 
-        #[cfg(feature = "plasma")]
+        #[cfg(any(feature = "plasma_native_crypto", feature = "plasma_openssl_crypto"))]
         let mock_prompter_plasma = {
             let mock_prompter_plasma = MockPrompterServicePlasma::new();
             client_conn
@@ -226,9 +227,9 @@ impl TestServiceSetup {
             collections,
             server_public_key,
             aes_key: Some(Arc::new(aes_key)),
-            #[cfg(feature = "gnome")]
+            #[cfg(any(feature = "gnome_native_crypto", feature = "gnome_openssl_crypto"))]
             mock_prompter,
-            #[cfg(feature = "plasma")]
+            #[cfg(any(feature = "plasma_native_crypto", feature = "plasma_openssl_crypto"))]
             mock_prompter_plasma,
         })
     }
@@ -255,7 +256,7 @@ impl TestServiceSetup {
         let discovered = service.discover_keyrings(secret.clone()).await?;
         service.initialize(server_conn, discovered, false).await?;
 
-        #[cfg(feature = "gnome")]
+        #[cfg(any(feature = "gnome_native_crypto", feature = "gnome_openssl_crypto"))]
         let mock_prompter = {
             let mock_prompter = MockPrompterService::new();
             client_conn
@@ -265,7 +266,7 @@ impl TestServiceSetup {
             mock_prompter
         };
 
-        #[cfg(feature = "plasma")]
+        #[cfg(any(feature = "plasma_native_crypto", feature = "plasma_openssl_crypto"))]
         let mock_prompter_plasma = {
             let mock_prompter_plasma = MockPrompterServicePlasma::new();
             client_conn
@@ -293,26 +294,26 @@ impl TestServiceSetup {
             collections,
             server_public_key,
             aes_key: None,
-            #[cfg(feature = "gnome")]
+            #[cfg(any(feature = "gnome_native_crypto", feature = "gnome_openssl_crypto"))]
             mock_prompter,
-            #[cfg(feature = "plasma")]
+            #[cfg(any(feature = "plasma_native_crypto", feature = "plasma_openssl_crypto"))]
             mock_prompter_plasma,
         })
     }
 
     pub(crate) async fn set_password_accept(&self, accept: bool) {
-        #[cfg(feature = "gnome")]
+        #[cfg(any(feature = "gnome_native_crypto", feature = "gnome_openssl_crypto"))]
         self.mock_prompter.set_accept(accept).await;
-        #[cfg(feature = "plasma")]
+        #[cfg(any(feature = "plasma_native_crypto", feature = "plasma_openssl_crypto"))]
         self.mock_prompter_plasma.set_accept(accept).await;
     }
 
     pub(crate) async fn set_password_queue(&self, passwords: Vec<oo7::Secret>) {
-        #[cfg(feature = "gnome")]
+        #[cfg(any(feature = "gnome_native_crypto", feature = "gnome_openssl_crypto"))]
         self.mock_prompter
             .set_password_queue(passwords.clone())
             .await;
-        #[cfg(feature = "plasma")]
+        #[cfg(any(feature = "plasma_native_crypto", feature = "plasma_openssl_crypto"))]
         self.mock_prompter_plasma
             .set_password_queue(passwords)
             .await;
@@ -323,7 +324,7 @@ impl TestServiceSetup {
 ///
 /// This simulates the GNOME System Prompter for testing without requiring
 /// the actual GNOME keyring prompter service to be running.
-#[cfg(feature = "gnome")]
+#[cfg(any(feature = "gnome_native_crypto", feature = "gnome_openssl_crypto"))]
 #[derive(Debug, Clone)]
 pub(crate) struct MockPrompterService {
     /// The password to use for unlock prompts (simulates user input)
@@ -334,7 +335,7 @@ pub(crate) struct MockPrompterService {
     password_queue: Arc<tokio::sync::Mutex<Vec<oo7::Secret>>>,
 }
 
-#[cfg(feature = "gnome")]
+#[cfg(any(feature = "gnome_native_crypto", feature = "gnome_openssl_crypto"))]
 impl MockPrompterService {
     pub fn new() -> Self {
         Self {
@@ -356,7 +357,7 @@ impl MockPrompterService {
     }
 }
 
-#[cfg(feature = "gnome")]
+#[cfg(any(feature = "gnome_native_crypto", feature = "gnome_openssl_crypto"))]
 #[zbus::interface(name = "org.gnome.keyring.internal.Prompter")]
 impl MockPrompterService {
     async fn begin_prompting(
@@ -555,7 +556,7 @@ impl MockPrompterService {
 ///
 /// This simulates the Plasma System Prompter for testing without requiring
 /// the actual service to be running.
-#[cfg(feature = "plasma")]
+#[cfg(any(feature = "plasma_native_crypto", feature = "plasma_openssl_crypto"))]
 #[derive(Debug, Clone)]
 pub(crate) struct MockPrompterServicePlasma {
     /// The password to use for unlock prompts (simulates user input)
@@ -566,7 +567,8 @@ pub(crate) struct MockPrompterServicePlasma {
     password_queue: Arc<tokio::sync::Mutex<Vec<oo7::Secret>>>,
 }
 
-#[cfg(feature = "plasma")]
+#[cfg(any(feature = "plasma_native_crypto", feature = "plasma_openssl_crypto"))]
+
 impl MockPrompterServicePlasma {
     pub fn new() -> Self {
         Self {
@@ -636,7 +638,7 @@ impl MockPrompterServicePlasma {
     }
 }
 
-#[cfg(feature = "plasma")]
+#[cfg(any(feature = "plasma_native_crypto", feature = "plasma_openssl_crypto"))]
 #[zbus::interface(name = "org.kde.secretprompter")]
 impl MockPrompterServicePlasma {
     async fn unlock_collection_prompt(

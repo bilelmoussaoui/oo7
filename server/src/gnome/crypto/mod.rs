@@ -1,13 +1,13 @@
-#[cfg(feature = "native_crypto")]
+#[cfg(feature = "gnome_native_crypto")]
 mod native;
-#[cfg(feature = "native_crypto")]
+#[cfg(feature = "gnome_native_crypto")]
 use native::*;
 
-#[cfg(feature = "openssl_crypto")]
+#[cfg(feature = "gnome_openssl_crypto")]
 mod openssl;
 use oo7::Key;
 
-#[cfg(feature = "openssl_crypto")]
+#[cfg(feature = "gnome_openssl_crypto")]
 use self::openssl::*;
 
 pub fn generate_public_key(private_key: &Key) -> Result<Key, oo7::crypto::Error> {

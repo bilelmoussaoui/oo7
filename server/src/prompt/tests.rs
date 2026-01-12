@@ -45,7 +45,7 @@ async fn prompt_called_twice_error() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-#[cfg(feature = "gnome")]
+#[cfg(any(feature = "gnome_native_crypto", feature = "gnome_openssl_crypto"))]
 #[tokio::test]
 async fn prompt_not_found_error() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestServiceSetup::plain_session(true).await?;
