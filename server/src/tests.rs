@@ -1,16 +1,16 @@
 use std::{collections::HashMap, sync::Arc};
 
+#[cfg(feature = "gnome")]
 use base64::Engine;
 use oo7::{Secret, crypto, dbus};
 use zbus::zvariant::{ObjectPath, Optional, Value};
 
-use crate::{
-    gnome::{
-        prompter::{PromptType, Properties, Reply},
-        secret_exchange,
-    },
-    service::Service,
+#[cfg(feature = "gnome")]
+use crate::gnome::{
+    prompter::{PromptType, Properties, Reply},
+    secret_exchange,
 };
+use crate::service::Service;
 
 /// Helper to create a peer-to-peer connection pair using Unix socket
 async fn create_p2p_connection()
@@ -40,6 +40,7 @@ pub(crate) struct TestServiceSetup {
     pub server_public_key: Option<oo7::Key>,
     pub keyring_secret: Option<oo7::Secret>,
     pub aes_key: Option<Arc<oo7::Key>>,
+    #[cfg(feature = "gnome")]
     pub mock_prompter: MockPrompterService,
 }
 
@@ -71,12 +72,14 @@ impl TestServiceSetup {
         let server = Service::run_with_connection(server_conn.clone(), secret.clone()).await?;
 
         // Create and serve the mock prompter
-        let mock_prompter = MockPrompterService::new();
-        client_conn
-            .object_server()
-            .at("/org/gnome/keyring/Prompter", mock_prompter.clone())
-            .await?;
-
+        #[cfg(feature = "gnome")]
+        {
+            let mock_prompter = MockPrompterService::new();
+            client_conn
+                .object_server()
+                .at("/org/gnome/keyring/Prompter", mock_prompter.clone())
+                .await?;
+        };
         // Give the server a moment to fully initialize
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
@@ -96,6 +99,7 @@ impl TestServiceSetup {
             collections,
             server_public_key,
             aes_key: None,
+            #[cfg(feature = "gnome")]
             mock_prompter,
         })
     }
@@ -114,11 +118,14 @@ impl TestServiceSetup {
         let server = Service::run_with_connection(server_conn.clone(), secret.clone()).await?;
 
         // Create and serve the mock prompter
-        let mock_prompter = MockPrompterService::new();
-        client_conn
-            .object_server()
-            .at("/org/gnome/keyring/Prompter", mock_prompter.clone())
-            .await?;
+        #[cfg(feature = "gnome")]
+        {
+            let mock_prompter = MockPrompterService::new();
+            client_conn
+                .object_server()
+                .at("/org/gnome/keyring/Prompter", mock_prompter.clone())
+                .await?;
+        };
 
         // Give the server a moment to fully initialize
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
@@ -147,6 +154,7 @@ impl TestServiceSetup {
             collections,
             server_public_key,
             aes_key: Some(Arc::new(aes_key)),
+            #[cfg(feature = "gnome")]
             mock_prompter,
         })
     }
@@ -173,11 +181,14 @@ impl TestServiceSetup {
         let discovered = service.discover_keyrings(secret.clone()).await?;
         service.initialize(server_conn, discovered, false).await?;
 
-        let mock_prompter = MockPrompterService::new();
-        client_conn
-            .object_server()
-            .at("/org/gnome/keyring/Prompter", mock_prompter.clone())
-            .await?;
+        #[cfg(feature = "gnome")]
+        {
+            let mock_prompter = MockPrompterService::new();
+            client_conn
+                .object_server()
+                .at("/org/gnome/keyring/Prompter", mock_prompter.clone())
+                .await?;
+        };
 
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
@@ -197,6 +208,7 @@ impl TestServiceSetup {
             collections,
             server_public_key,
             aes_key: None,
+            #[cfg(feature = "gnome")]
             mock_prompter,
         })
     }
@@ -206,6 +218,7 @@ impl TestServiceSetup {
 ///
 /// This simulates the GNOME System Prompter for testing without requiring
 /// the actual GNOME keyring prompter service to be running.
+#[cfg(feature = "gnome")]
 #[derive(Debug, Clone)]
 pub(crate) struct MockPrompterService {
     /// The password to use for unlock prompts (simulates user input)
@@ -216,6 +229,7 @@ pub(crate) struct MockPrompterService {
     password_queue: Arc<tokio::sync::Mutex<Vec<oo7::Secret>>>,
 }
 
+#[cfg(feature = "gnome")]
 impl MockPrompterService {
     pub fn new() -> Self {
         Self {
@@ -237,6 +251,7 @@ impl MockPrompterService {
     }
 }
 
+#[cfg(feature = "gnome")]
 #[zbus::interface(name = "org.gnome.keyring.internal.Prompter")]
 impl MockPrompterService {
     async fn begin_prompting(

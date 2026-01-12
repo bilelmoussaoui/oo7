@@ -11,7 +11,7 @@ version.workspace = true
 
 [dependencies]
 ashpd = {workspace = true, features = ["backend", "tracing"]}
-base64 = "0.22"
+base64 = {version = "0.22", optional = true}
 caps = "0.5"
 clap.workspace = true
 enumflags2 = "0.7"
@@ -37,12 +37,15 @@ zeroize.workspace = true
 
 [features]
 default = ["native_crypto"]
+gnome = ["dep:base64"]
 native_crypto = [
+    "gnome",
     "dep:hkdf",
     "dep:sha2",
     "oo7/native_crypto"
 ]
 openssl_crypto = [
+    "gnome",
     "dep:openssl",
     "oo7/openssl_crypto"
 ]

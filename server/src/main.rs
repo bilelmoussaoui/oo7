@@ -1,6 +1,7 @@
 mod capability;
 mod collection;
 mod error;
+#[cfg(feature = "gnome")]
 mod gnome;
 mod item;
 mod pam_listener;
