@@ -1,9 +1,11 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, fs::File, io::Write, sync::Arc};
 
 #[cfg(feature = "gnome")]
 use base64::Engine;
+use nix::sys::socket::{AddressFamily, socketpair};
 use oo7::{Secret, crypto, dbus};
-use zbus::zvariant::{ObjectPath, Optional, Value};
+use tokio_stream::StreamExt;
+use zbus::zvariant::{Fd, ObjectPath, Optional, Value};
 
 #[cfg(feature = "gnome")]
 use crate::gnome::{
@@ -11,6 +13,50 @@ use crate::gnome::{
     secret_exchange,
 };
 use crate::service::Service;
+
+macro_rules! gnome_prompter_test {
+    ($name:tt, $test_function:tt $(, $meta:meta)*) => {
+        #[cfg(feature = "gnome")]
+        #[tokio::test]
+        #[serial_test::serial(prompter_env)]
+        $(
+            #[$meta]
+        )*
+        async fn $name() -> Result<(), Box<dyn std::error::Error>> {
+            unsafe {
+                std::env::set_var("OO7_DAEMON_PROMPTER_TEST", "gnome");
+            }
+            let ret = $test_function().await;
+            unsafe {
+                std::env::remove_var("OO7_DAEMON_PROMPTER_TEST");
+            }
+            ret
+        }
+    }
+}
+pub(crate) use gnome_prompter_test;
+
+macro_rules! plasma_prompter_test {
+    ($name:tt, $test_function:tt $(, $meta:meta)*) => {
+        #[cfg(feature = "plasma")]
+        #[tokio::test]
+        #[serial_test::serial(prompter_env)]
+        $(
+            #[$meta]
+        )*
+        async fn $name() -> Result<(), Box<dyn std::error::Error>> {
+            unsafe {
+                std::env::set_var("OO7_DAEMON_PROMPTER_TEST", "plasma");
+            }
+            let ret = $test_function().await;
+            unsafe {
+                std::env::remove_var("OO7_DAEMON_PROMPTER_TEST");
+            }
+            ret
+        }
+    }
+}
+pub(crate) use plasma_prompter_test;
 
 /// Helper to create a peer-to-peer connection pair using Unix socket
 async fn create_p2p_connection()
@@ -42,6 +88,8 @@ pub(crate) struct TestServiceSetup {
     pub aes_key: Option<Arc<oo7::Key>>,
     #[cfg(feature = "gnome")]
     pub mock_prompter: MockPrompterService,
+    #[cfg(feature = "plasma")]
+    pub mock_prompter_plasma: MockPrompterServicePlasma,
 }
 
 impl TestServiceSetup {
@@ -73,13 +121,24 @@ impl TestServiceSetup {
 
         // Create and serve the mock prompter
         #[cfg(feature = "gnome")]
-        {
+        let mock_prompter = {
             let mock_prompter = MockPrompterService::new();
             client_conn
                 .object_server()
                 .at("/org/gnome/keyring/Prompter", mock_prompter.clone())
                 .await?;
+            mock_prompter
         };
+        #[cfg(feature = "plasma")]
+        let mock_prompter_plasma = {
+            let mock_prompter_plasma = MockPrompterServicePlasma::new();
+            client_conn
+                .object_server()
+                .at("/SecretPrompter", mock_prompter_plasma.clone())
+                .await?;
+            mock_prompter_plasma
+        };
+
         // Give the server a moment to fully initialize
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
@@ -101,6 +160,8 @@ impl TestServiceSetup {
             aes_key: None,
             #[cfg(feature = "gnome")]
             mock_prompter,
+            #[cfg(feature = "plasma")]
+            mock_prompter_plasma,
         })
     }
 
@@ -119,12 +180,23 @@ impl TestServiceSetup {
 
         // Create and serve the mock prompter
         #[cfg(feature = "gnome")]
-        {
+        let mock_prompter = {
             let mock_prompter = MockPrompterService::new();
             client_conn
                 .object_server()
                 .at("/org/gnome/keyring/Prompter", mock_prompter.clone())
                 .await?;
+            mock_prompter
+        };
+
+        #[cfg(feature = "plasma")]
+        let mock_prompter_plasma = {
+            let mock_prompter_plasma = MockPrompterServicePlasma::new();
+            client_conn
+                .object_server()
+                .at("/SecretPrompter", mock_prompter_plasma.clone())
+                .await?;
+            mock_prompter_plasma
         };
 
         // Give the server a moment to fully initialize
@@ -156,6 +228,8 @@ impl TestServiceSetup {
             aes_key: Some(Arc::new(aes_key)),
             #[cfg(feature = "gnome")]
             mock_prompter,
+            #[cfg(feature = "plasma")]
+            mock_prompter_plasma,
         })
     }
 
@@ -182,12 +256,23 @@ impl TestServiceSetup {
         service.initialize(server_conn, discovered, false).await?;
 
         #[cfg(feature = "gnome")]
-        {
+        let mock_prompter = {
             let mock_prompter = MockPrompterService::new();
             client_conn
                 .object_server()
                 .at("/org/gnome/keyring/Prompter", mock_prompter.clone())
                 .await?;
+            mock_prompter
+        };
+
+        #[cfg(feature = "plasma")]
+        let mock_prompter_plasma = {
+            let mock_prompter_plasma = MockPrompterServicePlasma::new();
+            client_conn
+                .object_server()
+                .at("/SecretPrompter", mock_prompter_plasma.clone())
+                .await?;
+            mock_prompter_plasma
         };
 
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
@@ -210,7 +295,27 @@ impl TestServiceSetup {
             aes_key: None,
             #[cfg(feature = "gnome")]
             mock_prompter,
+            #[cfg(feature = "plasma")]
+            mock_prompter_plasma,
         })
+    }
+
+    pub(crate) async fn set_password_accept(&self, accept: bool) {
+        #[cfg(feature = "gnome")]
+        self.mock_prompter.set_accept(accept).await;
+        #[cfg(feature = "plasma")]
+        self.mock_prompter_plasma.set_accept(accept).await;
+    }
+
+    pub(crate) async fn set_password_queue(&self, passwords: Vec<oo7::Secret>) {
+        #[cfg(feature = "gnome")]
+        self.mock_prompter
+            .set_password_queue(passwords.clone())
+            .await;
+        #[cfg(feature = "plasma")]
+        self.mock_prompter_plasma
+            .set_password_queue(passwords)
+            .await;
     }
 }
 
@@ -442,6 +547,204 @@ impl MockPrompterService {
             }
         });
 
+        Ok(())
+    }
+}
+
+/// Mock implementation of org.kde.secretprompter
+///
+/// This simulates the Plasma System Prompter for testing without requiring
+/// the actual service to be running.
+#[cfg(feature = "plasma")]
+#[derive(Debug, Clone)]
+pub(crate) struct MockPrompterServicePlasma {
+    /// The password to use for unlock prompts (simulates user input)
+    unlock_password: Arc<tokio::sync::Mutex<Option<oo7::Secret>>>,
+    /// Whether to accept (true) or dismiss (false) prompts
+    should_accept: Arc<tokio::sync::Mutex<bool>>,
+    /// Queue of passwords to use for for testing retry logic
+    password_queue: Arc<tokio::sync::Mutex<Vec<oo7::Secret>>>,
+}
+
+#[cfg(feature = "plasma")]
+impl MockPrompterServicePlasma {
+    pub fn new() -> Self {
+        Self {
+            unlock_password: Arc::new(tokio::sync::Mutex::new(Some(oo7::Secret::from(
+                "test-password-long-enough",
+            )))),
+            should_accept: Arc::new(tokio::sync::Mutex::new(true)),
+            password_queue: Arc::new(tokio::sync::Mutex::new(Vec::new())),
+        }
+    }
+
+    /// Set whether prompts should be accepted or dismissed
+    pub async fn set_accept(&self, accept: bool) {
+        *self.should_accept.lock().await = accept;
+    }
+
+    pub async fn set_password_queue(&self, passwords: Vec<oo7::Secret>) {
+        *self.password_queue.lock().await = passwords;
+    }
+
+    pub async fn send_secret(
+        connection: &zbus::Connection,
+        callback_path: &ObjectPath<'_>,
+        secret: &oo7::Secret,
+    ) -> zbus::fdo::Result<()> {
+        let callback_path = callback_path.to_owned();
+        let connection = connection.clone();
+        let secret = secret.clone();
+
+        // Accepted case
+        tokio::spawn(async move {
+            tracing::debug!(
+                "MockPrompterServicePlasma: calling Accepted on {}",
+                callback_path
+            );
+
+            let (read_fd, write_fd) = socketpair(
+                AddressFamily::Unix,
+                nix::sys::socket::SockType::Stream,
+                None,
+                nix::sys::socket::SockFlag::SOCK_CLOEXEC
+                    | nix::sys::socket::SockFlag::SOCK_NONBLOCK,
+            )
+            .expect("Failed to create socketpair");
+            let mut file = File::from(write_fd);
+            file.write_all(secret.as_bytes()).unwrap();
+            drop(file); // Close write end to signal EOF
+
+            connection
+                .call_method(
+                    None::<()>, // No destination in p2p
+                    &callback_path,
+                    Some("org.kde.secretprompter.request"),
+                    "Accepted",
+                    &(Fd::Owned(read_fd)),
+                )
+                .await?;
+
+            tracing::debug!(
+                "MockPrompterServicePlasma: Accepted completed for {}",
+                callback_path
+            );
+            Ok::<_, zbus::Error>(())
+        });
+
+        Ok(())
+    }
+}
+
+#[cfg(feature = "plasma")]
+#[zbus::interface(name = "org.kde.secretprompter")]
+impl MockPrompterServicePlasma {
+    async fn unlock_collection_prompt(
+        &self,
+        request: ObjectPath<'_>,
+        _window_id: &str,
+        _activation_token: &str,
+        _collection_name: &str,
+        #[zbus(connection)] connection: &zbus::Connection,
+    ) -> zbus::fdo::Result<()> {
+        tracing::debug!(
+            "MockPrompterServicePlasma: unlock_collection_prompt called for {}",
+            request
+        );
+
+        let callback_path = request.to_owned();
+        let connection = connection.clone();
+
+        // Reject case
+        if *self.should_accept.lock().await == false {
+            tokio::spawn(async move {
+                tracing::debug!(
+                    "MockPrompterServicePlasma: dismissing prompt for {}",
+                    callback_path
+                );
+
+                connection
+                    .call_method(
+                        None::<()>, // No destination in p2p
+                        &callback_path,
+                        Some("org.kde.secretprompter.request"),
+                        "Rejected",
+                        &(),
+                    )
+                    .await
+                    .unwrap();
+
+                tracing::debug!(
+                    "MockPrompterServicePlasma: Dismissed completed for {}",
+                    callback_path
+                );
+            });
+            return Ok(());
+        }
+
+        let mut queue = self.password_queue.lock().await.clone();
+        self.password_queue.lock().await.clear();
+        if !queue.is_empty() {
+            tokio::spawn(async move {
+                let proxy: zbus::proxy::Proxy<'_> = zbus::proxy::Builder::new(&connection)
+                    .destination("org.kde.client") // apparently unused but still required for p2p
+                    .unwrap()
+                    .path(callback_path.clone())
+                    .unwrap()
+                    .interface("org.kde.secretprompter.request")
+                    .unwrap()
+                    .build()
+                    .await
+                    .unwrap();
+                let mut signal_stream = proxy.receive_signal("Retry").await.unwrap();
+
+                loop {
+                    let secret = queue.remove(0);
+                    MockPrompterServicePlasma::send_secret(&connection, &callback_path, &secret)
+                        .await
+                        .unwrap();
+
+                    if queue.is_empty() {
+                        break;
+                    }
+
+                    // Wait for Retry signal before sending next secret from the queue
+                    signal_stream.next().await;
+                }
+            });
+        } else {
+            let pwd = self.unlock_password.lock().await.clone().unwrap();
+            tracing::debug!(
+                "MockPrompterServicePlasma: using default password (length: {})",
+                std::str::from_utf8(pwd.as_bytes()).unwrap_or("<binary>")
+            );
+            MockPrompterServicePlasma::send_secret(&connection, &callback_path, &pwd).await?;
+        };
+
+        Ok(())
+    }
+
+    async fn create_collection_prompt(
+        &self,
+        request: ObjectPath<'_>,
+        window_id: &str,
+        activation_token: &str,
+        collection_name: &str,
+        #[zbus(connection)] connection: &zbus::Connection,
+    ) -> zbus::fdo::Result<()> {
+        tracing::debug!(
+            "MockPrompterServicePlasma: create_collection_prompt called for {}",
+            request
+        );
+        // Behavior is identical for both prompts. Visualization would be different.
+        self.unlock_collection_prompt(
+            request,
+            window_id,
+            activation_token,
+            collection_name,
+            connection,
+        )
+        .await?;
         Ok(())
     }
 }

@@ -10,11 +10,11 @@ use zbus::{
     zvariant::{ObjectPath, Optional, OwnedObjectPath, OwnedValue},
 };
 
-use crate::{
-    error::custom_service_error,
-    gnome::prompter::{PrompterCallback, PrompterProxy},
-    service::Service,
-};
+#[cfg(feature = "gnome")]
+use crate::gnome::prompter::{PrompterCallback, PrompterProxy};
+#[cfg(feature = "plasma")]
+use crate::plasma::prompter::{PlasmaPrompterCallback, in_plasma_environment};
+use crate::{error::custom_service_error, service::Service};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PromptRole {
@@ -62,7 +62,11 @@ pub struct Prompt {
     /// The collection for Unlock prompts (needed for secret validation)
     collection: Option<crate::collection::Collection>,
     /// GNOME Specific
+    #[cfg(feature = "gnome")]
     callback: Arc<OnceCell<PrompterCallback>>,
+    /// KDE Plasma Specific
+    #[cfg(feature = "plasma")]
+    callback_plasma: Arc<OnceCell<PlasmaPrompterCallback>>,
     /// The action to execute when the prompt completes
     action: Arc<Mutex<Option<PromptAction>>>,
 }
@@ -80,44 +84,95 @@ impl std::fmt::Debug for Prompt {
     }
 }
 
+#[cfg(any(feature = "gnome", feature = "plasma"))] // User has to enable at least one prompt backend
 #[interface(name = "org.freedesktop.Secret.Prompt")]
 impl Prompt {
     pub async fn prompt(&self, window_id: Optional<&str>) -> Result<(), ServiceError> {
-        if self.callback.get().is_some() {
-            return Err(custom_service_error(
-                "A prompt callback is ongoing already.",
-            ));
-        };
+        #[cfg(feature = "plasma")]
+        if in_plasma_environment(self.service.connection()).await {
+            use ashpd::WindowIdentifierType;
 
-        let callback = PrompterCallback::new(
-            (*window_id).and_then(|w| ashpd::WindowIdentifierType::from_str(w).ok()),
-            self.service.clone(),
-            self.path.clone(),
-        )
-        .await
-        .map_err(|err| {
-            custom_service_error(&format!("Failed to create PrompterCallback {err}."))
-        })?;
+            if self.callback_plasma.get().is_some() {
+                return Err(custom_service_error(
+                    "A prompt callback is ongoing already.",
+                ));
+            };
 
-        let path = OwnedObjectPath::from(callback.path().clone());
+            let callback =
+                PlasmaPrompterCallback::new(self.service.clone(), self.path.clone()).await;
+            let path = OwnedObjectPath::from(callback.path().clone());
 
-        self.callback
-            .set(callback.clone())
-            .expect("A prompt callback is only set once");
+            self.callback_plasma
+                .set(callback.clone())
+                .expect("A prompt callback is only set once");
+            self.service
+                .object_server()
+                .at(&path, callback.clone())
+                .await?;
+            tracing::debug!("Prompt `{}` created.", self.path);
 
-        self.service.object_server().at(&path, callback).await?;
-        tracing::debug!("Prompt `{}` created.", self.path);
+            return callback
+                .start(
+                    &self.role,
+                    WindowIdentifierType::from_str(window_id.unwrap_or("")).ok(),
+                    &self.label,
+                )
+                .await;
+        }
 
-        // Starts GNOME System Prompting.
-        // Spawned separately to avoid blocking the early return of the current
-        // execution.
-        let prompter = PrompterProxy::new(self.service.connection()).await?;
-        tokio::spawn(async move { prompter.begin_prompting(&path).await });
+        #[cfg(feature = "gnome")]
+        {
+            if self.callback.get().is_some() {
+                return Err(custom_service_error(
+                    "A prompt callback is ongoing already.",
+                ));
+            };
 
-        Ok(())
+            let callback = PrompterCallback::new(
+                (*window_id).and_then(|w| ashpd::WindowIdentifierType::from_str(w).ok()),
+                self.service.clone(),
+                self.path.clone(),
+            )
+            .await
+            .map_err(|err| {
+                custom_service_error(&format!("Failed to create PrompterCallback {err}."))
+            })?;
+
+            let path = OwnedObjectPath::from(callback.path().clone());
+
+            self.callback
+                .set(callback.clone())
+                .expect("A prompt callback is only set once");
+
+            self.service.object_server().at(&path, callback).await?;
+            tracing::debug!("Prompt `{}` created.", self.path);
+
+            // Starts GNOME System Prompting.
+            // Spawned separately to avoid blocking the early return of the current
+            // execution.
+            let prompter = PrompterProxy::new(self.service.connection()).await?;
+            tokio::spawn(async move { prompter.begin_prompting(&path).await });
+
+            Ok(())
+        }
+
+        #[cfg(not(feature = "gnome"))] // ...and not plasma at runtime -> error out
+        Err(custom_service_error(
+            "No prompt backend available in the current environment.",
+        ))
     }
 
     pub async fn dismiss(&self) -> Result<(), ServiceError> {
+        #[cfg(feature = "plasma")]
+        if let Some(callback_plasma) = self.callback_plasma.get() {
+            let emitter = SignalEmitter::from_parts(
+                self.service.connection().clone(),
+                callback_plasma.path().clone(),
+            );
+            PlasmaPrompterCallback::dismiss(&emitter).await?;
+        }
+
+        #[cfg(feature = "gnome")]
         if let Some(_callback) = self.callback.get() {
             // TODO: figure out if we should destroy the un-export the callback
             // here?
@@ -155,7 +210,10 @@ impl Prompt {
             role,
             label,
             collection,
+            #[cfg(feature = "gnome")]
             callback: Default::default(),
+            #[cfg(feature = "plasma")]
+            callback_plasma: Default::default(),
             action: Arc::new(Mutex::new(None)),
         }
     }

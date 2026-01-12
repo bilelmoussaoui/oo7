@@ -1,7 +1,7 @@
 use oo7::dbus;
 
 use super::*;
-use crate::tests::TestServiceSetup;
+use crate::tests::{TestServiceSetup, gnome_prompter_test, plasma_prompter_test};
 
 #[tokio::test]
 async fn open_session_plain() -> Result<(), Box<dyn std::error::Error>> {
@@ -632,7 +632,9 @@ async fn lock_non_existent_objects() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-#[tokio::test]
+gnome_prompter_test!(unlock_collection_prompt_gnome, unlock_collection_prompt);
+plasma_prompter_test!(unlock_collection_prompt_plasma, unlock_collection_prompt);
+
 async fn unlock_collection_prompt() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestServiceSetup::plain_session(true).await?;
 
@@ -678,7 +680,7 @@ async fn unlock_collection_prompt() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Test 2: Unlock with dismiss
-    setup.mock_prompter.set_accept(false).await;
+    setup.set_password_accept(false).await;
     let result = setup
         .service_api
         .unlock(&[setup.collections[0].inner().path()], None)
@@ -696,7 +698,9 @@ async fn unlock_collection_prompt() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-#[tokio::test]
+gnome_prompter_test!(unlock_item_prompt_gnome, unlock_item_prompt);
+plasma_prompter_test!(unlock_item_prompt_plasma, unlock_item_prompt);
+
 async fn unlock_item_prompt() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestServiceSetup::plain_session(true).await?;
 
@@ -747,7 +751,7 @@ async fn unlock_item_prompt() -> Result<(), Box<dyn std::error::Error>> {
     assert!(item.is_locked().await?, "Item should be locked again");
 
     // Test 2: Unlock with dismiss
-    setup.mock_prompter.set_accept(false).await;
+    setup.set_password_accept(false).await;
     let result = setup.service_api.unlock(&[item.inner().path()], None).await;
 
     assert!(
@@ -863,8 +867,17 @@ async fn lock_collection_no_prompt() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-#[tokio::test]
-#[serial_test::serial(xdg_env)]
+gnome_prompter_test!(
+    create_collection_basic_gnome,
+    create_collection_basic,
+    serial_test::serial(xdg_env)
+);
+plasma_prompter_test!(
+    create_collection_basic_plasma,
+    create_collection_basic,
+    serial_test::serial(xdg_env)
+);
+
 async fn create_collection_basic() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestServiceSetup::plain_session(true).await?;
 
@@ -925,8 +938,17 @@ async fn create_collection_basic() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-#[tokio::test]
-#[serial_test::serial(xdg_env)]
+gnome_prompter_test!(
+    create_collection_signal_gnome,
+    create_collection_signal,
+    serial_test::serial(xdg_env)
+);
+plasma_prompter_test!(
+    create_collection_signal_plasma,
+    create_collection_signal,
+    serial_test::serial(xdg_env)
+);
+
 async fn create_collection_signal() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestServiceSetup::plain_session(true).await?;
 
@@ -969,8 +991,17 @@ async fn create_collection_signal() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-#[tokio::test]
-#[serial_test::serial(xdg_env)]
+gnome_prompter_test!(
+    create_collection_and_add_items_gnome,
+    create_collection_and_add_items,
+    serial_test::serial(xdg_env)
+);
+plasma_prompter_test!(
+    create_collection_and_add_items_plasma,
+    create_collection_and_add_items,
+    serial_test::serial(xdg_env)
+);
+
 async fn create_collection_and_add_items() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestServiceSetup::plain_session(true).await?;
 
@@ -1029,8 +1060,17 @@ async fn create_collection_and_add_items() -> Result<(), Box<dyn std::error::Err
     Ok(())
 }
 
-#[tokio::test]
-#[serial_test::serial(xdg_env)]
+gnome_prompter_test!(
+    create_collection_dismissed_gnome,
+    create_collection_dismissed,
+    serial_test::serial(xdg_env)
+);
+plasma_prompter_test!(
+    create_collection_dismissed_plasma,
+    create_collection_dismissed,
+    serial_test::serial(xdg_env)
+);
+
 async fn create_collection_dismissed() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestServiceSetup::plain_session(true).await?;
 
@@ -1039,7 +1079,7 @@ async fn create_collection_dismissed() -> Result<(), Box<dyn std::error::Error>>
     let initial_count = initial_collections.len();
 
     // Set mock prompter to dismiss
-    setup.mock_prompter.set_accept(false).await;
+    setup.set_password_accept(false).await;
 
     // Try to create a collection
     let result = setup

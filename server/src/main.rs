@@ -5,6 +5,8 @@ mod error;
 mod gnome;
 mod item;
 mod pam_listener;
+#[cfg(feature = "plasma")]
+mod plasma;
 mod prompt;
 mod service;
 mod session;

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use oo7::dbus;
 use tokio_stream::StreamExt;
 
-use crate::tests::TestServiceSetup;
+use crate::tests::{TestServiceSetup, gnome_prompter_test, plasma_prompter_test};
 
 #[tokio::test]
 async fn create_item_plain() -> Result<(), Box<dyn std::error::Error>> {
@@ -545,7 +545,15 @@ async fn collection_deleted_signal() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-#[tokio::test]
+gnome_prompter_test!(
+    create_item_in_locked_collection_gnome,
+    create_item_in_locked_collection
+);
+plasma_prompter_test!(
+    create_item_in_locked_collection_plasma,
+    create_item_in_locked_collection
+);
+
 async fn create_item_in_locked_collection() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestServiceSetup::plain_session(true).await?;
 
@@ -602,7 +610,15 @@ async fn create_item_in_locked_collection() -> Result<(), Box<dyn std::error::Er
     Ok(())
 }
 
-#[tokio::test]
+gnome_prompter_test!(
+    delete_locked_collection_with_prompt_gnome,
+    delete_locked_collection_with_prompt
+);
+plasma_prompter_test!(
+    delete_locked_collection_with_prompt_plasma,
+    delete_locked_collection_with_prompt
+);
+
 async fn delete_locked_collection_with_prompt() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestServiceSetup::plain_session(true).await?;
     let default_collection = setup.default_collection().await?;
@@ -654,7 +670,9 @@ async fn delete_locked_collection_with_prompt() -> Result<(), Box<dyn std::error
     Ok(())
 }
 
-#[tokio::test]
+gnome_prompter_test!(unlock_retry_gnome, unlock_retry);
+plasma_prompter_test!(unlock_retry_plasma, unlock_retry);
+
 async fn unlock_retry() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestServiceSetup::plain_session(true).await?;
     let default_collection = setup.default_collection().await?;
@@ -680,7 +698,6 @@ async fn unlock_retry() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     setup
-        .mock_prompter
         .set_password_queue(vec![
             oo7::Secret::from("wrong-password"),
             oo7::Secret::from("wrong-password2"),
