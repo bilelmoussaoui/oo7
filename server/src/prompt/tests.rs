@@ -1,6 +1,8 @@
-use crate::tests::TestServiceSetup;
+use crate::tests::{TestServiceSetup, gnome_prompter_test, plasma_prompter_test};
 
-#[tokio::test]
+gnome_prompter_test!(prompt_called_twice_error_gnome, prompt_called_twice_error);
+plasma_prompter_test!(prompt_called_twice_error_plasma, prompt_called_twice_error);
+
 async fn prompt_called_twice_error() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestServiceSetup::plain_session(true).await?;
 
@@ -43,6 +45,7 @@ async fn prompt_called_twice_error() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[cfg(feature = "gnome")]
 #[tokio::test]
 async fn prompt_not_found_error() -> Result<(), Box<dyn std::error::Error>> {
     let setup = TestServiceSetup::plain_session(true).await?;

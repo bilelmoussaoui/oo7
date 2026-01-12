@@ -19,7 +19,7 @@ formatx = "0.2"
 gettext-rs = {version = "0.7", features = ["gettext-system"]}
 hkdf = { version = "0.12", optional = true }
 libc = "0.2"
-nix = { version = "0.30", default-features = false, features = ["user"]}
+nix = { version = "0.30", default-features = false, features = ["user", "socket"]}
 num = "0.4.0"
 num-bigint-dig.workspace = true
 openssl = { version = "0.10", optional = true }
@@ -36,7 +36,7 @@ zbus = { workspace = true, features = ["p2p"] }
 zeroize.workspace = true
 
 [features]
-default = ["native_crypto"]
+default = ["native_crypto", "plasma"]
 gnome = ["dep:base64"]
 native_crypto = [
     "gnome",
@@ -49,6 +49,7 @@ openssl_crypto = [
     "dep:openssl",
     "oo7/openssl_crypto"
 ]
+plasma = []
 
 [dev-dependencies]
 serial_test = "3.3"
