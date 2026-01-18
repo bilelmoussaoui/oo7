@@ -10,7 +10,7 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
-ashpd = {workspace = true, features = ["backend", "tracing"]}
+ashpd = {workspace = true, features = ["backend_secret", "tracing"]}
 base64 = {version = "0.22", optional = true}
 caps = "0.5"
 clap.workspace = true
