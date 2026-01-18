@@ -12,7 +12,7 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
-ashpd = {workspace = true, features = ["backend", "tracing"]}
+ashpd = {workspace = true, features = ["backend_secret", "tracing"]}
 clap.workspace = true
 oo7 = { workspace = true, features = ["tokio"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
