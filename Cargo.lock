@@ -82,15 +82,14 @@ checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
 [[package]]
 name = "ashpd"
 version = "0.13.0"
-source = "git+https://github.com/bilelmoussaoui/ashpd#e44326ea8c5379a54f9b37c8bbe60d7e166f2dcc"
+source = "git+https://github.com/bilelmoussaoui/ashpd#55dec10caee7dcd09aa5f854250498c7b29bb37b"
 dependencies = [
  "async-fs",
  "async-net",
  "async-trait",
  "enumflags2",
- "fastrand",
- "futures-channel",
  "futures-util",
+ "getrandom",
  "serde",
  "tokio",
  "tracing",
