@@ -82,10 +82,8 @@ checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
 [[package]]
 name = "ashpd"
 version = "0.13.0"
-source = "git+https://github.com/bilelmoussaoui/ashpd#55dec10caee7dcd09aa5f854250498c7b29bb37b"
+source = "git+https://github.com/bilelmoussaoui/ashpd#c168bf50d79c1ad8cab6c2ef9d222c11a397a76d"
 dependencies = [
- "async-fs",
- "async-net",
  "async-trait",
  "enumflags2",
  "futures-util",
@@ -172,17 +170,6 @@ dependencies = [
  "event-listener",
  "event-listener-strategy",
  "pin-project-lite",
-]
-
-[[package]]
-name = "async-net"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b948000fad4873c1c9339d60f2623323a0cfd3816e5181033c6a5cb68b2accf7"
-dependencies = [
- "async-io",
- "blocking",
- "futures-lite",
 ]
 
 [[package]]
