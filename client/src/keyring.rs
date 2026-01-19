@@ -27,8 +27,7 @@ pub enum Keyring {
 impl Keyring {
     /// Create a new instance of the Keyring.
     pub async fn new() -> Result<Self> {
-        let is_sandboxed = ashpd::is_sandboxed().await;
-        if is_sandboxed {
+        if ashpd::is_sandboxed() {
             #[cfg(feature = "tracing")]
             tracing::debug!("Application is sandboxed, using the file backend");
 

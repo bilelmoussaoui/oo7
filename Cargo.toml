@@ -32,7 +32,7 @@ clap = { version = "4.5", features = [ "cargo", "derive" ] }
 futures-channel = "0.3"
 futures-lite = "2.6"
 futures-util = "0.3"
-num-bigint-dig = { version = "0.8", features = ["zeroize"] }
+num-bigint-dig = { version = "0.9", features = ["zeroize"] }
 oo7 = { path = "client", version = "0.6", default-features = false, features = ["unstable", "tracing"]}
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1.48", default-features = false }

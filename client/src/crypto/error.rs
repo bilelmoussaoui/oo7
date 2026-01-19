@@ -7,6 +7,7 @@ pub enum Error {
     PadError(cipher::inout::PadError),
     #[cfg(feature = "native_crypto")]
     UnpadError(cipher::block_padding::UnpadError),
+    Getrandom(getrandom::Error),
 }
 
 #[cfg(feature = "openssl_crypto")]
@@ -30,6 +31,12 @@ impl From<cipher::inout::PadError> for Error {
     }
 }
 
+impl From<getrandom::Error> for Error {
+    fn from(value: getrandom::Error) -> Self {
+        Self::Getrandom(value)
+    }
+}
+
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
@@ -37,6 +44,7 @@ impl std::error::Error for Error {
             Self::Openssl(e) => Some(e),
             #[cfg(feature = "native_crypto")]
             Self::UnpadError(_) | Self::PadError(_) => None,
+            Self::Getrandom(_) => None,
         }
     }
 }
@@ -50,6 +58,7 @@ impl std::fmt::Display for Error {
             Self::UnpadError(e) => f.write_fmt(format_args!("Wrong padding error: {e}")),
             #[cfg(feature = "native_crypto")]
             Self::PadError(e) => f.write_fmt(format_args!("Wrong padding error: {e}")),
+            Self::Getrandom(e) => f.write_fmt(format_args!("Random number generation error: {e}")),
         }
     }
 }
