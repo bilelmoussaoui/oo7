@@ -1,13 +1,54 @@
 use caps::{CapSet, Capability, CapsHashSet};
-use nix::unistd::{getgid, getuid, setgid, setgroups, setuid};
+use rustix::process::{Gid, Uid, getgid, getuid};
+
+// Wrapper functions using libc since rustix doesn't expose these
+fn setuid(uid: Uid) -> Result<(), rustix::io::Errno> {
+    let ret = unsafe { libc::setuid(uid.as_raw()) };
+    if ret == 0 {
+        Ok(())
+    } else {
+        Err(rustix::io::Errno::from_raw_os_error(
+            std::io::Error::last_os_error()
+                .raw_os_error()
+                .unwrap_or(libc::EINVAL),
+        ))
+    }
+}
+
+fn setgid(gid: Gid) -> Result<(), rustix::io::Errno> {
+    let ret = unsafe { libc::setgid(gid.as_raw()) };
+    if ret == 0 {
+        Ok(())
+    } else {
+        Err(rustix::io::Errno::from_raw_os_error(
+            std::io::Error::last_os_error()
+                .raw_os_error()
+                .unwrap_or(libc::EINVAL),
+        ))
+    }
+}
+
+fn setgroups(groups: &[Gid]) -> Result<(), rustix::io::Errno> {
+    let gids: Vec<libc::gid_t> = groups.iter().map(|g| g.as_raw()).collect();
+    let ret = unsafe { libc::setgroups(gids.len(), gids.as_ptr()) };
+    if ret == 0 {
+        Ok(())
+    } else {
+        Err(rustix::io::Errno::from_raw_os_error(
+            std::io::Error::last_os_error()
+                .raw_os_error()
+                .unwrap_or(libc::EINVAL),
+        ))
+    }
+}
 
 #[derive(Debug)]
 pub enum Error {
     CapsRead(caps::errors::CapsError),
     CapsUpdate(caps::errors::CapsError),
-    DropGroups(nix::Error),
-    SetGid(nix::Error),
-    SetUid(nix::Error),
+    DropGroups(rustix::io::Errno),
+    SetGid(rustix::io::Errno),
+    SetUid(rustix::io::Errno),
 }
 
 impl std::fmt::Display for Error {

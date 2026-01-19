@@ -2,8 +2,8 @@ use std::{collections::HashMap, fs::File, io::Write, sync::Arc};
 
 #[cfg(any(feature = "gnome_native_crypto", feature = "gnome_openssl_crypto"))]
 use base64::Engine;
-use nix::sys::socket::{AddressFamily, socketpair};
 use oo7::{Secret, crypto, dbus};
+use rustix::net::{AddressFamily, SocketFlags, SocketType, socketpair};
 use tokio_stream::StreamExt;
 use zbus::zvariant::{Fd, ObjectPath, Optional, Value};
 
@@ -606,11 +606,10 @@ impl MockPrompterServicePlasma {
             );
 
             let (read_fd, write_fd) = socketpair(
-                AddressFamily::Unix,
-                nix::sys::socket::SockType::Stream,
+                AddressFamily::UNIX,
+                SocketType::STREAM,
+                SocketFlags::CLOEXEC | SocketFlags::NONBLOCK,
                 None,
-                nix::sys::socket::SockFlag::SOCK_CLOEXEC
-                    | nix::sys::socket::SockFlag::SOCK_NONBLOCK,
             )
             .expect("Failed to create socketpair");
             let mut file = File::from(write_fd);

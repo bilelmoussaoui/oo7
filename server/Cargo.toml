@@ -19,7 +19,7 @@ formatx = "0.2"
 gettext-rs = {version = "0.7", features = ["gettext-system"]}
 hkdf = { version = "0.12", optional = true }
 libc = "0.2"
-nix = { version = "0.30", default-features = false, features = ["user", "socket"]}
+rustix = { version = "1.1", default-features = false, features = ["process", "std", "thread"] }
 num = "0.4.0"
 num-bigint-dig.workspace = true
 openssl = { version = "0.10", optional = true }
@@ -58,5 +58,6 @@ plasma_openssl_crypto = [
 ]
 
 [dev-dependencies]
+rustix = { version = "1.1", default-features = false, features = ["net"] }
 serial_test = "3.3"
 tempfile.workspace = true
