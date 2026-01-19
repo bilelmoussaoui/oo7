@@ -95,7 +95,7 @@ impl UnlockedKeyring {
     /// Creates a temporary backend, that is never stored on disk.
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(secret)))]
     pub async fn temporary(secret: Secret) -> Result<Self, Error> {
-        let keyring = api::Keyring::new();
+        let keyring = api::Keyring::new()?;
         Ok(Self {
             keyring: Arc::new(RwLock::new(keyring)),
             path: None,
@@ -130,7 +130,7 @@ impl UnlockedKeyring {
                 tracing::debug!("Migrating from legacy keyring format");
 
                 let legacy_keyring = api::LegacyKeyring::try_from(content.as_slice())?;
-                let mut keyring = api::Keyring::new();
+                let mut keyring = api::Keyring::new()?;
                 let key = keyring.derive_key(&secret)?;
 
                 let decrypted_items = legacy_keyring.decrypt_items(&secret)?;
@@ -186,7 +186,7 @@ impl UnlockedKeyring {
             #[cfg(feature = "tracing")]
             tracing::debug!("Creating new keyring");
             Ok(Self {
-                keyring: Arc::new(RwLock::new(api::Keyring::new())),
+                keyring: Arc::new(RwLock::new(api::Keyring::new()?)),
                 path: Some(v1_path),
                 mtime: Default::default(),
                 key: Default::default(),
@@ -536,7 +536,7 @@ impl UnlockedKeyring {
 
         // Reset Keyring content before setting the new key
         let mut keyring = self.keyring.write().await;
-        keyring.reset();
+        keyring.reset()?;
         drop(keyring);
 
         // Set new key

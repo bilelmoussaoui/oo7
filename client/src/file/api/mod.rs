@@ -18,7 +18,6 @@ use async_fs as fs;
 use async_fs::unix::{DirBuilderExt, OpenOptionsExt};
 #[cfg(feature = "async-std")]
 use futures_lite::AsyncWriteExt;
-use rand::Rng;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "tokio")]
 use tokio::{fs, io, io::AsyncWriteExt};
@@ -81,12 +80,14 @@ pub struct Keyring {
 
 impl Keyring {
     #[allow(clippy::new_without_default)]
-    pub(crate) fn new() -> Self {
-        let salt = rand::rng().random::<[u8; DEFAULT_SALT_SIZE]>().to_vec();
+    pub(crate) fn new() -> Result<Self, Error> {
+        let mut salt = [0u8; DEFAULT_SALT_SIZE];
+        getrandom::fill(&mut salt)
+            .map_err(|e| Error::Crypto(crate::crypto::Error::Getrandom(e)))?;
 
-        Self {
+        Ok(Self {
             salt_size: salt.len() as u32,
-            salt,
+            salt: salt.to_vec(),
             iteration_count: DEFAULT_ITERATION_COUNT,
             // TODO: UTC?
             modified_time: std::time::SystemTime::UNIX_EPOCH
@@ -95,7 +96,7 @@ impl Keyring {
                 .as_secs(),
             usage_count: 0,
             items: Vec::new(),
-        }
+        })
     }
 
     pub fn key_strength(&self, secret: &[u8]) -> Result<(), WeakKeyError> {
@@ -117,11 +118,13 @@ impl Keyring {
         mtime: Option<std::time::SystemTime>,
     ) -> Result<(), Error> {
         let tmp_path = if let Some(parent) = path.as_ref().parent() {
-            let rnd: String = rand::rng()
-                .sample_iter(&rand::distr::Alphanumeric)
-                .take(16)
-                .map(char::from)
-                .collect();
+            let mut rnd_bytes = [0u8; 8];
+            getrandom::fill(&mut rnd_bytes)
+                .map_err(|e| Error::Crypto(crate::crypto::Error::Getrandom(e)))?;
+            let rnd = rnd_bytes.iter().fold(String::new(), |mut acc, b| {
+                acc.push_str(&format!("{:02x}", b));
+                acc
+            });
 
             let mut tmp_path = parent.to_path_buf();
             tmp_path.push(format!(".tmpkeyring{rnd}"));
@@ -314,13 +317,16 @@ impl Keyring {
     }
 
     // Reset Keyring content
-    pub(crate) fn reset(&mut self) {
-        let salt = rand::rng().random::<[u8; DEFAULT_SALT_SIZE]>().to_vec();
+    pub(crate) fn reset(&mut self) -> Result<(), Error> {
+        let mut salt = [0u8; DEFAULT_SALT_SIZE];
+        getrandom::fill(&mut salt)
+            .map_err(|e| Error::Crypto(crate::crypto::Error::Getrandom(e)))?;
         self.salt_size = salt.len() as u32;
-        self.salt = salt;
+        self.salt = salt.to_vec();
         self.iteration_count = DEFAULT_ITERATION_COUNT;
         self.usage_count = 0;
         self.items = Vec::new();
+        Ok(())
     }
 }
 
@@ -376,7 +382,7 @@ mod tests {
     async fn keyfile_add_remove() -> Result<(), Error> {
         let needle = &[("key", "value")];
 
-        let mut keyring = Keyring::new();
+        let mut keyring = Keyring::new()?;
         let key = keyring.derive_key(&SECRET.to_vec().into())?;
 
         keyring
@@ -396,7 +402,7 @@ mod tests {
     async fn keyfile_dump_load() -> Result<(), Error> {
         let _silent = std::fs::remove_file("/tmp/test.keyring");
 
-        let mut new_keyring = Keyring::new();
+        let mut new_keyring = Keyring::new()?;
         let key = new_keyring.derive_key(&SECRET.to_vec().into())?;
 
         new_keyring.items.push(
@@ -419,8 +425,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn key_strength() {
-        let mut keyring = Keyring::new();
+    async fn key_strength() -> Result<(), Error> {
+        let mut keyring = Keyring::new()?;
         keyring.iteration_count = 50000; // Less than MIN_ITERATION_COUNT (100000)
         let secret = Secret::from("test-password-that-is-long-enough");
         let result = keyring.key_strength(&secret);
@@ -429,15 +435,17 @@ mod tests {
             Err(WeakKeyError::IterationCountTooLow(50000))
         ));
 
-        let keyring = Keyring::new();
+        let keyring = Keyring::new()?;
         let secret = Secret::from("ab");
         let result = keyring.key_strength(&secret);
         assert!(matches!(result, Err(WeakKeyError::PasswordTooShort(2))));
 
-        let mut keyring = Keyring::new();
+        let mut keyring = Keyring::new()?;
         keyring.salt = vec![1, 2, 3, 4]; // Less than MIN_SALT_SIZE (32)
         let secret = Secret::from("test-password-that-is-long-enough");
         let result = keyring.key_strength(&secret);
         assert!(matches!(result, Err(WeakKeyError::SaltTooShort(4))));
+
+        Ok(())
     }
 }

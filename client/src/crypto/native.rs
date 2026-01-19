@@ -74,8 +74,9 @@ pub(crate) fn iv_len() -> usize {
 }
 
 pub(crate) fn generate_private_key() -> Result<Zeroizing<Vec<u8>>, super::Error> {
-    let generic_array = EncAlg::generate_key(cipher::rand_core::OsRng);
-    Ok(Zeroizing::new(generic_array.to_vec()))
+    let mut key = vec![0u8; EncAlg::key_size()];
+    getrandom::fill(&mut key)?;
+    Ok(Zeroizing::new(key))
 }
 
 pub(crate) fn generate_public_key(private_key: impl AsRef<[u8]>) -> Result<Vec<u8>, super::Error> {
@@ -116,7 +117,9 @@ pub(crate) fn generate_aes_key(
 }
 
 pub fn generate_iv() -> Result<Vec<u8>, super::Error> {
-    Ok(EncAlg::generate_iv(cipher::rand_core::OsRng).to_vec())
+    let mut iv = vec![0u8; EncAlg::iv_size()];
+    getrandom::fill(&mut iv)?;
+    Ok(iv)
 }
 
 pub(crate) fn mac_len() -> usize {

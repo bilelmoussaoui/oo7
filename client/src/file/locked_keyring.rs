@@ -149,7 +149,7 @@ impl LockedKeyring {
             Err(err) if err.kind() == io::ErrorKind::NotFound => {
                 #[cfg(feature = "tracing")]
                 tracing::debug!("Keyring file not found, creating a new one");
-                (None, api::Keyring::new())
+                (None, api::Keyring::new()?)
             }
             Err(err) => return Err(err.into()),
             Ok(mut file) => {
