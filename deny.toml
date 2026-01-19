@@ -28,12 +28,4 @@ multiple-versions = "deny"
 wildcards = "deny"
 highlight = "all"
 skip = [
-  # num-bigint-dig & crypto_common
-  {name = "rand_core", version = "0.6.4"},
-  # num-bigint-dig
-  {name = "rand_chacha", version = "0.3.1"},
-  # num-bigint-dig
-  {name = "rand", version = "0.8.5"},
-  # num-bigint-dig & crypto_common
-  {name = "getrandom", version = "0.2.15"},
 ]
