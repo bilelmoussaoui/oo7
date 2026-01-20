@@ -2,8 +2,6 @@ use std::fmt;
 
 use oo7::dbus::ServiceError;
 
-use crate::capability;
-
 #[derive(Debug)]
 pub enum Error {
     // File backend error
@@ -17,7 +15,7 @@ pub enum Error {
     // Invalid item error
     InvalidItem(oo7::file::InvalidItemError),
     // Capability error
-    Capability(capability::Error),
+    Capability(rustix::io::Errno),
 }
 
 impl std::error::Error for Error {}
@@ -40,8 +38,8 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl From<capability::Error> for Error {
-    fn from(err: capability::Error) -> Self {
+impl From<rustix::io::Errno> for Error {
+    fn from(err: rustix::io::Errno) -> Self {
         Self::Capability(err)
     }
 }

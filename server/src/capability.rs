@@ -1,9 +1,15 @@
-use caps::{CapSet, Capability, CapsHashSet};
-use rustix::process::{Gid, Uid, getgid, getuid};
+use rustix::{
+    mm::{MlockAllFlags, mlockall},
+    process::{Gid, Uid, getgid, getuid},
+    thread::{
+        CapabilitySet, CapabilitySets, capabilities, remove_capability_from_bounding_set,
+        set_capabilities,
+    },
+};
 
-// Wrapper functions using libc since rustix doesn't expose these
-fn setuid(uid: Uid) -> Result<(), rustix::io::Errno> {
-    let ret = unsafe { libc::setuid(uid.as_raw()) };
+// libc wrappers since rustix doesn't expose these in public API
+fn setresuid(ruid: Uid, euid: Uid, suid: Uid) -> Result<(), rustix::io::Errno> {
+    let ret = unsafe { libc::setresuid(ruid.as_raw(), euid.as_raw(), suid.as_raw()) };
     if ret == 0 {
         Ok(())
     } else {
@@ -15,8 +21,8 @@ fn setuid(uid: Uid) -> Result<(), rustix::io::Errno> {
     }
 }
 
-fn setgid(gid: Gid) -> Result<(), rustix::io::Errno> {
-    let ret = unsafe { libc::setgid(gid.as_raw()) };
+fn setresgid(rgid: Gid, egid: Gid, sgid: Gid) -> Result<(), rustix::io::Errno> {
+    let ret = unsafe { libc::setresgid(rgid.as_raw(), egid.as_raw(), sgid.as_raw()) };
     if ret == 0 {
         Ok(())
     } else {
@@ -42,165 +48,121 @@ fn setgroups(groups: &[Gid]) -> Result<(), rustix::io::Errno> {
     }
 }
 
-#[derive(Debug)]
-pub enum Error {
-    CapsRead(caps::errors::CapsError),
-    CapsUpdate(caps::errors::CapsError),
-    DropGroups(rustix::io::Errno),
-    SetGid(rustix::io::Errno),
-    SetUid(rustix::io::Errno),
-}
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::CapsRead(e) => write!(f, "Failed to read process capabilities: {e}"),
-            Self::CapsUpdate(e) => write!(f, "Failed updating process capabilities: {e}"),
-            Self::DropGroups(e) => write!(f, "Failed to drop supplementary groups: {e}"),
-            Self::SetGid(e) => write!(f, "Failed to setgid: {e}"),
-            Self::SetUid(e) => write!(f, "Failed to setuid: {e}"),
-        }
+fn set_bounding_set(caps: CapabilitySet) -> Result<(), rustix::io::Errno> {
+    let caps_to_drop = CapabilitySet::all().difference(caps);
+    for cap in caps_to_drop.iter() {
+        let _ = remove_capability_from_bounding_set(cap);
     }
+    Ok(())
 }
-
-impl std::error::Error for Error {}
 
 #[derive(Debug, PartialEq)]
 enum CapabilityState {
-    // We are either setuid root or the root user
-    Full,
-    // File system based capabilities
-    Partial,
+    Full,    // setuid root or root user
+    Partial, // filesystem-based capabilities
     None,
 }
 
-fn handle_full_capabilities() -> Result<(), Error> {
-    // First, prepare the capability sets we want to end up with
-    let mut ipc_lock_caps = CapsHashSet::new();
-    ipc_lock_caps.insert(Capability::CAP_IPC_LOCK);
-
-    // Clear all capabilities first, but DON'T touch bounding set yet
-    let empty_caps = CapsHashSet::new();
-    caps::set(None, CapSet::Effective, &empty_caps).map_err(Error::CapsUpdate)?;
-    caps::set(None, CapSet::Permitted, &empty_caps).map_err(Error::CapsUpdate)?;
-
-    // Set only CAP_IPC_LOCK in permitted and effective (before identity change)
-    caps::set(None, CapSet::Permitted, &ipc_lock_caps).map_err(Error::CapsUpdate)?;
-    caps::set(None, CapSet::Effective, &ipc_lock_caps).map_err(Error::CapsUpdate)?;
-
-    // Drop supplementary groups first
-    setgroups(&[]).map_err(Error::DropGroups)?;
-
-    // Change to real GID
-    setgid(getgid()).map_err(Error::SetGid)?;
-
-    // Change to real UID (this should be done last)
-    setuid(getuid()).map_err(Error::SetUid)?;
-
-    // NOW we can safely clear the bounding set (after identity change)
-    if let Err(err) = caps::set(None, CapSet::Bounding, &ipc_lock_caps) {
-        tracing::debug!(
-            "Could not clear bounding set (may not be supported): {}",
-            err
-        );
-    }
-
-    Ok(())
-}
-
-fn handle_partial_capabilities() -> Result<(), Error> {
-    let effective_caps = caps::read(None, CapSet::Effective).map_err(Error::CapsRead)?;
-
-    // Check if we have CAP_IPC_LOCK in effective set
-    if !effective_caps.contains(&Capability::CAP_IPC_LOCK) {
-        tracing::warn!("Insufficient process capabilities, insecure memory might get used");
-    }
-
-    // Check if we have CAP_SETPCAP for bounding set manipulation
-    let has_setpcap =
-        caps::has_cap(None, CapSet::Effective, Capability::CAP_SETPCAP).map_err(Error::CapsRead)?;
-
-    // Clear all capabilities first
-    let empty_caps = CapsHashSet::new();
-    caps::set(None, CapSet::Effective, &empty_caps).map_err(Error::CapsUpdate)?;
-    caps::set(None, CapSet::Permitted, &empty_caps).map_err(Error::CapsUpdate)?;
-
-    // Only clear bounding set if we have CAP_SETPCAP
-    if has_setpcap {
-        if let Err(err) = caps::set(None, CapSet::Bounding, &empty_caps) {
-            tracing::warn!("Failed to clear bounding set: {}", err);
-        }
-    }
-
-    // Add only CAP_IPC_LOCK to effective and permitted sets
-    let mut ipc_lock_caps = CapsHashSet::new();
-    ipc_lock_caps.insert(Capability::CAP_IPC_LOCK);
-
-    caps::set(None, CapSet::Effective, &ipc_lock_caps).map_err(Error::CapsUpdate)?;
-    caps::set(None, CapSet::Permitted, &ipc_lock_caps).map_err(Error::CapsUpdate)?;
-
-    // Only set bounding set if we have CAP_SETPCAP and cleared it successfully
-    if has_setpcap {
-        if let Err(err) = caps::set(None, CapSet::Bounding, &ipc_lock_caps) {
-            tracing::warn!("Failed to set bounding set: {}", err);
-        }
-    }
-
-    Ok(())
-}
-
-/// Determines the current capability state of the process
-/// This mirrors the logic from libcap-ng's capng_have_capabilities()
-fn determine_capability_state() -> Result<CapabilityState, Error> {
-    let effective_caps = caps::read(None, CapSet::Effective).map_err(Error::CapsRead)?;
-    let permitted_caps = caps::read(None, CapSet::Permitted).map_err(Error::CapsRead)?;
-    let bounding_caps = caps::read(None, CapSet::Bounding).map_err(Error::CapsRead)?;
-
-    // Check if we have no capabilities at all
-    if permitted_caps.is_empty() && effective_caps.is_empty() {
-        return Ok(CapabilityState::None);
-    }
-
-    // To match libcap-ng logic more closely, check if we have "most" capabilities
-    // This is a heuristic - if we have a substantial number of capabilities,
-    // we're likely in FULL state (setuid root or running as root)
-
-    // Count total unique capabilities across all sets
-    let mut all_caps = permitted_caps.clone();
-    all_caps.extend(&effective_caps);
-    all_caps.extend(&bounding_caps);
-
-    // If we have 10+ capabilities total, likely FULL state
-    // This matches libcap-ng's heuristic more closely than checking specific caps
-    if all_caps.len() >= 10 {
-        Ok(CapabilityState::Full)
-    } else {
-        // Otherwise, we have partial/filesystem-based capabilities
-        Ok(CapabilityState::Partial)
-    }
-}
-
-pub fn drop_unnecessary_capabilities() -> Result<(), Error> {
-    // First, verify we can read capabilities at all (equivalent to CAPNG_FAIL
-    // check)
-    if let Err(e) = caps::read(None, CapSet::Effective) {
-        // Critical error - cannot proceed safely, should abort like C version
+pub fn drop_unnecessary_capabilities() -> Result<(), rustix::io::Errno> {
+    // Abort if we can't read capabilities (libcap-ng CAPNG_FAIL behavior)
+    let caps = capabilities(None).unwrap_or_else(|e| {
         tracing::error!("Error getting process capabilities: {:?}, aborting", e);
         std::process::exit(1);
-    }
+    });
 
-    match determine_capability_state()? {
+    let capability_state = {
+        if caps.permitted.is_empty() && caps.effective.is_empty() {
+            CapabilityState::None
+        } else {
+            let all_caps = caps.effective | caps.permitted | caps.inheritable;
+            // 10+ capabilities = Full (matches libcap-ng heuristic)
+            if all_caps.bits().count_ones() >= 10 {
+                CapabilityState::Full
+            } else {
+                CapabilityState::Partial
+            }
+        }
+    };
+
+    match capability_state {
         CapabilityState::Full => {
-            // We are either setuid root or the root user
-            handle_full_capabilities()?;
+            set_capabilities(
+                None,
+                CapabilitySets {
+                    effective: CapabilitySet::IPC_LOCK,
+                    permitted: CapabilitySet::IPC_LOCK,
+                    inheritable: CapabilitySet::empty(),
+                },
+            )?;
+
+            // Needed so permitted caps survive uid 0 → non-zero transition
+            if unsafe { libc::prctl(libc::PR_SET_KEEPCAPS, 1, 0, 0, 0) } != 0 {
+                tracing::warn!("Failed to set PR_SET_KEEPCAPS");
+            }
+
+            if let Err(err) = set_bounding_set(CapabilitySet::IPC_LOCK) {
+                tracing::debug!("Could not set bounding set (may not be supported): {}", err);
+            }
+
+            let uid = getuid();
+            let gid = getgid();
+
+            setresgid(gid, gid, gid)?;
+            setgroups(&[])?;
+            setresuid(uid, uid, uid)?; // Clears effective caps despite keepcaps
+
+            if unsafe { libc::prctl(libc::PR_SET_KEEPCAPS, 0, 0, 0, 0) } != 0 {
+                tracing::warn!("Failed to clear PR_SET_KEEPCAPS");
+            }
+
+            // Re-raise from permitted → effective
+            set_capabilities(
+                None,
+                CapabilitySets {
+                    effective: CapabilitySet::IPC_LOCK,
+                    permitted: CapabilitySet::IPC_LOCK,
+                    inheritable: CapabilitySet::empty(),
+                },
+            )?;
         }
         CapabilityState::None => {
             tracing::warn!("No process capabilities, insecure memory might get used");
             return Ok(());
         }
         CapabilityState::Partial => {
-            // File system based capabilities
-            handle_partial_capabilities()?;
+            if !caps.effective.contains(CapabilitySet::IPC_LOCK) {
+                tracing::warn!("Insufficient process capabilities, insecure memory might get used");
+            }
+
+            // Clear bounding set if we have CAP_SETPCAP (do this before dropping caps)
+            if caps.effective.contains(CapabilitySet::SETPCAP) {
+                if let Err(err) = set_bounding_set(CapabilitySet::IPC_LOCK) {
+                    tracing::warn!("Failed to set bounding set: {}", err);
+                }
+            }
+
+            set_capabilities(
+                None,
+                CapabilitySets {
+                    effective: CapabilitySet::IPC_LOCK,
+                    permitted: CapabilitySet::IPC_LOCK,
+                    inheritable: CapabilitySet::empty(),
+                },
+            )?;
+        }
+    }
+
+    // After dropping capabilities, try to lock memory
+    // This prevents secrets from being swapped to disk
+    match mlockall(MlockAllFlags::CURRENT | MlockAllFlags::FUTURE) {
+        Ok(_) => {
+            tracing::info!("Successfully locked all memory pages");
+        }
+        Err(e) => {
+            tracing::warn!(
+                "Failed to lock memory pages (secrets may be swapped to disk): {}",
+                e
+            );
         }
     }
 
