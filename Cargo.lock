@@ -310,15 +310,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b35204fbdc0b3f4446b89fc1ac2cf84a8a68971995d0bf2e925ec7cd960f9cb3"
 
 [[package]]
-name = "caps"
-version = "0.5.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd1ddba47aba30b6a889298ad0109c3b8dcb0e8fc993b459daa7067d46f865e0"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "cargo-credential"
 version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1133,7 +1124,6 @@ version = "0.6.0"
 dependencies = [
  "ashpd",
  "base64",
- "caps",
  "clap",
  "enumflags2",
  "formatx",
