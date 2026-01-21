@@ -327,7 +327,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-credential-oo7"
-version = "0.6.0"
+version = "0.6.0-alpha"
 dependencies = [
  "cargo-credential",
  "oo7",
@@ -1068,7 +1068,7 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
 name = "oo7"
-version = "0.6.0"
+version = "0.6.0-alpha"
 dependencies = [
  "aes",
  "ashpd",
@@ -1108,7 +1108,7 @@ dependencies = [
 
 [[package]]
 name = "oo7-cli"
-version = "0.6.0"
+version = "0.6.0-alpha"
 dependencies = [
  "anstyle",
  "clap",
@@ -1121,7 +1121,7 @@ dependencies = [
 
 [[package]]
 name = "oo7-daemon"
-version = "0.6.0"
+version = "0.6.0-alpha"
 dependencies = [
  "ashpd",
  "base64",
@@ -1152,7 +1152,7 @@ dependencies = [
 
 [[package]]
 name = "oo7-macros"
-version = "0.6.0"
+version = "0.6.0-alpha"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1161,7 +1161,7 @@ dependencies = [
 
 [[package]]
 name = "oo7-pam"
-version = "0.6.0"
+version = "0.6.0-alpha"
 dependencies = [
  "libc",
  "serde",
@@ -1177,7 +1177,7 @@ dependencies = [
 
 [[package]]
 name = "oo7-portal"
-version = "0.6.0"
+version = "0.6.0-alpha"
 dependencies = [
  "ashpd",
  "clap",
@@ -1190,7 +1190,7 @@ dependencies = [
 
 [[package]]
 name = "oo7-python"
-version = "0.6.0"
+version = "0.6.0-alpha"
 dependencies = [
  "oo7",
  "pyo3",
